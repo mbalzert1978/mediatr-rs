@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Gibt den gestagten Stand frei, wenn alle Pflicht-Prüfungen grün sind und alle Review-Stempel PASS sagen.
+# Die Freigabe (review_dir <tree>/approved) prüft .githooks/reference-transaction bei jeder Branch-Änderung.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+source scripts/lib.sh
+
+# check.sh prüft das Arbeitsverzeichnis. Das muss genau dem gestagten Stand entsprechen.
+if ! git diff --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
+  echo "pre-commit: Es gibt ungestagte Änderungen. Stage oder stashe sie, dann prüft check.sh genau den Commit." >&2
+  exit 1
+fi
+
+# skip-worktree/assume-unchanged verstecken Unterschiede vor "git diff --quiet".
+# Ausgaben erst in eine Variable: grep -q in einer Pipe kann git per SIGPIPE abbrechen.
+flags=$(git ls-files -v)
+if grep -qE '^(S|[a-z]) ' <<<"$flags"; then
+  echo "pre-commit: Dateien mit skip-worktree/assume-unchanged gefunden. Heb das auf (git update-index --no-skip-worktree/--no-assume-unchanged)." >&2
+  exit 1
+fi
+
+scripts/check.sh
+
+dir=$(review_dir "$(git write-tree)")
+
+# Reviews braucht jeder Commit, der Code oder Testliste ändert.
+files=$(git diff --cached --name-only)
+if grep -qE '^(src/|tests/|examples/|benches/|build\.rs$|TESTLIST\.md$)' <<<"$files"; then
+  missing=""
+  for r in $(reviewer_ids); do
+    if [ "$(head -n 1 "$dir/$r" 2>/dev/null)" != PASS ]; then
+      echo "pre-commit: Kein PASS-Stempel von $(reviewer_agent "$r") für diesen gestagten Stand." >&2
+      missing="$missing $(reviewer_agent "$r")"
+    fi
+  done
+  if [ -n "$missing" ]; then
+    echo "pre-commit: Starte auf dem gestagten Stand:$missing." >&2
+    exit 1
+  fi
+fi
+
+mkdir -p "$dir" && touch "$dir/approved"

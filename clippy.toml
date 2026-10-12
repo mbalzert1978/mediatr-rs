@@ -1,0 +1,18 @@
+# Kleine Funktionen (Clean Code)
+too-many-lines-threshold = 30
+excessive-nesting-threshold = 3
+
+# In #[test]-Funktionen dürfen Tests scheitern lassen
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-indexing-slicing-in-tests = true
+
+# DIP: Abhängigkeiten kommen über Generics oder Felder, nie über globalen Zustand
+disallowed-types = [
+  { path = "std::sync::LazyLock", reason = "globaler Zustand verletzt DIP (docs/rules/solid.md)" },
+  { path = "std::sync::OnceLock", reason = "globaler Zustand verletzt DIP (docs/rules/solid.md)" },
+]
+disallowed-macros = [
+  { path = "std::thread_local", reason = "globaler Zustand verletzt DIP (docs/rules/solid.md)" },
+]

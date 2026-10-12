@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Frühe Rückmeldung zu den Commit-Regeln. Die harte Sperre ist .githooks/reference-transaction.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+scripts/verify-commit.sh "$(git write-tree)" "$(git rev-parse -q --verify HEAD || true)" "$1"

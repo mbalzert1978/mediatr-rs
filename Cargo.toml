@@ -1,0 +1,36 @@
+[package]
+name = "mediatr-rs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+# Regeln, die der Compiler erzwingt. Ausnahme nur per #[expect(lint, reason = "…")].
+[lints.rust]
+missing_docs = "deny"
+missing_debug_implementations = "deny"
+unsafe_code = "forbid"
+
+[lints.clippy]
+pedantic = { level = "deny", priority = -1 }
+# Fehler als Result statt Panic
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+exit = "deny"
+panic_in_result_fn = "deny"
+arithmetic_side_effects = "deny"
+indexing_slicing = "deny"
+let_underscore_must_use = "deny"
+# Ausnahmen brauchen #[expect] mit Grund, #[allow] ist verboten
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
+# Library schreibt nichts auf die Konsole
+dbg_macro = "deny"
+print_stdout = "deny"
+print_stderr = "deny"
+# Schwellwert in clippy.toml
+excessive_nesting = "deny"
