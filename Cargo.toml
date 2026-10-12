@@ -34,3 +34,6 @@ print_stdout = "deny"
 print_stderr = "deny"
 # Schwellwert in clippy.toml
 excessive_nesting = "deny"
+
+[dev-dependencies]
+tokio = { version = "1.53.2", features = ["macros", "rt"] }
