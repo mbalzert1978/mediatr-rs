@@ -3,7 +3,7 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use mediatr_rs::{Mediator, Request, RequestHandler};
+use mediatr_rs::{Mediator, MissingHandler, Request, RequestHandler};
 
 struct Ping(String);
 
@@ -24,9 +24,10 @@ impl RequestHandler<Ping> for PingHandler {
 
 #[tokio::test]
 async fn send_returns_handler_response() {
-    let mediator = Mediator::new(PingHandler);
+    let mut mediator = Mediator::default();
+    mediator.register(PingHandler);
 
-    let response = mediator.send(Ping("Ping".to_owned())).await;
+    let response = mediator.send(Ping("Ping".to_owned())).await.unwrap();
 
     assert_eq!(response, Pong("Ping Pong".to_owned()));
 }
@@ -50,11 +51,21 @@ impl RequestHandler<VoidPing> for VoidPingHandler {
 #[tokio::test]
 async fn send_runs_handler_for_unit_response() {
     let called = Rc::new(Cell::new(false));
-    let mediator = Mediator::new(VoidPingHandler {
+    let mut mediator = Mediator::default();
+    mediator.register(VoidPingHandler {
         called: Rc::clone(&called),
     });
 
-    mediator.send(VoidPing).await;
+    mediator.send(VoidPing).await.unwrap();
 
     assert!(called.get());
+}
+
+#[tokio::test]
+async fn send_without_handler_returns_err() {
+    let mediator = Mediator::default();
+
+    let response = mediator.send(Ping("Ping".to_owned())).await;
+
+    assert_eq!(response, Err(MissingHandler));
 }
