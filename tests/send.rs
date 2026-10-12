@@ -62,6 +62,25 @@ async fn send_runs_handler_for_unit_response() {
 }
 
 #[tokio::test]
+async fn send_reaches_only_handler_of_its_request_type() {
+    let called = Rc::new(Cell::new(false));
+    let mut mediator = Mediator::default();
+    mediator.register(PingHandler);
+    mediator.register(VoidPingHandler {
+        called: Rc::clone(&called),
+    });
+
+    let response = mediator.send(Ping("Ping".to_owned())).await.unwrap();
+
+    assert_eq!(response, Pong("Ping Pong".to_owned()));
+    assert!(!called.get());
+
+    mediator.send(VoidPing).await.unwrap();
+
+    assert!(called.get());
+}
+
+#[tokio::test]
 async fn send_without_handler_returns_err() {
     let mediator = Mediator::default();
 
