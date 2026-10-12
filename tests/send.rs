@@ -1,5 +1,8 @@
 //! Tests für den Abschnitt „Request/Handler — `send`“ in `TESTLIST.md`.
 
+use std::cell::Cell;
+use std::rc::Rc;
+
 use mediatr_rs::{Mediator, Request, RequestHandler};
 
 struct Ping(String);
@@ -26,4 +29,32 @@ async fn send_returns_handler_response() {
     let response = mediator.send(Ping("Ping".to_owned())).await;
 
     assert_eq!(response, Pong("Ping Pong".to_owned()));
+}
+
+struct VoidPing;
+
+impl Request for VoidPing {
+    type Response = ();
+}
+
+struct VoidPingHandler {
+    called: Rc<Cell<bool>>,
+}
+
+impl RequestHandler<VoidPing> for VoidPingHandler {
+    async fn handle(&self, _request: VoidPing) {
+        self.called.set(true);
+    }
+}
+
+#[tokio::test]
+async fn send_runs_handler_for_unit_response() {
+    let called = Rc::new(Cell::new(false));
+    let mediator = Mediator::new(VoidPingHandler {
+        called: Rc::clone(&called),
+    });
+
+    mediator.send(VoidPing).await;
+
+    assert!(called.get());
 }
