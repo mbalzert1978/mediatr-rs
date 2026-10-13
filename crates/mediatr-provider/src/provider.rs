@@ -50,13 +50,7 @@ impl Provider {
     pub fn get<T: 'static>(&self) -> Option<Rc<T>> {
         let id = TypeId::of::<T>();
         let recipe = self.services.get(&id)?.downcast_ref::<Recipe<T>>()?;
-        if !self.building.borrow_mut().insert(id) {
-            return None;
-        }
-        let _building = Building {
-            types: &self.building,
-            id,
-        };
+        let _building = Building::enter(&self.building, id)?;
         Some(recipe(self))
     }
 
@@ -134,6 +128,16 @@ impl ProviderBuilder {
 struct Building<'a> {
     types: &'a RefCell<HashSet<TypeId>>,
     id: TypeId,
+}
+
+impl<'a> Building<'a> {
+    /// Trägt `id` in `types` ein; `None`, wenn `id` dort schon steht.
+    fn enter(types: &'a RefCell<HashSet<TypeId>>, id: TypeId) -> Option<Self> {
+        if !types.borrow_mut().insert(id) {
+            return None;
+        }
+        Some(Self { types, id })
+    }
 }
 
 impl Drop for Building<'_> {
