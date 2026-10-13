@@ -205,6 +205,37 @@ fn upgrade_after_scope_dropped_returns_none() {
     assert!(weak.upgrade().is_none());
 }
 
+/// Bündelt die Änderungen einer Anfrage; merkt sich ihren Scope, um später Dienste zu holen.
+struct UnitOfWork {
+    _scope: WeakProvider,
+    /// Steht auf `false`, sobald die Arbeitseinheit freigegeben ist.
+    open: Rc<Cell<bool>>,
+}
+
+impl Drop for UnitOfWork {
+    fn drop(&mut self) {
+        self.open.set(false);
+    }
+}
+
+#[test]
+fn scoped_holding_weak_scope_is_released_with_scope() {
+    let open = Rc::new(Cell::new(true));
+    let flag = Rc::clone(&open);
+    let provider = Provider::builder()
+        .scoped(move |scope| UnitOfWork {
+            _scope: scope.downgrade(),
+            open: Rc::clone(&flag),
+        })
+        .build();
+    let scope = provider.scope();
+    scope.get::<UnitOfWork>().unwrap();
+
+    drop(scope);
+
+    assert!(!open.get());
+}
+
 /// Einstellungen, die sich beim Bau auf übergeordnete Einstellungen stützen, falls es welche gibt.
 struct Settings {
     parent: Option<Rc<Settings>>,
