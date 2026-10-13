@@ -2,7 +2,9 @@
 
 mod erased;
 mod mediator;
+mod notification;
 mod request;
 
-pub use mediator::{Mediator, MediatorBuilder, SendError, Sender, WeakMediator};
+pub use mediator::{Mediator, MediatorBuilder, Publisher, SendError, Sender, WeakMediator};
+pub use notification::Notification;
 pub use request::{Request, RequestHandler};

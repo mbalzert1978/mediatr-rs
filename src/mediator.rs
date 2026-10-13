@@ -1,4 +1,4 @@
-//! Der Mediator leitet einen Request an seinen Handler weiter.
+//! Der Mediator stellt Nachrichten ihren Handlern zu.
 
 use std::error::Error;
 use std::fmt;
@@ -8,11 +8,11 @@ use mediatr_provider::{Provider, ProviderBuilder, WeakProvider};
 
 use crate::erased::{ErasedHandler, erase};
 use crate::request::HandlerResult;
-use crate::{Request, RequestHandler};
+use crate::{Notification, Request, RequestHandler};
 
-/// Leitet Requests an den Handler weiter, der für ihren Typ registriert ist.
+/// Stellt Requests und Notifications den Handlern zu, die für ihren Typ registriert sind.
 ///
-/// Entsteht über [`Mediator::builder`]. Verschickt wird über [`Sender`].
+/// Entsteht über [`Mediator::builder`]. Verschickt wird über [`Sender`] und [`Publisher`].
 #[derive(Debug, Clone)]
 pub struct Mediator {
     provider: Provider,
@@ -47,7 +47,21 @@ pub trait Sender<R: Request> {
     fn send(&self, request: R) -> impl Future<Output = Result<R::Response, R::Error>>;
 }
 
-/// Warum [`Sender::send`] einen Request nicht zustellen kann; `send` liefert ihn als `R::Error`.
+/// Meldet Notifications vom Typ `N` an alle ihre Handler; ein Handler bekommt einen Publisher per Konstruktor.
+///
+/// # Vertrag
+///
+/// `publish` liefert `Ok(())` oder einen Fehler und löst keine Panic aus.
+pub trait Publisher<N: Notification> {
+    /// Meldet `notification` an alle ihre Handler.
+    ///
+    /// # Errors
+    ///
+    /// Einen [`SendError`] als `N::Error`, wenn `publish` die Notification nicht zustellen kann.
+    fn publish(&self, notification: N) -> impl Future<Output = Result<(), N::Error>>;
+}
+
+/// Warum [`Sender::send`] oder [`Publisher::publish`] eine Nachricht nicht zustellen kann; beide liefern ihn als Fehlertyp der Nachricht.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum SendError {
@@ -72,6 +86,12 @@ impl<R: Request + 'static> Sender<R> for Mediator {
             .get::<ErasedHandler<R>>()
             .ok_or(SendError::NoHandler)?;
         handler(request).await
+    }
+}
+
+impl<N: Notification> Publisher<N> for Mediator {
+    async fn publish(&self, _notification: N) -> Result<(), N::Error> {
+        Ok(())
     }
 }
 

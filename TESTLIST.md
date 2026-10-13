@@ -59,3 +59,19 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] Schwacher Verweis auf einen lebenden Scope → `upgrade` liefert einen Provider, der denselben `scoped`-Dienst liefert wie der Scope · `upgraded_weak_scope_returns_same_scoped_service`
 - [x] Bauanleitung von `scoped` merkt sich den Scope schwach, der Scope fällt weg, der Provider lebt → der Dienst wird freigegeben (sein `Drop` läuft) · `scoped_holding_weak_scope_is_released_with_scope`
 - [x] `scoped`-Dienst, abgefragt beim Provider selbst, hält ein Singleton, das sich den Provider schwach merkt; der Provider fällt weg → beide werden freigegeben (ihr `Drop` läuft) · `scoped_service_and_its_singleton_with_weak_provider_are_released_with_provider`
+
+## Notification — `publish`
+
+Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `NotificationHandlerTests.cs`; Standard-Publisher `ForeachAwaitPublisher` (nacheinander, erster Fehler stoppt). Gleichzeitiges Ausführen (`TaskWhenAllPublisher`) bekommt einen eigenen Abschnitt.
+
+- [ ] Notification mit einem registrierten Handler → `publish` führt den Handler aus
+- [ ] Notification mit zwei Handlern → beide laufen, in der Reihenfolge der Registrierung
+- [x] Notification ohne registrierten Handler → `publish` liefert `Ok(())`, kein Panic · `publish_without_handler_returns_ok`
+- [ ] Zwei Notification-Typen mit je eigenem Handler → jede Notification erreicht nur ihre Handler
+- [ ] Erster Handler wartet (`await`), bevor er fertig ist → der zweite Handler startet erst danach
+- [ ] Erster von zwei Handlern liefert einen Fehler → `publish` gibt genau diesen Fehler zurück, der zweite Handler läuft nicht
+- [ ] Derselbe Handler-Typ zweimal für dieselbe Notification registriert → `publish` führt ihn einmal aus, und zwar den zuletzt registrierten
+- [ ] Request-Handler bekommt einen Publisher per Konstruktor und meldet darüber ein Ereignis → die Handler dieser Notification laufen
+- [ ] Handler, der einen Publisher per Konstruktor bekommt, wird ohne Mediator getestet und bekommt eine Attrappe → die Attrappe sieht die gemeldete Notification
+- [ ] Handler mit Publisher ist als `singleton` registriert und meldet eine Notification, nachdem der Mediator weggefallen ist → `publish` liefert `Err(SendError::MediatorDropped)`, kein Panic
+- [ ] Fehler von `publish` → lässt sich mit `?` als `Box<dyn std::error::Error>` weitergeben
