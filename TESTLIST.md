@@ -54,3 +54,5 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] Bauanleitung von `singleton` merkt sich den Provider schwach, der Provider fällt weg → das Singleton wird freigegeben (sein `Drop` läuft) · `singleton_holding_weak_provider_is_released_with_provider`
 - [ ] Schwacher Verweis, nachdem der Provider weggefallen ist → `upgrade` liefert `None`
 - [ ] Schwacher Verweis auf einen Scope, der Scope fällt weg, der Provider lebt → `upgrade` liefert `None`
+- [ ] Bauanleitung von `scoped` merkt sich den Scope schwach, der Scope fällt weg, der Provider lebt → der Dienst wird freigegeben (sein `Drop` läuft)
+- [ ] `scoped`-Dienst, abgefragt beim Provider selbst, hält ein Singleton, das sich den Provider schwach merkt; der Provider fällt weg → beide werden freigegeben (ihr `Drop` läuft)
