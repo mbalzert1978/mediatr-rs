@@ -42,7 +42,7 @@ struct Shared {
 #[derive(Debug, Clone)]
 pub struct WeakProvider {
     shared: Weak<Shared>,
-    built: Rc<Built>,
+    built: Weak<Built>,
 }
 
 /// Sammelt Dienste und baut daraus einen [`Provider`].
@@ -83,7 +83,7 @@ impl Provider {
     pub fn downgrade(&self) -> WeakProvider {
         WeakProvider {
             shared: Rc::downgrade(&self.shared),
-            built: Rc::clone(&self.built),
+            built: Rc::downgrade(&self.built),
         }
     }
 
@@ -97,12 +97,12 @@ impl Provider {
 }
 
 impl WeakProvider {
-    /// Liefert den Provider, auf den dieser Verweis zeigt; `None`, wenn er weggefallen ist.
+    /// Liefert den Provider oder Scope, auf den dieser Verweis zeigt; `None`, wenn er weggefallen ist.
     #[must_use]
     pub fn upgrade(&self) -> Option<Provider> {
         Some(Provider {
             shared: self.shared.upgrade()?,
-            built: Rc::clone(&self.built),
+            built: self.built.upgrade()?,
         })
     }
 }

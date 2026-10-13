@@ -186,10 +186,21 @@ fn singleton_holding_weak_provider_is_released_with_provider() {
 
 #[test]
 fn upgrade_after_provider_dropped_returns_none() {
-    let provider = Provider::builder().singleton(|_| Config).build();
+    let provider = Provider::builder().build();
     let weak = provider.downgrade();
 
     drop(provider);
+
+    assert!(weak.upgrade().is_none());
+}
+
+#[test]
+fn upgrade_after_scope_dropped_returns_none() {
+    let provider = Provider::builder().build();
+    let scope = provider.scope();
+    let weak = scope.downgrade();
+
+    drop(scope);
 
     assert!(weak.upgrade().is_none());
 }
