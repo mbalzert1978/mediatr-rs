@@ -77,23 +77,37 @@ fn scoped_runs_recipe_once_per_scope() {
     assert_eq!(calls.get(), 2);
 }
 
-/// Liefert eine Bauanleitung für `Config` und den Zähler ihrer Läufe.
-fn counting_recipe() -> (Rc<Cell<u32>>, impl Fn() -> Config) {
-    let calls = Rc::new(Cell::new(0_u32));
-    let counter = Rc::clone(&calls);
-    let recipe = move || {
-        counter.set(counter.get().saturating_add(1));
-        Config
-    };
-    (calls, recipe)
-}
-
 #[test]
 fn singleton_returns_same_object_in_new_scope() {
-    let provider = Provider::builder().singleton(|| Config).build();
+    let provider = Provider::builder().singleton(|_| Config).build();
 
     let first = provider.get::<Config>().unwrap();
     let second = provider.scope().get::<Config>().unwrap();
 
     assert!(Rc::ptr_eq(&first, &second));
+}
+
+struct Greeting(String);
+
+#[test]
+fn recipe_gets_other_service_from_provider() {
+    let provider = Provider::builder()
+        .instance(Name("Welt"))
+        .transient(|provider| Greeting(format!("Hallo {}", provider.get::<Name>().unwrap().0)))
+        .build();
+
+    let greeting = provider.get::<Greeting>().unwrap();
+
+    assert_eq!(greeting.0, "Hallo Welt");
+}
+
+/// Liefert eine Bauanleitung für `Config` und den Zähler ihrer Läufe.
+fn counting_recipe() -> (Rc<Cell<u32>>, impl Fn(&Provider) -> Config) {
+    let calls = Rc::new(Cell::new(0_u32));
+    let counter = Rc::clone(&calls);
+    let recipe = move |_: &Provider| {
+        counter.set(counter.get().saturating_add(1));
+        Config
+    };
+    (calls, recipe)
 }

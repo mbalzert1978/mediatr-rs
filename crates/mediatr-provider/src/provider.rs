@@ -12,10 +12,10 @@ type Services = HashMap<TypeId, Rc<dyn Any>>;
 /// Dienste, die ein Scope schon gebaut hat, je Typ einer.
 type Built = RefCell<HashMap<TypeId, Rc<dyn Any>>>;
 
-/// Liefert bei jedem Aufruf einen Dienst vom Typ `T`, gebaut oder gemerkt im übergebenen Scope.
+/// Liefert bei jedem Aufruf einen Dienst vom Typ `T`, gebaut mit dem übergebenen Provider oder gemerkt in seinem Scope.
 // dyn: `get` kennt nur `T`, nicht den Typ der Bauanleitung. Bauanleitungen verschiedener
 // Typen (aus `instance`, `transient`, `singleton`, `scoped`) liegen deshalb hinter einem gemeinsamen Typ je `T`.
-type Recipe<T> = Box<dyn Fn(&Built) -> Rc<T>>;
+type Recipe<T> = Box<dyn Fn(&Provider) -> Rc<T>>;
 
 /// Liefert Dienste nach ihrem Typ.
 ///
@@ -27,6 +27,8 @@ pub struct Provider {
 }
 
 /// Sammelt Dienste und baut daraus einen [`Provider`].
+///
+/// Eine Bauanleitung bekommt den abfragenden Provider und holt darüber andere Dienste.
 #[derive(Debug, Clone, Default)]
 pub struct ProviderBuilder {
     services: Services,
@@ -46,7 +48,7 @@ impl Provider {
             .services
             .get(&TypeId::of::<T>())?
             .downcast_ref::<Recipe<T>>()?;
-        Some(recipe(&self.built))
+        Some(recipe(self))
     }
 
     /// Beginnt einen neuen Scope mit denselben Diensten; `scoped`-Dienste baut er neu.
@@ -69,21 +71,21 @@ impl ProviderBuilder {
 
     /// Registriert `recipe`; jede Abfrage baut den Dienst damit neu.
     #[must_use]
-    pub fn transient<T: 'static>(self, recipe: impl Fn() -> T + 'static) -> Self {
-        self.recipe(move |_| Rc::new(recipe()))
+    pub fn transient<T: 'static>(self, recipe: impl Fn(&Provider) -> T + 'static) -> Self {
+        self.recipe(move |provider| Rc::new(recipe(provider)))
     }
 
     /// Registriert `recipe`; die erste Abfrage baut den Dienst, jede weitere liefert dasselbe Objekt.
     #[must_use]
-    pub fn singleton<T: 'static>(self, recipe: impl Fn() -> T + 'static) -> Self {
+    pub fn singleton<T: 'static>(self, recipe: impl Fn(&Provider) -> T + 'static) -> Self {
         let service = OnceCell::new();
-        self.recipe(move |_| Rc::clone(service.get_or_init(|| Rc::new(recipe()))))
+        self.recipe(move |provider| Rc::clone(service.get_or_init(|| Rc::new(recipe(provider)))))
     }
 
     /// Registriert `recipe`; die erste Abfrage in einem Scope baut den Dienst, jede weitere im selben Scope liefert dasselbe Objekt.
     #[must_use]
-    pub fn scoped<T: 'static>(self, recipe: impl Fn() -> T + 'static) -> Self {
-        self.recipe(move |built| scoped_service(built, &recipe))
+    pub fn scoped<T: 'static>(self, recipe: impl Fn(&Provider) -> T + 'static) -> Self {
+        self.recipe(move |provider| scoped_service(provider, &recipe))
     }
 
     /// Baut den Provider mit allen registrierten Diensten.
@@ -95,23 +97,25 @@ impl ProviderBuilder {
         }
     }
 
-    fn recipe<T: 'static>(mut self, recipe: impl Fn(&Built) -> Rc<T> + 'static) -> Self {
+    fn recipe<T: 'static>(mut self, recipe: impl Fn(&Provider) -> Rc<T> + 'static) -> Self {
         let recipe: Recipe<T> = Box::new(recipe);
         self.services.insert(TypeId::of::<T>(), Rc::new(recipe));
         self
     }
 }
 
-/// Liefert den Dienst vom Typ `T` aus `built`; fehlt er dort, baut `recipe` ihn, und `built` merkt ihn sich.
-fn scoped_service<T: 'static>(built: &Built, recipe: impl Fn() -> T) -> Rc<T> {
+/// Liefert den Dienst vom Typ `T` aus dem Scope von `provider`; fehlt er dort, baut `recipe` ihn, und der Scope merkt ihn sich.
+fn scoped_service<T: 'static>(provider: &Provider, recipe: impl Fn(&Provider) -> T) -> Rc<T> {
     let id = TypeId::of::<T>();
-    let cached = built
+    let cached = provider
+        .built
         .borrow()
         .get(&id)
         .and_then(|service| Rc::clone(service).downcast().ok());
     cached.unwrap_or_else(|| {
-        let service = Rc::new(recipe());
-        built
+        let service = Rc::new(recipe(provider));
+        provider
+            .built
             .borrow_mut()
             .insert(id, Rc::clone(&service) as Rc<dyn Any>);
         service
