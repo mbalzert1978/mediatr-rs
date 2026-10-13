@@ -1,5 +1,6 @@
 //! Tests für den Abschnitt „Provider-Crate `mediatr-provider`“ in `TESTLIST.md`.
 
+use std::cell::Cell;
 use std::rc::Rc;
 
 use mediatr_provider::Provider;
@@ -37,4 +38,21 @@ fn instance_twice_returns_last_registered_service() {
     let name = provider.get::<Name>().unwrap();
 
     assert_eq!(name.0, "neu");
+}
+
+#[test]
+fn transient_runs_recipe_on_every_get() {
+    let calls = Rc::new(Cell::new(0_u32));
+    let counter = Rc::clone(&calls);
+    let provider = Provider::builder()
+        .transient(move || {
+            counter.set(counter.get().saturating_add(1));
+            Config
+        })
+        .build();
+
+    provider.get::<Config>().unwrap();
+    provider.get::<Config>().unwrap();
+
+    assert_eq!(calls.get(), 2);
 }

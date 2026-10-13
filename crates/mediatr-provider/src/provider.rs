@@ -4,9 +4,14 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::rc::Rc;
 
-/// Dienste verschiedener Typen, je Typ einer.
+/// Bauanleitungen verschiedener Typen, je Typ eine; jede ist ein [`Recipe`] ihres Typs.
 // Rc reicht, solange kein Testlisten-Punkt Threads verlangt; dann Arc.
 type Services = HashMap<TypeId, Rc<dyn Any>>;
+
+/// Liefert bei jedem Aufruf einen Dienst vom Typ `T`.
+// dyn: `get` kennt nur `T`, nicht den Typ der Bauanleitung. Bauanleitungen verschiedener
+// Typen (aus `instance`, `transient`) liegen deshalb hinter einem gemeinsamen Typ je `T`.
+type Recipe<T> = Box<dyn Fn() -> Rc<T>>;
 
 /// Liefert Dienste nach ihrem Typ.
 ///
@@ -32,18 +37,26 @@ impl Provider {
     /// Liefert den Dienst vom Typ `T`.
     #[must_use]
     pub fn get<T: 'static>(&self) -> Option<Rc<T>> {
-        Rc::clone(self.services.get(&TypeId::of::<T>())?)
-            .downcast()
-            .ok()
+        let recipe = self
+            .services
+            .get(&TypeId::of::<T>())?
+            .downcast_ref::<Recipe<T>>()?;
+        Some(recipe())
     }
 }
 
 impl ProviderBuilder {
     /// Registriert `service`; jede Abfrage liefert dasselbe Objekt.
     #[must_use]
-    pub fn instance<T: 'static>(mut self, service: T) -> Self {
-        self.services.insert(TypeId::of::<T>(), Rc::new(service));
-        self
+    pub fn instance<T: 'static>(self, service: T) -> Self {
+        let service = Rc::new(service);
+        self.recipe(move || Rc::clone(&service))
+    }
+
+    /// Registriert `recipe`; jede Abfrage baut den Dienst damit neu.
+    #[must_use]
+    pub fn transient<T: 'static>(self, recipe: impl Fn() -> T + 'static) -> Self {
+        self.recipe(move || Rc::new(recipe()))
     }
 
     /// Baut den Provider mit allen registrierten Diensten.
@@ -52,5 +65,11 @@ impl ProviderBuilder {
         Provider {
             services: self.services,
         }
+    }
+
+    fn recipe<T: 'static>(mut self, recipe: impl Fn() -> Rc<T> + 'static) -> Self {
+        let recipe: Recipe<T> = Box::new(recipe);
+        self.services.insert(TypeId::of::<T>(), Rc::new(recipe));
+        self
     }
 }
