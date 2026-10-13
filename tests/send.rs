@@ -33,6 +33,25 @@ async fn send_returns_handler_response() {
     assert_eq!(response, Pong("Ping Pong".to_owned()));
 }
 
+struct ReplacementPingHandler;
+
+impl RequestHandler<Ping> for ReplacementPingHandler {
+    async fn handle(&self, request: Ping) -> Result<Pong, MissingHandler> {
+        Ok(Pong(format!("{} Replacement", request.0)))
+    }
+}
+
+#[tokio::test]
+async fn register_twice_keeps_last_handler() {
+    let mut mediator = Mediator::default();
+    mediator.register(PingHandler);
+    mediator.register(ReplacementPingHandler);
+
+    let response = mediator.send(Ping("Ping".to_owned())).await.unwrap();
+
+    assert_eq!(response, Pong("Ping Replacement".to_owned()));
+}
+
 struct VoidPing;
 
 impl Request for VoidPing {
