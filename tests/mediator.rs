@@ -58,7 +58,8 @@ struct Confirmation {
 
 #[derive(Debug)]
 enum OrderError {
-    CustomerNotFound,
+    /// Der Kunde ließ sich nicht holen; der Grund bleibt erhalten.
+    Customer(CustomerError),
     MissingHandler,
 }
 
@@ -70,10 +71,7 @@ impl From<MissingHandler> for OrderError {
 
 impl From<CustomerError> for OrderError {
     fn from(error: CustomerError) -> Self {
-        match error {
-            CustomerError::NotFound => Self::CustomerNotFound,
-            CustomerError::MissingHandler => Self::MissingHandler,
-        }
+        Self::Customer(error)
     }
 }
 
@@ -133,4 +131,24 @@ async fn handler_processes_data_fetched_through_injected_sender() {
             total: 90,
         }
     );
+}
+
+#[tokio::test]
+async fn handler_wraps_failed_inner_request_in_own_error() {
+    let mediator = Mediator::builder()
+        .register(CustomerDirectory { customers: vec![] })
+        .transient(|sender| PlaceOrderHandler { sender })
+        .build();
+
+    let result = mediator
+        .send(PlaceOrder {
+            customer_id: 7,
+            amount: 100,
+        })
+        .await;
+
+    assert!(matches!(
+        result,
+        Err(OrderError::Customer(CustomerError::NotFound))
+    ));
 }
