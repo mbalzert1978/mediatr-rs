@@ -1,6 +1,7 @@
 //! Der Provider liefert Dienste, die sein Builder registriert hat.
 
 use std::any::{Any, TypeId};
+use std::cell::OnceCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -10,7 +11,7 @@ type Services = HashMap<TypeId, Rc<dyn Any>>;
 
 /// Liefert bei jedem Aufruf einen Dienst vom Typ `T`.
 // dyn: `get` kennt nur `T`, nicht den Typ der Bauanleitung. Bauanleitungen verschiedener
-// Typen (aus `instance`, `transient`) liegen deshalb hinter einem gemeinsamen Typ je `T`.
+// Typen (aus `instance`, `transient`, `singleton`) liegen deshalb hinter einem gemeinsamen Typ je `T`.
 type Recipe<T> = Box<dyn Fn() -> Rc<T>>;
 
 /// Liefert Dienste nach ihrem Typ.
@@ -57,6 +58,13 @@ impl ProviderBuilder {
     #[must_use]
     pub fn transient<T: 'static>(self, recipe: impl Fn() -> T + 'static) -> Self {
         self.recipe(move || Rc::new(recipe()))
+    }
+
+    /// Registriert `recipe`; die erste Abfrage baut den Dienst, jede weitere liefert dasselbe Objekt.
+    #[must_use]
+    pub fn singleton<T: 'static>(self, recipe: impl Fn() -> T + 'static) -> Self {
+        let service = OnceCell::new();
+        self.recipe(move || Rc::clone(service.get_or_init(|| Rc::new(recipe()))))
     }
 
     /// Baut den Provider mit allen registrierten Diensten.

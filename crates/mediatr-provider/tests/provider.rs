@@ -56,3 +56,21 @@ fn transient_runs_recipe_on_every_get() {
 
     assert_eq!(calls.get(), 2);
 }
+
+#[test]
+fn singleton_runs_recipe_once_on_first_get() {
+    let calls = Rc::new(Cell::new(0_u32));
+    let counter = Rc::clone(&calls);
+    let provider = Provider::builder()
+        .singleton(move || {
+            counter.set(counter.get().saturating_add(1));
+            Config
+        })
+        .build();
+    assert_eq!(calls.get(), 0);
+
+    provider.get::<Config>().unwrap();
+    provider.get::<Config>().unwrap();
+
+    assert_eq!(calls.get(), 1);
+}
