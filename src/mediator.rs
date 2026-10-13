@@ -9,7 +9,7 @@ pub struct Mediator {
     registry: Registry,
 }
 
-/// Fehler von [`Mediator::send`]: Für den Request-Typ ist kein Handler registriert.
+/// Für den Request-Typ ist kein Handler registriert; [`Mediator::send`] liefert ihn als `R::Error`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MissingHandler;
 
@@ -27,12 +27,10 @@ impl Mediator {
     ///
     /// # Errors
     ///
-    /// [`MissingHandler`], wenn für `R` kein Handler registriert ist.
-    pub async fn send<R: Request + 'static>(
-        &self,
-        request: R,
-    ) -> Result<R::Response, MissingHandler> {
+    /// Den Fehler des Handlers, oder [`MissingHandler`] als `R::Error`,
+    /// wenn für `R` kein Handler registriert ist.
+    pub async fn send<R: Request + 'static>(&self, request: R) -> Result<R::Response, R::Error> {
         let handler = self.registry.get::<R>().ok_or(MissingHandler)?;
-        Ok(handler(request).await)
+        handler(request).await
     }
 }

@@ -12,13 +12,14 @@ struct Pong(String);
 
 impl Request for Ping {
     type Response = Pong;
+    type Error = MissingHandler;
 }
 
 struct PingHandler;
 
 impl RequestHandler<Ping> for PingHandler {
-    async fn handle(&self, request: Ping) -> Pong {
-        Pong(format!("{} Pong", request.0))
+    async fn handle(&self, request: Ping) -> Result<Pong, MissingHandler> {
+        Ok(Pong(format!("{} Pong", request.0)))
     }
 }
 
@@ -36,6 +37,7 @@ struct VoidPing;
 
 impl Request for VoidPing {
     type Response = ();
+    type Error = MissingHandler;
 }
 
 struct VoidPingHandler {
@@ -43,8 +45,9 @@ struct VoidPingHandler {
 }
 
 impl RequestHandler<VoidPing> for VoidPingHandler {
-    async fn handle(&self, _request: VoidPing) {
+    async fn handle(&self, _request: VoidPing) -> Result<(), MissingHandler> {
         self.called.set(true);
+        Ok(())
     }
 }
 
@@ -87,4 +90,41 @@ async fn send_without_handler_returns_err() {
     let response = mediator.send(Ping("Ping".to_owned())).await;
 
     assert_eq!(response, Err(MissingHandler));
+}
+
+struct Reject;
+
+#[derive(Debug, PartialEq)]
+enum RejectError {
+    MissingHandler,
+    Rejected,
+}
+
+impl From<MissingHandler> for RejectError {
+    fn from(_: MissingHandler) -> Self {
+        Self::MissingHandler
+    }
+}
+
+impl Request for Reject {
+    type Response = ();
+    type Error = RejectError;
+}
+
+struct RejectHandler;
+
+impl RequestHandler<Reject> for RejectHandler {
+    async fn handle(&self, _request: Reject) -> Result<(), RejectError> {
+        Err(RejectError::Rejected)
+    }
+}
+
+#[tokio::test]
+async fn send_returns_handler_error() {
+    let mut mediator = Mediator::default();
+    mediator.register(RejectHandler);
+
+    let response = mediator.send(Reject).await;
+
+    assert_eq!(response, Err(RejectError::Rejected));
 }
