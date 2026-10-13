@@ -154,17 +154,19 @@ fn upgraded_weak_provider_returns_same_singleton() {
     ));
 }
 
+/// Meldet über den geteilten Schalter, ob der Dienst noch lebt, der ihn hält: Sein `Drop` setzt ihn auf `false`.
+struct Alive(Rc<Cell<bool>>);
+
+impl Drop for Alive {
+    fn drop(&mut self) {
+        self.0.set(false);
+    }
+}
+
 /// Plant Aufgaben für die ganze Anwendung; merkt sich den Provider, um später Dienste zu holen.
 struct Scheduler {
     _provider: WeakProvider,
-    /// Steht auf `false`, sobald der Scheduler freigegeben ist.
-    running: Rc<Cell<bool>>,
-}
-
-impl Drop for Scheduler {
-    fn drop(&mut self) {
-        self.running.set(false);
-    }
+    _alive: Alive,
 }
 
 #[test]
@@ -174,7 +176,7 @@ fn singleton_holding_weak_provider_is_released_with_provider() {
     let provider = Provider::builder()
         .singleton(move |provider| Scheduler {
             _provider: provider.downgrade(),
-            running: Rc::clone(&flag),
+            _alive: Alive(Rc::clone(&flag)),
         })
         .build();
     provider.get::<Scheduler>().unwrap();
@@ -221,14 +223,7 @@ fn upgrade_after_scope_dropped_returns_none() {
 /// Bündelt die Änderungen einer Anfrage; merkt sich ihren Scope, um später Dienste zu holen.
 struct UnitOfWork {
     _scope: WeakProvider,
-    /// Steht auf `false`, sobald die Arbeitseinheit freigegeben ist.
-    open: Rc<Cell<bool>>,
-}
-
-impl Drop for UnitOfWork {
-    fn drop(&mut self) {
-        self.open.set(false);
-    }
+    _alive: Alive,
 }
 
 #[test]
@@ -238,7 +233,7 @@ fn scoped_holding_weak_scope_is_released_with_scope() {
     let provider = Provider::builder()
         .scoped(move |scope| UnitOfWork {
             _scope: scope.downgrade(),
-            open: Rc::clone(&flag),
+            _alive: Alive(Rc::clone(&flag)),
         })
         .build();
     let scope = provider.scope();
@@ -247,6 +242,34 @@ fn scoped_holding_weak_scope_is_released_with_scope() {
     drop(scope);
 
     assert!(!open.get());
+}
+
+/// Ein Bericht, der seine Aufgaben über den Scheduler plant.
+struct Report {
+    _scheduler: Rc<Scheduler>,
+    _alive: Alive,
+}
+
+#[test]
+fn scoped_service_and_its_singleton_with_weak_provider_are_released_with_provider() {
+    let running = Rc::new(Cell::new(true));
+    let open = Rc::new(Cell::new(true));
+    let (running_flag, open_flag) = (Rc::clone(&running), Rc::clone(&open));
+    let provider = Provider::builder()
+        .singleton(move |provider| Scheduler {
+            _provider: provider.downgrade(),
+            _alive: Alive(Rc::clone(&running_flag)),
+        })
+        .scoped(move |provider| Report {
+            _scheduler: provider.get::<Scheduler>().unwrap(),
+            _alive: Alive(Rc::clone(&open_flag)),
+        })
+        .build();
+    provider.get::<Report>().unwrap();
+
+    drop(provider);
+
+    assert!(!running.get() && !open.get());
 }
 
 /// Einstellungen, die sich beim Bau auf übergeordnete Einstellungen stützen, falls es welche gibt.
