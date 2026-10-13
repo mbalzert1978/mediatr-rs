@@ -17,7 +17,9 @@ if [ -n "$reason" ] && [ "$reviewer" != testlist ]; then
   echo "Nur der testlist-Reviewer bestätigt einen Ohne-Testliste-Grund" >&2; exit 2
 fi
 
-dir=$(review_dir "$(git write-tree)")
+# Eigene Zuweisung: Nur so bricht set -e ab, wenn write-tree scheitert (z. B. index.lock belegt).
+tree=$(git write-tree)
+dir=$(review_dir "$tree")
 if [ "$(head -n 1 "$dir/$reviewer" 2>/dev/null)" = FAIL ] && [ "$verdict" = PASS ]; then
   echo "Für diesen Stand steht schon FAIL. Erst den Code ändern, dann neu prüfen." >&2; exit 1
 fi
