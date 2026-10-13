@@ -231,14 +231,8 @@ struct Connection;
 
 #[test]
 fn recipe_runs_again_after_caught_panic() {
-    let server_up = Rc::new(Cell::new(false));
-    let reachable = Rc::clone(&server_up);
-    let provider = Provider::builder()
-        .transient(move |_| {
-            assert!(reachable.get(), "Server nicht erreichbar");
-            Connection
-        })
-        .build();
+    let (server_up, recipe) = connection_recipe();
+    let provider = Provider::builder().transient(recipe).build();
     let failed = panic::catch_unwind(AssertUnwindSafe(|| provider.get::<Connection>()));
     assert!(failed.is_err());
     server_up.set(true);
@@ -250,14 +244,8 @@ fn recipe_runs_again_after_caught_panic() {
 
 #[test]
 fn singleton_recipe_runs_again_after_caught_panic() {
-    let server_up = Rc::new(Cell::new(false));
-    let reachable = Rc::clone(&server_up);
-    let provider = Provider::builder()
-        .singleton(move |_| {
-            assert!(reachable.get(), "Server nicht erreichbar");
-            Connection
-        })
-        .build();
+    let (server_up, recipe) = connection_recipe();
+    let provider = Provider::builder().singleton(recipe).build();
     let failed = panic::catch_unwind(AssertUnwindSafe(|| provider.get::<Connection>()));
     assert!(failed.is_err());
     server_up.set(true);
@@ -265,6 +253,30 @@ fn singleton_recipe_runs_again_after_caught_panic() {
     let connection = provider.get::<Connection>();
 
     assert!(connection.is_some());
+}
+
+#[test]
+fn scoped_recipe_runs_again_after_caught_panic() {
+    let (server_up, recipe) = connection_recipe();
+    let scope = Provider::builder().scoped(recipe).build().scope();
+    let failed = panic::catch_unwind(AssertUnwindSafe(|| scope.get::<Connection>()));
+    assert!(failed.is_err());
+    server_up.set(true);
+
+    let connection = scope.get::<Connection>();
+
+    assert!(connection.is_some());
+}
+
+/// Liefert den Schalter für den Server (anfangs aus) und eine Bauanleitung für `Connection`, die mit einem Panic abbricht, solange er aus ist.
+fn connection_recipe() -> (Rc<Cell<bool>>, impl Fn(&Provider) -> Connection) {
+    let server_up = Rc::new(Cell::new(false));
+    let reachable = Rc::clone(&server_up);
+    let recipe = move |_: &Provider| {
+        assert!(reachable.get(), "Server nicht erreichbar");
+        Connection
+    };
+    (server_up, recipe)
 }
 
 /// Liefert eine Bauanleitung für `Config` und den Zähler ihrer Läufe.
