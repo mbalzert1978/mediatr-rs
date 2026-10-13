@@ -145,13 +145,16 @@ struct Settings {
     parent: Option<Rc<Settings>>,
 }
 
+/// Bauanleitung für `Settings`, die beim Provider nach übergeordneten `Settings` fragt.
+fn settings_recipe(provider: &Provider) -> Settings {
+    Settings {
+        parent: provider.get::<Settings>(),
+    }
+}
+
 #[test]
 fn recipe_asking_for_own_type_gets_none() {
-    let provider = Provider::builder()
-        .transient(|provider| Settings {
-            parent: provider.get::<Settings>(),
-        })
-        .build();
+    let provider = Provider::builder().transient(settings_recipe).build();
 
     let settings = provider.get::<Settings>().unwrap();
 
@@ -160,11 +163,16 @@ fn recipe_asking_for_own_type_gets_none() {
 
 #[test]
 fn singleton_recipe_asking_for_own_type_gets_none() {
-    let provider = Provider::builder()
-        .singleton(|provider| Settings {
-            parent: provider.get::<Settings>(),
-        })
-        .build();
+    let provider = Provider::builder().singleton(settings_recipe).build();
+
+    let settings = provider.get::<Settings>().unwrap();
+
+    assert!(settings.parent.is_none());
+}
+
+#[test]
+fn scoped_recipe_asking_for_own_type_gets_none() {
+    let provider = Provider::builder().scoped(settings_recipe).build();
 
     let settings = provider.get::<Settings>().unwrap();
 
