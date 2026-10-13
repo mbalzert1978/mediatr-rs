@@ -14,5 +14,21 @@ Quelle: MediatR `test/MediatR.Tests/SendTests.cs`, `SendVoidInterfaceTests.cs`, 
 - [x] Zweimal `register` für denselben Request-Typ → der zuletzt registrierte Handler antwortet · `register_twice_keeps_last_handler`
 - [x] Fehler von `send` → lässt sich mit `?` als `Box<dyn std::error::Error>` weitergeben · `send_error_propagates_as_boxed_error`
 - [x] Async-Closure als Handler → `register` nimmt sie an, `send` liefert ihre Antwort · `register_accepts_async_closure`
-- [ ] Handler schickt selbst einen Request über den Mediator → `send` liefert eine Antwort, die die Antwort des inneren Handlers enthält
-- [ ] Request mit eigenem Fehlertyp ohne registrierten Handler → `send` liefert den aus `MissingHandler` gewandelten Fehler
+- [x] Request mit eigenem Fehlertyp ohne registrierten Handler → `send` liefert den aus `MissingHandler` gewandelten Fehler · `send_without_handler_converts_missing_handler_into_request_error`
+
+## Mediator und Provider
+
+Quelle: MediatR `Mediator(IServiceProvider)` speichert keine Handler; es holt sie bei jedem `Send` über `GetRequiredService` (`src/MediatR/Mediator.cs`, `Wrappers/RequestHandlerWrapper.cs`).
+
+- [ ] Mediator per Builder mit einem Provider gebaut → `send` holt den Handler über diesen Provider
+- [ ] Handler bekommt einen Sender per Konstruktor (DI, wie `ISender`) und schickt darüber einen Request → seine Antwort enthält die Antwort des inneren Handlers
+- [ ] Handler bekommt einen Sender per Konstruktor, der innere Request scheitert → der Handler gibt den Fehler über seinen eigenen Fehlertyp weiter
+
+## Handler-Provider — eigene Crate
+
+Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSingleton`, `AddScoped`, `AddTransient`). Der Provider registriert und baut Handler; das Weiterleiten kennt er nicht.
+
+- [ ] Handler mit `instance` registriert → jede Anfrage liefert dasselbe Handler-Objekt
+- [ ] Handler mit `transient` registriert → die Bauanleitung läuft bei jeder Anfrage neu
+- [ ] Handler mit `singleton` registriert → die Bauanleitung läuft einmal, bei der ersten Anfrage
+- [ ] Handler mit `scoped` registriert → die Bauanleitung läuft einmal pro Scope; ein neuer Scope baut neu

@@ -159,6 +159,15 @@ async fn send_returns_handler_error() {
 }
 
 #[tokio::test]
+async fn send_without_handler_converts_missing_handler_into_request_error() {
+    let mediator = Mediator::default();
+
+    let response = mediator.send(Reject).await;
+
+    assert_eq!(response, Err(RejectError::MissingHandler));
+}
+
+#[tokio::test]
 async fn send_error_propagates_as_boxed_error() {
     let mediator = Mediator::default();
 
