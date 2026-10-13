@@ -158,6 +158,32 @@ fn recipe_asking_for_own_type_gets_none() {
     assert!(settings.parent.is_none());
 }
 
+/// Ein Team mit seiner Leitung, falls es eine gibt.
+struct Team {
+    lead: Option<Rc<Employee>>,
+}
+
+/// Eine Mitarbeiterin mit ihrem Team, falls es eins gibt.
+struct Employee {
+    team: Option<Rc<Team>>,
+}
+
+#[test]
+fn mutually_dependent_recipes_get_none_for_inner_query() {
+    let provider = Provider::builder()
+        .transient(|provider| Team {
+            lead: provider.get::<Employee>(),
+        })
+        .transient(|provider| Employee {
+            team: provider.get::<Team>(),
+        })
+        .build();
+
+    let team = provider.get::<Team>().unwrap();
+
+    assert!(team.lead.as_ref().unwrap().team.is_none());
+}
+
 /// Liefert eine Bauanleitung für `Config` und den Zähler ihrer Läufe.
 fn counting_recipe() -> (Rc<Cell<u32>>, impl Fn(&Provider) -> Config) {
     let calls = Rc::new(Cell::new(0_u32));
