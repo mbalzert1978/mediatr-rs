@@ -4,6 +4,7 @@ use std::error::Error;
 use std::fmt;
 
 use crate::registry::Registry;
+use crate::request::HandlerResult;
 use crate::{Request, RequestHandler};
 
 /// Leitet Requests an den Handler weiter, der für ihren Typ registriert ist.
@@ -32,7 +33,7 @@ impl Mediator {
     ///
     /// Den Fehler des Handlers, oder [`MissingHandler`] als `R::Error`,
     /// wenn für `R` kein Handler registriert ist.
-    pub async fn send<R: Request + 'static>(&self, request: R) -> Result<R::Response, R::Error> {
+    pub async fn send<R: Request + 'static>(&self, request: R) -> HandlerResult<R> {
         let handler = self.registry.get::<R>().ok_or(MissingHandler)?;
         handler(request).await
     }

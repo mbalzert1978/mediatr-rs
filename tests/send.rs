@@ -52,6 +52,16 @@ async fn register_twice_keeps_last_handler() {
     assert_eq!(response, Pong("Ping Replacement".to_owned()));
 }
 
+#[tokio::test]
+async fn register_accepts_async_closure() {
+    let mut mediator = Mediator::default();
+    mediator.register(async |request: Ping| Ok(Pong(format!("{} Closure", request.0))));
+
+    let response = mediator.send(Ping("Ping".to_owned())).await.unwrap();
+
+    assert_eq!(response, Pong("Ping Closure".to_owned()));
+}
+
 struct VoidPing;
 
 impl Request for VoidPing {

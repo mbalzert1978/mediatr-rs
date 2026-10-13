@@ -18,6 +18,9 @@ pub trait Request {
     type Error: From<MissingHandler>;
 }
 
+/// Was ein Handler für `R` liefert: die Antwort oder den Fehler von `R`.
+pub(crate) type HandlerResult<R> = Result<<R as Request>::Response, <R as Request>::Error>;
+
 /// Beantwortet Requests vom Typ `R`.
 ///
 /// # Vertrag
@@ -29,5 +32,18 @@ pub trait RequestHandler<R: Request> {
     /// # Errors
     ///
     /// `R::Error`, wenn der Handler `request` nicht beantworten kann.
-    fn handle(&self, request: R) -> impl Future<Output = Result<R::Response, R::Error>>;
+    fn handle(&self, request: R) -> impl Future<Output = HandlerResult<R>>;
+}
+
+/// Jede async-Funktion und jede Async-Closure von `R` nach `Result` ist ein Handler für `R`.
+///
+/// Der Vertrag von [`RequestHandler`] gilt auch für sie: Sie löst keine Panic aus.
+impl<R, F> RequestHandler<R> for F
+where
+    R: Request,
+    F: AsyncFn(R) -> HandlerResult<R>,
+{
+    fn handle(&self, request: R) -> impl Future<Output = HandlerResult<R>> {
+        self(request)
+    }
 }

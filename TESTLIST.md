@@ -13,6 +13,6 @@ Quelle: MediatR `test/MediatR.Tests/SendTests.cs`, `SendVoidInterfaceTests.cs`, 
 - [x] Handler liefert einen Fehler → `send` gibt genau diesen Fehler zurück · `send_returns_handler_error`
 - [x] Zweimal `register` für denselben Request-Typ → der zuletzt registrierte Handler antwortet · `register_twice_keeps_last_handler`
 - [x] Fehler von `send` → lässt sich mit `?` als `Box<dyn std::error::Error>` weitergeben · `send_error_propagates_as_boxed_error`
-- [ ] Async-Closure als Handler → `register` nimmt sie an, `send` liefert ihre Antwort
+- [x] Async-Closure als Handler → `register` nimmt sie an, `send` liefert ihre Antwort · `register_accepts_async_closure`
 - [ ] Handler schickt selbst einen Request über den Mediator → `send` liefert eine Antwort, die die Antwort des inneren Handlers enthält
 - [ ] Request mit eigenem Fehlertyp ohne registrierten Handler → `send` liefert den aus `MissingHandler` gewandelten Fehler

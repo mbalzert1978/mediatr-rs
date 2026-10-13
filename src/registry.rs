@@ -6,6 +6,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 
+use crate::request::HandlerResult;
 use crate::{Request, RequestHandler};
 
 /// Ein Handler mit gelöschtem Typ: nimmt einen `R` und liefert später dessen Antwort oder Fehler.
@@ -13,9 +14,6 @@ use crate::{Request, RequestHandler};
 // und ihre Futures liegen deshalb hinter einem gemeinsamen Typ je `R`.
 pub(crate) type ErasedHandler<R> =
     Box<dyn Fn(R) -> Pin<Box<dyn Future<Output = HandlerResult<R>>>>>;
-
-/// Was ein Handler für `R` liefert: die Antwort oder den Fehler von `R`.
-pub(crate) type HandlerResult<R> = Result<<R as Request>::Response, <R as Request>::Error>;
 
 /// Handler verschiedener Typen, je Request-Typ einer.
 #[derive(Debug, Default)]
