@@ -16,19 +16,18 @@ Quelle: MediatR `test/MediatR.Tests/SendTests.cs`, `SendVoidInterfaceTests.cs`, 
 - [x] Async-Closure als Handler → `register` nimmt sie an, `send` liefert ihre Antwort · `register_accepts_async_closure`
 - [x] Request mit eigenem Fehlertyp ohne registrierten Handler → `send` liefert den aus `MissingHandler` gewandelten Fehler · `send_without_handler_converts_missing_handler_into_request_error`
 
-## Mediator und Provider
+## Mediator — Fassade und DI
 
-Quelle: MediatR `Mediator(IServiceProvider)` speichert keine Handler; es holt sie bei jedem `Send` über `GetRequiredService` (`src/MediatR/Mediator.cs`, `Wrappers/RequestHandlerWrapper.cs`).
+Quelle: MediatR `Mediator(IServiceProvider)` speichert keine Handler; es holt sie bei jedem `Send` über `GetRequiredService` (`src/MediatR/Mediator.cs`, `Wrappers/RequestHandlerWrapper.cs`). Nutzer sehen nur `Mediator::builder()`; Registry und Provider liegen dahinter.
 
-- [x] Mediator per Builder mit einem Provider gebaut → `send` holt den Handler über diesen Provider · `send_fetches_handler_from_provider`
 - [ ] Handler bekommt einen Sender per Konstruktor (DI, wie `ISender`) und schickt darüber einen Request → seine Antwort enthält die Antwort des inneren Handlers
 - [ ] Handler bekommt einen Sender per Konstruktor, der innere Request scheitert → der Handler gibt den Fehler über seinen eigenen Fehlertyp weiter
 
-## Handler-Provider — eigene Crate
+## Provider-Crate `mediatr-provider`
 
-Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSingleton`, `AddScoped`, `AddTransient`). Der Provider registriert und baut Handler; das Weiterleiten kennt er nicht.
+Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSingleton`, `AddScoped`, `AddTransient`). Der Container registriert und baut Dienste; vom Mediator weiß er nichts.
 
-- [ ] Handler mit `instance` registriert → jede Abfrage beim Provider liefert dasselbe Handler-Objekt
-- [ ] Handler mit `transient` registriert → die Bauanleitung läuft bei jeder Abfrage beim Provider neu
-- [ ] Handler mit `singleton` registriert → die Bauanleitung läuft einmal, bei der ersten Abfrage beim Provider
-- [ ] Handler mit `scoped` registriert → die Bauanleitung läuft einmal pro Scope; ein neuer Scope baut neu
+- [ ] Dienst mit `instance` registriert → jede Abfrage beim Provider liefert dasselbe Objekt
+- [ ] Dienst mit `transient` registriert → die Bauanleitung läuft bei jeder Abfrage beim Provider neu
+- [ ] Dienst mit `singleton` registriert → die Bauanleitung läuft einmal, bei der ersten Abfrage beim Provider
+- [ ] Dienst mit `scoped` registriert → die Bauanleitung läuft einmal pro Scope; ein neuer Scope baut neu

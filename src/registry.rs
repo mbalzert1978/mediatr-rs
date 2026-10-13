@@ -7,7 +7,7 @@ use std::pin::Pin;
 use std::rc::Rc;
 
 use crate::request::HandlerResult;
-use crate::{HandlerProvider, Request, RequestHandler};
+use crate::{Request, RequestHandler};
 
 /// Ein Handler mit gelöschtem Typ: nimmt einen `R` und liefert später dessen Antwort oder Fehler.
 // dyn: `handler` kennt nur `R`, nicht den Handler-Typ. Handler verschiedener Typen
@@ -15,16 +15,16 @@ use crate::{HandlerProvider, Request, RequestHandler};
 pub(crate) type ErasedHandler<R> =
     Box<dyn Fn(R) -> Pin<Box<dyn Future<Output = HandlerResult<R>>>>>;
 
-/// Provider, der zu jedem Request-Typ einen registrierten Handler hält.
+/// Handler verschiedener Typen, je Request-Typ einer.
 #[derive(Debug, Default)]
-pub struct Registry {
+pub(crate) struct Registry {
     // dyn: Hier liegen Handler verschiedener Typen zusammen.
     handlers: HashMap<TypeId, Box<dyn Any>>,
 }
 
 impl Registry {
     /// Registriert `handler` für Requests vom Typ `R`; ein früherer Handler für `R` fällt weg.
-    pub fn register<R, H>(&mut self, handler: H)
+    pub(crate) fn register<R, H>(&mut self, handler: H)
     where
         R: Request + 'static,
         H: RequestHandler<R> + 'static,
@@ -35,15 +35,10 @@ impl Registry {
             Box::new(move |request| Box::pin(call(Rc::clone(&handler), request)));
         self.handlers.insert(TypeId::of::<R>(), Box::new(erased));
     }
-}
 
-impl<R: Request + 'static> HandlerProvider<R> for Registry {
-    fn handler(&self) -> Option<impl RequestHandler<R>> {
-        let erased = self
-            .handlers
-            .get(&TypeId::of::<R>())?
-            .downcast_ref::<ErasedHandler<R>>()?;
-        Some(move |request: R| erased(request))
+    /// Liefert den Handler für Requests vom Typ `R`, falls einer registriert ist.
+    pub(crate) fn handler<R: Request + 'static>(&self) -> Option<&ErasedHandler<R>> {
+        self.handlers.get(&TypeId::of::<R>())?.downcast_ref()
     }
 }
 
