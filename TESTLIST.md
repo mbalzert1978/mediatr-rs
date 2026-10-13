@@ -28,7 +28,8 @@ Quelle: MediatR `Mediator(IServiceProvider)` speichert keine Handler; es holt si
 Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSingleton`, `AddScoped`, `AddTransient`). Der Container registriert und baut Dienste; vom Mediator weiß er nichts.
 
 - [x] Dienst mit `instance` registriert → jede Abfrage beim Provider liefert dasselbe Objekt · `instance_returns_same_object_on_every_get`
-- [ ] Dienst nicht registriert → die Abfrage beim Provider liefert `None`
+- [x] Dienst nicht registriert → die Abfrage beim Provider liefert `None` · `get_without_registration_returns_none`
+- [ ] Zweimal `instance` für denselben Typ → die Abfrage liefert den zuletzt registrierten Dienst
 - [ ] Dienst mit `transient` registriert → die Bauanleitung läuft bei jeder Abfrage beim Provider neu
 - [ ] Dienst mit `singleton` registriert → die Bauanleitung läuft einmal, bei der ersten Abfrage beim Provider
 - [ ] Dienst mit `scoped` registriert → die Bauanleitung läuft einmal pro Scope; ein neuer Scope baut neu

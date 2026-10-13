@@ -15,3 +15,12 @@ fn instance_returns_same_object_on_every_get() {
 
     assert!(Rc::ptr_eq(&first, &second));
 }
+
+#[test]
+fn get_without_registration_returns_none() {
+    let provider = Provider::builder().build();
+
+    let service = provider.get::<Config>();
+
+    assert!(service.is_none());
+}
