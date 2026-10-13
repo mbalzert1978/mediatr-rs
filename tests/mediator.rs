@@ -188,6 +188,33 @@ async fn transient_builds_handler_on_every_send() {
     assert_eq!(built.get(), 2);
 }
 
+#[tokio::test]
+async fn singleton_builds_handler_only_on_first_send() {
+    let built = Rc::new(Cell::new(0_u32));
+    let counter = Rc::clone(&built);
+    let mediator = Mediator::builder()
+        .register(CustomerDirectory {
+            customers: vec![ada()],
+        })
+        .singleton(move |sender| {
+            counter.set(counter.get().saturating_add(1));
+            PlaceOrderHandler { sender }
+        })
+        .build();
+
+    for amount in [100, 250] {
+        mediator
+            .send(PlaceOrder {
+                customer_id: 7,
+                amount,
+            })
+            .await
+            .unwrap();
+    }
+
+    assert_eq!(built.get(), 1);
+}
+
 /// Nimmt Bestellungen an wie [`PlaceOrderHandler`] und hält dafür die Leitung zum Lager offen; beim Freigeben legt er auf.
 struct WarehouseOrderHandler {
     orders: PlaceOrderHandler<WeakMediator>,

@@ -24,7 +24,7 @@ Quelle: MediatR `Mediator(IServiceProvider)` speichert keine Handler; es holt si
 - [x] Handler bekommt einen Sender per Konstruktor, der innere Request scheitert → der Handler gibt den Fehler, in seinen eigenen Fehlertyp verpackt, unverändert weiter · `handler_wraps_failed_inner_request_in_own_error`
 - [x] Handler mit `transient` registriert → jedes `send` baut den Handler neu · `transient_builds_handler_on_every_send`
 - [x] Handler, der einen Sender per Konstruktor bekommt, wird ohne Mediator getestet und bekommt eine Attrappe statt des Senders → er verarbeitet die Antwort der Attrappe · `handler_processes_response_of_fake_sender`
-- [ ] Handler mit `singleton` registriert → nur das erste `send` baut den Handler, jedes weitere nutzt denselben
+- [x] Handler mit `singleton` registriert → nur das erste `send` baut den Handler, jedes weitere nutzt denselben · `singleton_builds_handler_only_on_first_send`
 - [x] Handler mit Sender per Konstruktor ist als `singleton` registriert, der Mediator wird fallen gelassen → der Handler wird freigegeben (sein `Drop` läuft) · `singleton_handler_with_sender_is_released_with_mediator`
 - [ ] Handler mit Sender ist als `singleton` registriert und schickt einen Request, nachdem der Mediator weggefallen ist → `send` liefert `Err` (`MissingHandler`), kein Panic
 
