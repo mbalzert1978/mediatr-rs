@@ -1,5 +1,8 @@
 //! Tests für den Abschnitt „Mediator — Fassade und DI“ in `TESTLIST.md`.
 
+use std::cell::Cell;
+use std::rc::Rc;
+
 use mediatr_rs::{Mediator, MissingHandler, Request, RequestHandler, Sender};
 
 #[derive(Clone)]
@@ -151,4 +154,35 @@ async fn handler_wraps_failed_inner_request_in_own_error() {
         result,
         Err(OrderError::Customer(CustomerError::NotFound))
     ));
+}
+
+#[tokio::test]
+async fn transient_builds_handler_on_every_send() {
+    let built = Rc::new(Cell::new(0_u32));
+    let counter = Rc::clone(&built);
+    let mediator = Mediator::builder()
+        .register(CustomerDirectory {
+            customers: vec![Customer {
+                id: 7,
+                name: "Ada".to_owned(),
+                vip: false,
+            }],
+        })
+        .transient(move |sender| {
+            counter.set(counter.get().saturating_add(1));
+            PlaceOrderHandler { sender }
+        })
+        .build();
+
+    for amount in [100, 250] {
+        mediator
+            .send(PlaceOrder {
+                customer_id: 7,
+                amount,
+            })
+            .await
+            .unwrap();
+    }
+
+    assert_eq!(built.get(), 2);
 }
