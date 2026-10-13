@@ -4,8 +4,9 @@ use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 
+use crate::notification::NotificationResult;
 use crate::request::HandlerResult;
-use crate::{Request, RequestHandler};
+use crate::{Notification, NotificationHandler, Request, RequestHandler};
 
 /// Ein Handler mit gelöschtem Typ: nimmt einen `R` und liefert später dessen Antwort oder Fehler.
 // dyn: `Sender::send` kennt nur `R`, nicht den Handler-Typ. Handler verschiedener Typen
@@ -27,4 +28,27 @@ where
 /// Ruft `handler` auf; die Future besitzt den Handler, damit sie ohne Leihe auskommt.
 async fn call<R: Request, H: RequestHandler<R>>(handler: Rc<H>, request: R) -> HandlerResult<R> {
     handler.handle(request).await
+}
+
+/// Ein Notification-Handler mit gelöschtem Typ: leiht sich ein `N` und meldet später `Ok(())` oder den Fehler.
+// dyn: aus demselben Grund wie bei `ErasedHandler`, je `N` statt je `R`.
+pub(crate) type ErasedNotificationHandler<N> =
+    Box<dyn for<'a> Fn(&'a N) -> Pin<Box<dyn Future<Output = NotificationResult<N>> + 'a>>>;
+
+/// Verpackt `handler` als [`ErasedNotificationHandler`].
+pub(crate) fn erase_notification_handler<N, H>(handler: H) -> ErasedNotificationHandler<N>
+where
+    N: Notification + 'static,
+    H: NotificationHandler<N> + 'static,
+{
+    let handler = Rc::new(handler);
+    Box::new(move |notification| Box::pin(notify(Rc::clone(&handler), notification)))
+}
+
+/// Ruft `handler` auf; die Future besitzt den Handler und leiht sich nur die Notification.
+async fn notify<N: Notification, H: NotificationHandler<N>>(
+    handler: Rc<H>,
+    notification: &N,
+) -> NotificationResult<N> {
+    handler.handle(notification).await
 }

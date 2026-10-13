@@ -6,9 +6,9 @@ use std::future::Future;
 
 use mediatr_provider::{Provider, ProviderBuilder, WeakProvider};
 
-use crate::erased::{ErasedHandler, erase};
+use crate::erased::{ErasedHandler, ErasedNotificationHandler, erase, erase_notification_handler};
 use crate::request::HandlerResult;
-use crate::{Notification, Request, RequestHandler};
+use crate::{Notification, NotificationHandler, Request, RequestHandler};
 
 /// Stellt Requests und Notifications den Handlern zu, die für ihren Typ registriert sind.
 ///
@@ -89,9 +89,12 @@ impl<R: Request + 'static> Sender<R> for Mediator {
     }
 }
 
-impl<N: Notification> Publisher<N> for Mediator {
-    async fn publish(&self, _notification: N) -> Result<(), N::Error> {
-        Ok(())
+impl<N: Notification + 'static> Publisher<N> for Mediator {
+    async fn publish(&self, notification: N) -> Result<(), N::Error> {
+        match self.provider.get::<ErasedNotificationHandler<N>>() {
+            Some(handler) => handler(&notification).await,
+            None => Ok(()),
+        }
     }
 }
 
@@ -148,6 +151,18 @@ impl MediatorBuilder {
                     provider: provider.downgrade(),
                 }))
             }),
+        }
+    }
+
+    /// Registriert `handler` für Notifications vom Typ `N`.
+    #[must_use]
+    pub fn subscribe<N, H>(self, handler: H) -> Self
+    where
+        N: Notification + 'static,
+        H: NotificationHandler<N> + 'static,
+    {
+        Self {
+            provider: self.provider.instance(erase_notification_handler(handler)),
         }
     }
 

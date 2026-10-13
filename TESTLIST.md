@@ -64,7 +64,7 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 
 Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `NotificationHandlerTests.cs`; Standard-Publisher `ForeachAwaitPublisher` (nacheinander, erster Fehler stoppt). Gleichzeitiges Ausführen (`TaskWhenAllPublisher`) bekommt einen eigenen Abschnitt.
 
-- [ ] Notification mit einem registrierten Handler → `publish` führt den Handler aus
+- [x] Notification mit einem registrierten Handler → `publish` führt den Handler aus · `publish_runs_registered_handler`
 - [ ] Notification mit zwei Handlern → beide laufen, in der Reihenfolge der Registrierung
 - [x] Notification ohne registrierten Handler → `publish` liefert `Ok(())`, kein Panic · `publish_without_handler_returns_ok`
 - [ ] Zwei Notification-Typen mit je eigenem Handler → jede Notification erreicht nur ihre Handler
