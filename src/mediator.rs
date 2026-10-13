@@ -2,6 +2,7 @@
 
 use std::error::Error;
 use std::fmt;
+use std::future::Future;
 
 use mediatr_provider::{Provider, ProviderBuilder};
 
@@ -11,10 +12,10 @@ use crate::{Request, RequestHandler};
 
 /// Leitet Requests an den Handler weiter, der für ihren Typ registriert ist.
 ///
-/// Entsteht über [`Mediator::builder`].
+/// Entsteht über [`Mediator::builder`]. Verschickt wird über [`Sender`].
 #[derive(Debug, Clone)]
 pub struct Mediator {
-    sender: Sender,
+    provider: Provider,
 }
 
 /// Sammelt Handler und baut daraus einen [`Mediator`].
@@ -23,13 +24,24 @@ pub struct MediatorBuilder {
     provider: ProviderBuilder,
 }
 
-/// Schickt Requests an ihren Handler; ein Handler bekommt ihn per Konstruktor.
-#[derive(Debug, Clone)]
-pub struct Sender {
-    provider: Provider,
+/// Schickt Requests vom Typ `R` an ihren Handler; ein Handler bekommt einen Sender per Konstruktor.
+///
+/// [`Mediator`] schickt jeden Request-Typ. Im Test ersetzt eine Attrappe den Mediator.
+///
+/// # Vertrag
+///
+/// `send` liefert für jeden Request genau eine Antwort oder einen Fehler und löst keine Panic aus.
+pub trait Sender<R: Request> {
+    /// Schickt `request` an seinen Handler und liefert dessen Antwort.
+    ///
+    /// # Errors
+    ///
+    /// Den Fehler des Handlers, oder [`MissingHandler`] als `R::Error`,
+    /// wenn für `R` kein Handler registriert ist.
+    fn send(&self, request: R) -> impl Future<Output = Result<R::Response, R::Error>>;
 }
 
-/// Für den Request-Typ ist kein Handler registriert; [`Mediator::send`] liefert ihn als `R::Error`.
+/// Für den Request-Typ ist kein Handler registriert; [`Sender::send`] liefert ihn als `R::Error`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MissingHandler;
 
@@ -39,25 +51,10 @@ impl Mediator {
     pub fn builder() -> MediatorBuilder {
         MediatorBuilder::default()
     }
-
-    /// Schickt `request` an seinen Handler und liefert dessen Antwort.
-    ///
-    /// # Errors
-    ///
-    /// Den Fehler des Handlers, oder [`MissingHandler`] als `R::Error`,
-    /// wenn für `R` kein Handler registriert ist.
-    pub async fn send<R: Request + 'static>(&self, request: R) -> HandlerResult<R> {
-        self.sender.send(request).await
-    }
 }
 
-impl Sender {
-    /// Schickt `request` an seinen Handler und liefert dessen Antwort.
-    ///
-    /// # Errors
-    ///
-    /// Wie [`Mediator::send`].
-    pub async fn send<R: Request + 'static>(&self, request: R) -> HandlerResult<R> {
+impl<R: Request + 'static> Sender<R> for Mediator {
+    async fn send(&self, request: R) -> HandlerResult<R> {
         let handler = self
             .provider
             .get::<ErasedHandler<R>>()
@@ -79,16 +76,16 @@ impl MediatorBuilder {
         }
     }
 
-    /// Registriert `make` für Requests vom Typ `R`; jedes `send` baut den Handler damit neu und gibt ihm einen [`Sender`].
+    /// Registriert `make` für Requests vom Typ `R`; jedes `send` baut den Handler damit neu und gibt ihm den [`Mediator`] als [`Sender`].
     #[must_use]
-    pub fn transient<R, H>(self, make: impl Fn(Sender) -> H + 'static) -> Self
+    pub fn transient<R, H>(self, make: impl Fn(Mediator) -> H + 'static) -> Self
     where
         R: Request + 'static,
         H: RequestHandler<R> + 'static,
     {
         Self {
             provider: self.provider.transient(move |provider| {
-                erase(make(Sender {
+                erase(make(Mediator {
                     provider: provider.clone(),
                 }))
             }),
@@ -99,9 +96,7 @@ impl MediatorBuilder {
     #[must_use]
     pub fn build(self) -> Mediator {
         Mediator {
-            sender: Sender {
-                provider: self.provider.build(),
-            },
+            provider: self.provider.build(),
         }
     }
 }

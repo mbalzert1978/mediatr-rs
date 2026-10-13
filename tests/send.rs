@@ -3,7 +3,7 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use mediatr_rs::{Mediator, MissingHandler, Request, RequestHandler};
+use mediatr_rs::{Mediator, MissingHandler, Request, RequestHandler, Sender};
 
 struct Ping(String);
 

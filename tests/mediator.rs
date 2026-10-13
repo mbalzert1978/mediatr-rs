@@ -12,6 +12,15 @@ struct Customer {
     vip: bool,
 }
 
+/// Die VIP-Kundin mit der Nummer 7, die in den Bestell-Tests bestellt.
+fn ada() -> Customer {
+    Customer {
+        id: 7,
+        name: "Ada".to_owned(),
+        vip: true,
+    }
+}
+
 struct GetCustomer {
     id: u32,
 }
@@ -86,11 +95,11 @@ impl Request for PlaceOrder {
 const VIP_DISCOUNT: u32 = 10;
 
 /// Nimmt Bestellungen an; holt den Kunden über den Sender, den er per Konstruktor bekommt.
-struct PlaceOrderHandler {
-    sender: Sender,
+struct PlaceOrderHandler<S> {
+    sender: S,
 }
 
-impl RequestHandler<PlaceOrder> for PlaceOrderHandler {
+impl<S: Sender<GetCustomer>> RequestHandler<PlaceOrder> for PlaceOrderHandler<S> {
     async fn handle(&self, order: PlaceOrder) -> Result<Confirmation, OrderError> {
         let customer = self
             .sender
@@ -110,11 +119,7 @@ impl RequestHandler<PlaceOrder> for PlaceOrderHandler {
 async fn handler_processes_data_fetched_through_injected_sender() {
     let mediator = Mediator::builder()
         .register(CustomerDirectory {
-            customers: vec![Customer {
-                id: 7,
-                name: "Ada".to_owned(),
-                vip: true,
-            }],
+            customers: vec![ada()],
         })
         .transient(|sender| PlaceOrderHandler { sender })
         .build();
@@ -162,11 +167,7 @@ async fn transient_builds_handler_on_every_send() {
     let counter = Rc::clone(&built);
     let mediator = Mediator::builder()
         .register(CustomerDirectory {
-            customers: vec![Customer {
-                id: 7,
-                name: "Ada".to_owned(),
-                vip: false,
-            }],
+            customers: vec![ada()],
         })
         .transient(move |sender| {
             counter.set(counter.get().saturating_add(1));
@@ -185,4 +186,36 @@ async fn transient_builds_handler_on_every_send() {
     }
 
     assert_eq!(built.get(), 2);
+}
+
+/// Attrappe für den Sender: antwortet auf jede Kundenabfrage mit derselben Kundin, ohne Mediator.
+struct FixedCustomer(Customer);
+
+impl Sender<GetCustomer> for FixedCustomer {
+    async fn send(&self, _request: GetCustomer) -> Result<Customer, CustomerError> {
+        Ok(self.0.clone())
+    }
+}
+
+#[tokio::test]
+async fn handler_processes_response_of_fake_sender() {
+    let handler = PlaceOrderHandler {
+        sender: FixedCustomer(ada()),
+    };
+
+    let confirmation = handler
+        .handle(PlaceOrder {
+            customer_id: 7,
+            amount: 100,
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(
+        confirmation,
+        Confirmation {
+            customer: "Ada".to_owned(),
+            total: 90,
+        }
+    );
 }
