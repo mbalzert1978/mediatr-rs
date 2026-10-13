@@ -42,14 +42,8 @@ fn instance_twice_returns_last_registered_service() {
 
 #[test]
 fn transient_runs_recipe_on_every_get() {
-    let calls = Rc::new(Cell::new(0_u32));
-    let counter = Rc::clone(&calls);
-    let provider = Provider::builder()
-        .transient(move || {
-            counter.set(counter.get().saturating_add(1));
-            Config
-        })
-        .build();
+    let (calls, recipe) = counting_recipe();
+    let provider = Provider::builder().transient(recipe).build();
 
     provider.get::<Config>().unwrap();
     provider.get::<Config>().unwrap();
@@ -59,18 +53,37 @@ fn transient_runs_recipe_on_every_get() {
 
 #[test]
 fn singleton_runs_recipe_once_on_first_get() {
-    let calls = Rc::new(Cell::new(0_u32));
-    let counter = Rc::clone(&calls);
-    let provider = Provider::builder()
-        .singleton(move || {
-            counter.set(counter.get().saturating_add(1));
-            Config
-        })
-        .build();
+    let (calls, recipe) = counting_recipe();
+    let provider = Provider::builder().singleton(recipe).build();
     assert_eq!(calls.get(), 0);
 
     provider.get::<Config>().unwrap();
     provider.get::<Config>().unwrap();
 
     assert_eq!(calls.get(), 1);
+}
+
+#[test]
+fn scoped_runs_recipe_once_per_scope() {
+    let (calls, recipe) = counting_recipe();
+    let provider = Provider::builder().scoped(recipe).build();
+    let first = provider.scope();
+    let second = provider.scope();
+
+    first.get::<Config>().unwrap();
+    first.get::<Config>().unwrap();
+    second.get::<Config>().unwrap();
+
+    assert_eq!(calls.get(), 2);
+}
+
+/// Liefert eine Bauanleitung für `Config` und den Zähler ihrer Läufe.
+fn counting_recipe() -> (Rc<Cell<u32>>, impl Fn() -> Config) {
+    let calls = Rc::new(Cell::new(0_u32));
+    let counter = Rc::clone(&calls);
+    let recipe = move || {
+        counter.set(counter.get().saturating_add(1));
+        Config
+    };
+    (calls, recipe)
 }
