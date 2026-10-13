@@ -4,7 +4,7 @@ use std::error::Error;
 use std::fmt;
 use std::future::Future;
 
-use mediatr_provider::{Provider, ProviderBuilder};
+use mediatr_provider::{Provider, ProviderBuilder, WeakProvider};
 
 use crate::erased::{ErasedHandler, erase};
 use crate::request::HandlerResult;
@@ -16,6 +16,12 @@ use crate::{Request, RequestHandler};
 #[derive(Debug, Clone)]
 pub struct Mediator {
     provider: Provider,
+}
+
+/// Verweis auf einen [`Mediator`], der dessen Handler nicht am Leben hält; ein `singleton`-Handler bekommt ihn als [`Sender`].
+#[derive(Debug, Clone)]
+pub struct WeakMediator {
+    provider: WeakProvider,
 }
 
 /// Sammelt Handler und baut daraus einen [`Mediator`].
@@ -63,6 +69,15 @@ impl<R: Request + 'static> Sender<R> for Mediator {
     }
 }
 
+impl<R: Request + 'static> Sender<R> for WeakMediator {
+    async fn send(&self, request: R) -> HandlerResult<R> {
+        let mediator = Mediator {
+            provider: self.provider.upgrade().ok_or(MissingHandler)?,
+        };
+        mediator.send(request).await
+    }
+}
+
 impl MediatorBuilder {
     /// Registriert `handler` für Requests vom Typ `R`; ein früherer Handler für `R` fällt weg.
     #[must_use]
@@ -87,6 +102,24 @@ impl MediatorBuilder {
             provider: self.provider.transient(move |provider| {
                 erase(make(Mediator {
                     provider: provider.clone(),
+                }))
+            }),
+        }
+    }
+
+    /// Registriert `make` für Requests vom Typ `R`; das erste `send` baut den Handler damit, jedes weitere nutzt denselben Handler.
+    ///
+    /// Der Handler bekommt einen [`WeakMediator`] als [`Sender`], damit er den Mediator nicht selbst am Leben hält.
+    #[must_use]
+    pub fn singleton<R, H>(self, make: impl Fn(WeakMediator) -> H + 'static) -> Self
+    where
+        R: Request + 'static,
+        H: RequestHandler<R> + 'static,
+    {
+        Self {
+            provider: self.provider.singleton(move |provider| {
+                erase(make(WeakMediator {
+                    provider: provider.downgrade(),
                 }))
             }),
         }

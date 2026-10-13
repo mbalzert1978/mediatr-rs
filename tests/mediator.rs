@@ -3,7 +3,7 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use mediatr_rs::{Mediator, MissingHandler, Request, RequestHandler, Sender};
+use mediatr_rs::{Mediator, MissingHandler, Request, RequestHandler, Sender, WeakMediator};
 
 #[derive(Clone)]
 struct Customer {
@@ -186,6 +186,50 @@ async fn transient_builds_handler_on_every_send() {
     }
 
     assert_eq!(built.get(), 2);
+}
+
+/// Nimmt Bestellungen an wie [`PlaceOrderHandler`] und hält dafür die Leitung zum Lager offen; beim Freigeben legt er auf.
+struct WarehouseOrderHandler {
+    orders: PlaceOrderHandler<WeakMediator>,
+    line_open: Rc<Cell<bool>>,
+}
+
+impl RequestHandler<PlaceOrder> for WarehouseOrderHandler {
+    async fn handle(&self, order: PlaceOrder) -> Result<Confirmation, OrderError> {
+        self.orders.handle(order).await
+    }
+}
+
+impl Drop for WarehouseOrderHandler {
+    fn drop(&mut self) {
+        self.line_open.set(false);
+    }
+}
+
+#[tokio::test]
+async fn singleton_handler_with_sender_is_released_with_mediator() {
+    let line_open = Rc::new(Cell::new(true));
+    let line = Rc::clone(&line_open);
+    let mediator = Mediator::builder()
+        .register(CustomerDirectory {
+            customers: vec![ada()],
+        })
+        .singleton(move |sender| WarehouseOrderHandler {
+            orders: PlaceOrderHandler { sender },
+            line_open: Rc::clone(&line),
+        })
+        .build();
+    mediator
+        .send(PlaceOrder {
+            customer_id: 7,
+            amount: 100,
+        })
+        .await
+        .unwrap();
+
+    drop(mediator);
+
+    assert!(!line_open.get());
 }
 
 /// Attrappe für den Sender: antwortet auf jede Kundenabfrage mit derselben Kundin, ohne Mediator.
