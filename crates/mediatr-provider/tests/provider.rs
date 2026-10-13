@@ -195,6 +195,19 @@ fn upgrade_after_provider_dropped_returns_none() {
 }
 
 #[test]
+fn upgraded_weak_scope_returns_same_scoped_service() {
+    let scope = Provider::builder().scoped(|_| Config).build().scope();
+    let weak = scope.downgrade();
+
+    let upgraded = weak.upgrade().unwrap();
+
+    assert!(Rc::ptr_eq(
+        &scope.get::<Config>().unwrap(),
+        &upgraded.get::<Config>().unwrap()
+    ));
+}
+
+#[test]
 fn upgrade_after_scope_dropped_returns_none() {
     let provider = Provider::builder().build();
     let scope = provider.scope();
