@@ -2,7 +2,7 @@
 
 use std::any::{Any, TypeId};
 use std::cell::{OnceCell, RefCell};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 /// Bauanleitungen verschiedener Typen, je Typ eine; jede ist ein [`Recipe`] ihres Typs.
@@ -26,6 +26,8 @@ pub struct Provider {
     built: Rc<Built>,
     /// Der Speicher des Providers, aus dem alle Scopes stammen; dort liegen die `scoped`-Dienste eines Singletons.
     root: Rc<Built>,
+    /// Typen, deren Bauanleitung gerade läuft; geteilt mit allen Scopes desselben Providers.
+    building: Rc<RefCell<HashSet<TypeId>>>,
 }
 
 /// Sammelt Dienste und baut daraus einen [`Provider`].
@@ -43,14 +45,17 @@ impl Provider {
         ProviderBuilder::default()
     }
 
-    /// Liefert den Dienst vom Typ `T`.
+    /// Liefert den Dienst vom Typ `T`; `None`, wenn er fehlt oder seine Bauanleitung gerade läuft.
     #[must_use]
     pub fn get<T: 'static>(&self) -> Option<Rc<T>> {
-        let recipe = self
-            .services
-            .get(&TypeId::of::<T>())?
-            .downcast_ref::<Recipe<T>>()?;
-        Some(recipe(self))
+        let id = TypeId::of::<T>();
+        let recipe = self.services.get(&id)?.downcast_ref::<Recipe<T>>()?;
+        if !self.building.borrow_mut().insert(id) {
+            return None;
+        }
+        let service = recipe(self);
+        self.building.borrow_mut().remove(&id);
+        Some(service)
     }
 
     /// Beginnt einen neuen Scope mit denselben Diensten; `scoped`-Dienste baut er neu.
@@ -60,6 +65,7 @@ impl Provider {
             services: self.services.clone(),
             built: Rc::default(),
             root: Rc::clone(&self.root),
+            building: Rc::clone(&self.building),
         }
     }
 
@@ -69,6 +75,7 @@ impl Provider {
             services: self.services.clone(),
             built: Rc::clone(&self.root),
             root: Rc::clone(&self.root),
+            building: Rc::clone(&self.building),
         }
     }
 }
@@ -110,6 +117,7 @@ impl ProviderBuilder {
             services: self.services,
             root: Rc::clone(&built),
             built,
+            building: Rc::default(),
         }
     }
 

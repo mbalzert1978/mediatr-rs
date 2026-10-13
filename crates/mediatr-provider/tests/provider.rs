@@ -140,6 +140,24 @@ fn cloned_scope_returns_same_scoped_service() {
     assert_eq!(calls.get(), 1);
 }
 
+/// Einstellungen, die sich beim Bau auf übergeordnete Einstellungen stützen, falls es welche gibt.
+struct Settings {
+    parent: Option<Rc<Settings>>,
+}
+
+#[test]
+fn recipe_asking_for_own_type_gets_none() {
+    let provider = Provider::builder()
+        .transient(|provider| Settings {
+            parent: provider.get::<Settings>(),
+        })
+        .build();
+
+    let settings = provider.get::<Settings>().unwrap();
+
+    assert!(settings.parent.is_none());
+}
+
 /// Liefert eine Bauanleitung für `Config` und den Zähler ihrer Läufe.
 fn counting_recipe() -> (Rc<Cell<u32>>, impl Fn(&Provider) -> Config) {
     let calls = Rc::new(Cell::new(0_u32));
