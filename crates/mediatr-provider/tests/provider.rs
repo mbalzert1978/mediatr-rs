@@ -42,6 +42,18 @@ fn instance_twice_returns_last_registered_service() {
 }
 
 #[test]
+fn all_returns_every_instance_in_registration_order() {
+    let provider = Provider::builder()
+        .instance(Name("alt"))
+        .instance(Name("neu"))
+        .build();
+
+    let names: Vec<_> = provider.all::<Name>().iter().map(|name| name.0).collect();
+
+    assert_eq!(names, ["alt", "neu"]);
+}
+
+#[test]
 fn transient_runs_recipe_on_every_get() {
     let (calls, recipe) = counting_recipe();
     let provider = Provider::builder().transient(recipe).build();

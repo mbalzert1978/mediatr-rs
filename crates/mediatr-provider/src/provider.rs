@@ -5,9 +5,9 @@ use std::cell::{OnceCell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::rc::{Rc, Weak};
 
-/// Bauanleitungen verschiedener Typen, je Typ eine; jede ist ein [`Recipe`] ihres Typs.
+/// Bauanleitungen verschiedener Typen, je Typ alle in der Reihenfolge ihrer Registrierung; jede ist ein [`Recipe`] ihres Typs.
 // Rc reicht, solange kein Testlisten-Punkt Threads verlangt; dann Arc.
-type Services = HashMap<TypeId, Rc<dyn Any>>;
+type Services = HashMap<TypeId, Vec<Rc<dyn Any>>>;
 
 /// Dienste, die ein Scope schon gebaut hat, je Typ einer.
 type Built = RefCell<HashMap<TypeId, Rc<dyn Any>>>;
@@ -64,9 +64,27 @@ impl Provider {
     #[must_use]
     pub fn get<T: 'static>(&self) -> Option<Rc<T>> {
         let id = TypeId::of::<T>();
-        let recipe = self.shared.services.get(&id)?.downcast_ref::<Recipe<T>>()?;
+        let recipe = self
+            .shared
+            .services
+            .get(&id)?
+            .last()?
+            .downcast_ref::<Recipe<T>>()?;
         let _building = Building::enter(&self.shared.building, id)?;
         Some(recipe(self))
+    }
+
+    /// Liefert alle Dienste vom Typ `T`, in der Reihenfolge ihrer Registrierung.
+    #[must_use]
+    pub fn all<T: 'static>(&self) -> Vec<Rc<T>> {
+        self.shared
+            .services
+            .get(&TypeId::of::<T>())
+            .into_iter()
+            .flatten()
+            .filter_map(|recipe| recipe.downcast_ref::<Recipe<T>>())
+            .map(|recipe| recipe(self))
+            .collect()
     }
 
     /// Beginnt einen neuen Scope mit denselben Diensten; `scoped`-Dienste baut er neu.
@@ -152,7 +170,10 @@ impl ProviderBuilder {
 
     fn recipe<T: 'static>(mut self, recipe: impl Fn(&Provider) -> Rc<T> + 'static) -> Self {
         let recipe: Recipe<T> = Box::new(recipe);
-        self.services.insert(TypeId::of::<T>(), Rc::new(recipe));
+        self.services
+            .entry(TypeId::of::<T>())
+            .or_default()
+            .push(Rc::new(recipe));
         self
     }
 }
