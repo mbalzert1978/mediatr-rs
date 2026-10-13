@@ -13,7 +13,7 @@ Steht ein Muster aus der linken Spalte im Code, ist das ein Verstoß mit der ID 
 | C2 | Generischer Marker `IRequest<TResponse>` | Trait mit assoziiertem Typ `type Response;` | Ein Request hat genau einen Antworttyp; der Compiler prüft das. |
 | C3 | Exceptions | `Result<T, E>` mit `?` | Fehler stehen in der Signatur. |
 | C4 | `null` | `Option<T>` | Der Compiler erzwingt die Behandlung von „nichts da“. |
-| C5 | Reflection / DI-Container / Assembly-Scan | Explizite Registrierung beim Bauen des Mediators; Generics oder Trait-Objekte | Rust hat keine Laufzeit-Reflection; Registrierung bleibt im Code sichtbar. |
+| C5 | Reflection / Assembly-Scan / Auflösen ohne Registrierung | Explizite Registrierung im Builder des Mediators; ein DI-Container nur mit expliziter Registrierung, über Generics oder Trait-Objekte | Rust hat keine Laufzeit-Reflection; Registrierung bleibt im Code sichtbar. |
 | C6 | Vererbung (`abstract class`) | Komposition + Default-Methoden im Trait | Rust hat keine Klassen-Vererbung. |
 | C7 | Eigener `Unit`-Typ | `()` | Gibt es schon. |
 | C8 | `Task<T>` | `async fn` / `Future` | Rusts Form von „Ergebnis kommt später“. |
