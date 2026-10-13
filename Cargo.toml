@@ -5,13 +5,19 @@ edition = "2024"
 
 [dependencies]
 
-# Regeln, die der Compiler erzwingt. Ausnahme nur per #[expect(lint, reason = "…")].
-[lints.rust]
+[lints]
+workspace = true
+
+[workspace]
+members = ["crates/mediatr-provider"]
+
+# Regeln, die der Compiler erzwingt, für jede Crate im Workspace. Ausnahme nur per #[expect(lint, reason = "…")].
+[workspace.lints.rust]
 missing_docs = "deny"
 missing_debug_implementations = "deny"
 unsafe_code = "forbid"
 
-[lints.clippy]
+[workspace.lints.clippy]
 pedantic = { level = "deny", priority = -1 }
 # Fehler als Result statt Panic
 unwrap_used = "deny"

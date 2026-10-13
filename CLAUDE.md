@@ -15,7 +15,7 @@ Wenn ein MediatR-Design und ein Rust-Idiom kollidieren, gewinnt Rust.
 
 ## Commit
 
-Ein TDD-Zyklus ist ein Commit. „Code“ heißt hier: `src/`, `tests/`, `examples/`, `benches/`, `build.rs`. „Produktionscode“ heißt: `src/`, `build.rs`.
+Ein TDD-Zyklus ist ein Commit. „Code“ heißt hier: `src/`, `tests/`, `examples/`, `benches/`, `build.rs`. „Produktionscode“ heißt: `src/`, `build.rs`. Beides gilt in der Wurzel-Crate und in jeder Crate unter `crates/`; jeder Pfad in den Regeln ist so zu lesen.
 Die Git-Hooks in `.githooks/` blockieren den Commit, wenn eins davon fehlt:
 
 1. `scripts/check.sh` ist grün, und alles ist gestagt.

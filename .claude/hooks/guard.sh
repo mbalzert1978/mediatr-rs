@@ -45,7 +45,7 @@ own_stamp_id() { reviewer_id_of_agent "$agent"; }
 stamps=".git/$REVIEW_SUBDIR"
 
 # Geschützte Pfade, relativ zum Projekt-Root, klein geschrieben.
-protected='(\.githooks/|scripts/|\.claude/|\.cargo/|docs/rules/|clippy\.toml|cargo\.toml|claude\.md)'
+protected="(\.githooks/|scripts/|\.claude/|\.cargo/|docs/rules/|clippy\.toml|${CRATE_RE}cargo\.toml|claude\.md)"
 GIT_DIR_ONLY="Git-Interna (.git/) ändern nur git-Befehle; sonst sieht der reference-transaction-Hook die Änderung nicht."
 mutating='(>|\btee\b|\bsed[[:space:]]+-[a-z]*i|\bperl[[:space:]]+-[a-z]*i|\b(mv|rm|cp|ln|chmod|truncate|install)[[:space:]]|\bgit[[:space:]]+(checkout|restore|config)\b)'
 # Nennt ein Teilbefehl das Stempel-Skript, gilt das als Aufruf – außer der Teilbefehl liest nur.

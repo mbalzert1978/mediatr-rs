@@ -29,7 +29,7 @@ fi
 
 if [ -n "$parent" ]; then files=$(git diff --name-only "$parent" "$tree"); else files=$(git ls-tree -r --name-only "$tree"); fi
 need=""
-if grep -qE '^(src/|build\.rs$)' <<<"$files" && [ -z "$added" ]; then
+if grep -qE "$PROD_PATH_RE" <<<"$files" && [ -z "$added" ]; then
   need="Der Commit ändert Produktionscode, hakt aber keinen Punkt in TESTLIST.md neu ab."
 fi
 if [ -n "$removed" ]; then

@@ -27,12 +27,17 @@ gate() { # gate <name> <befehl...>
 # Treffer = Verstoß: grep findet etwas → Gate rot.
 none() { ! "$@"; }
 
-code_paths() { for p in src tests examples benches build.rs; do [ -e "$p" ] && echo "$p"; done; }
+code_paths() { # in jeder Crate
+  local c p
+  for c in $(crate_roots); do for p in src tests examples benches build.rs; do
+    [ -e "$c/$p" ] && p="$c/$p" && echo "${p#./}"
+  done; done
+}
 
 # Jeder Test, den cargo kennt (auch #[tokio::test(...)], Makro-Tests, Einzeiler), als letzter Pfad-Teil.
 # Doctests zählen nicht: Sie sind Doku-Beispiele und laufen in "cargo test" trotzdem mit.
 test_names() {
-  cargo test --quiet --tests -- --list --format terse 2>/dev/null \
+  cargo test --workspace --quiet --tests -- --list --format terse 2>/dev/null \
     | sed -nE 's/^(.*::)?([A-Za-z0-9_]+): test$/\2/p' | sort
 }
 
@@ -60,22 +65,22 @@ testlist_checks() {
 
 # Ein ignorierter Test läuft nie und belegt deshalb keinen Punkt.
 ignored_tests() {
-  cargo test --quiet --tests -- --list --format terse --ignored 2>/dev/null | grep ': test$'
+  cargo test --workspace --quiet --tests -- --list --format terse --ignored 2>/dev/null | grep ': test$'
 }
 
 # Module ohne gemeinsame Aufgabe: als Datei, Ordner oder inline (`mod util {`). tests/common/ ist Rusts Ort für Test-Setup.
 bad_names='util utils helper helpers shared misc common'
 forbidden_modules() {
   local n dirs found
-  dirs=$(for d in src tests; do [ -d "$d" ] && echo "$d"; done)  # find bricht bei fehlendem Ordner ganz ab
-  found=$( { for n in $bad_names; do find $dirs \( -iname "$n" -o -iname "$n.rs" \); done | grep -vx 'tests/common'
-    grep -rsnE "^[[:space:]]*(pub(\([a-z]+\))?[[:space:]]+)?mod[[:space:]]+(${bad_names// /|})\b" src; } || true)
+  dirs=$(code_paths | grep -E '(^|/)(src|tests)$')  # nur vorhandene: find bricht bei fehlendem Ordner ganz ab
+  found=$( { for n in $bad_names; do find $dirs \( -iname "$n" -o -iname "$n.rs" \); done | grep -vxE "${CRATE_RE}tests/common"
+    grep -rsnE "^[[:space:]]*(pub(\([a-z]+\))?[[:space:]]+)?mod[[:space:]]+(${bad_names// /|})\b" $(grep -E '(^|/)src$' <<<"$dirs"); } || true)
   [ -n "$found" ] && echo "$found"
 }
 
-gate "cargo fmt --check"                 cargo fmt --check
-gate "cargo clippy --all-targets"        cargo clippy --all-targets --quiet -- -D warnings
-gate "cargo test"                        cargo test --quiet
+gate "cargo fmt --check"                 cargo fmt --all --check
+gate "cargo clippy --all-targets"        cargo clippy --workspace --all-targets --quiet -- -D warnings
+gate "cargo test"                        cargo test --workspace --quiet
 gate "kein get_-Getter"                  none grep -rsnE '\bfn get_[a-z0-9_]*(<[^>]*>)?\(&self\)' $(code_paths)
 gate "kein I-Präfix bei Traits"          none grep -rsnE '\btrait I[A-Z]' $(code_paths)
 gate "kein _async-Suffix"                none grep -rsnE '\bfn [a-z0-9_]+_async\b' $(code_paths)

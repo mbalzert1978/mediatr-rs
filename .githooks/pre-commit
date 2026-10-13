@@ -25,7 +25,7 @@ dir=$(review_dir "$(git write-tree)")
 
 # Reviews braucht jeder Commit, der Code oder Testliste ändert.
 files=$(git diff --cached --name-only)
-if grep -qE '^(src/|tests/|examples/|benches/|build\.rs$|TESTLIST\.md$)' <<<"$files"; then
+if grep -qE "$CODE_PATH_RE|^TESTLIST\.md$" <<<"$files"; then
   missing=""
   for r in $(reviewer_ids); do
     if [ "$(head -n 1 "$dir/$r" 2>/dev/null)" != PASS ]; then
