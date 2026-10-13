@@ -6,6 +6,8 @@ use mediatr_provider::Provider;
 
 struct Config;
 
+struct Name(&'static str);
+
 #[test]
 fn instance_returns_same_object_on_every_get() {
     let provider = Provider::builder().instance(Config).build();
@@ -23,4 +25,16 @@ fn get_without_registration_returns_none() {
     let service = provider.get::<Config>();
 
     assert!(service.is_none());
+}
+
+#[test]
+fn instance_twice_returns_last_registered_service() {
+    let provider = Provider::builder()
+        .instance(Name("alt"))
+        .instance(Name("neu"))
+        .build();
+
+    let name = provider.get::<Name>().unwrap();
+
+    assert_eq!(name.0, "neu");
 }
