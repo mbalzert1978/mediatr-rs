@@ -51,6 +51,6 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] Bauanleitung fragt nach einem anderen Dienst, dessen Bauanleitung mit einem Panic abbricht, der Aufrufer fängt ihn → die nächste Abfrage baut den Dienst samt dem anderen Dienst · `recipe_runs_again_after_caught_panic_in_dependency`
 - [x] Scope geklont → Klon und Original liefern denselben `scoped`-Dienst; die Bauanleitung läuft nur einmal · `cloned_scope_returns_same_scoped_service`
 - [x] Schwacher Verweis (`downgrade`) auf einen lebenden Provider → `upgrade` liefert einen Provider, der dasselbe Singleton liefert · `upgraded_weak_provider_returns_same_singleton`
-- [ ] Bauanleitung von `singleton` merkt sich den Provider schwach, der Provider fällt weg → das Singleton wird freigegeben (sein `Drop` läuft)
+- [x] Bauanleitung von `singleton` merkt sich den Provider schwach, der Provider fällt weg → das Singleton wird freigegeben (sein `Drop` läuft) · `singleton_holding_weak_provider_is_released_with_provider`
 - [ ] Schwacher Verweis, nachdem der Provider weggefallen ist → `upgrade` liefert `None`
 - [ ] Schwacher Verweis auf einen Scope, der Scope fällt weg, der Provider lebt → `upgrade` liefert `None`

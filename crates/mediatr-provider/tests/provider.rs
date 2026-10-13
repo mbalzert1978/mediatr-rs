@@ -4,7 +4,7 @@ use std::cell::Cell;
 use std::panic::{self, AssertUnwindSafe};
 use std::rc::Rc;
 
-use mediatr_provider::Provider;
+use mediatr_provider::{Provider, WeakProvider};
 
 struct Config;
 
@@ -152,6 +152,36 @@ fn upgraded_weak_provider_returns_same_singleton() {
         &provider.get::<Config>().unwrap(),
         &upgraded.get::<Config>().unwrap()
     ));
+}
+
+/// Plant Aufgaben für die ganze Anwendung; merkt sich den Provider, um später Dienste zu holen.
+struct Scheduler {
+    _provider: WeakProvider,
+    /// Steht auf `false`, sobald der Scheduler freigegeben ist.
+    running: Rc<Cell<bool>>,
+}
+
+impl Drop for Scheduler {
+    fn drop(&mut self) {
+        self.running.set(false);
+    }
+}
+
+#[test]
+fn singleton_holding_weak_provider_is_released_with_provider() {
+    let running = Rc::new(Cell::new(true));
+    let flag = Rc::clone(&running);
+    let provider = Provider::builder()
+        .singleton(move |provider| Scheduler {
+            _provider: provider.downgrade(),
+            running: Rc::clone(&flag),
+        })
+        .build();
+    provider.get::<Scheduler>().unwrap();
+
+    drop(provider);
+
+    assert!(!running.get());
 }
 
 /// Einstellungen, die sich beim Bau auf übergeordnete Einstellungen stützen, falls es welche gibt.

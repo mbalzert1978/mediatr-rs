@@ -3,7 +3,7 @@
 use std::any::{Any, TypeId};
 use std::cell::{OnceCell, RefCell};
 use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 /// Bauanleitungen verschiedener Typen, je Typ eine; jede ist ein [`Recipe`] ihres Typs.
 // Rc reicht, solange kein Testlisten-Punkt Threads verlangt; dann Arc.
@@ -22,19 +22,27 @@ type Recipe<T> = Box<dyn Fn(&Provider) -> Rc<T>>;
 /// Entsteht über [`Provider::builder`]. Der Provider ist selbst ein Scope.
 #[derive(Debug, Clone)]
 pub struct Provider {
-    services: Services,
+    shared: Rc<Shared>,
     built: Rc<Built>,
-    /// Der Speicher des Providers, aus dem alle Scopes stammen; dort liegen die `scoped`-Dienste eines Singletons.
-    root: Rc<Built>,
-    /// Typen, deren Bauanleitung gerade läuft; geteilt mit allen Scopes desselben Providers.
-    building: Rc<RefCell<HashSet<TypeId>>>,
 }
 
-/// Verweis auf einen [`Provider`], den [`Provider::downgrade`] liefert; [`WeakProvider::upgrade`] macht daraus wieder einen Provider.
-// Noch stark: Erst der Testlisten-Punkt „Singleton wird freigegeben“ verlangt, dass er den Provider nicht am Leben hält.
+/// Was ein Provider mit allen seinen Scopes teilt.
+#[derive(Debug)]
+struct Shared {
+    services: Services,
+    /// Der Speicher des Providers, aus dem alle Scopes stammen; dort liegen die `scoped`-Dienste eines Singletons.
+    root: Rc<Built>,
+    /// Typen, deren Bauanleitung gerade läuft.
+    building: RefCell<HashSet<TypeId>>,
+}
+
+/// Verweis auf einen [`Provider`], den [`Provider::downgrade`] liefert; hält dessen Dienste nicht am Leben.
+///
+/// [`WeakProvider::upgrade`] macht daraus wieder einen Provider.
 #[derive(Debug, Clone)]
 pub struct WeakProvider {
-    provider: Provider,
+    shared: Weak<Shared>,
+    built: Rc<Built>,
 }
 
 /// Sammelt Dienste und baut daraus einen [`Provider`].
@@ -56,8 +64,8 @@ impl Provider {
     #[must_use]
     pub fn get<T: 'static>(&self) -> Option<Rc<T>> {
         let id = TypeId::of::<T>();
-        let recipe = self.services.get(&id)?.downcast_ref::<Recipe<T>>()?;
-        let _building = Building::enter(&self.building, id)?;
+        let recipe = self.shared.services.get(&id)?.downcast_ref::<Recipe<T>>()?;
+        let _building = Building::enter(&self.shared.building, id)?;
         Some(recipe(self))
     }
 
@@ -65,10 +73,8 @@ impl Provider {
     #[must_use]
     pub fn scope(&self) -> Self {
         Self {
-            services: self.services.clone(),
+            shared: Rc::clone(&self.shared),
             built: Rc::default(),
-            root: Rc::clone(&self.root),
-            building: Rc::clone(&self.building),
         }
     }
 
@@ -76,26 +82,28 @@ impl Provider {
     #[must_use]
     pub fn downgrade(&self) -> WeakProvider {
         WeakProvider {
-            provider: self.clone(),
+            shared: Rc::downgrade(&self.shared),
+            built: Rc::clone(&self.built),
         }
     }
 
     /// Liefert den Provider, aus dem dieser Scope stammt.
     fn root(&self) -> Self {
         Self {
-            services: self.services.clone(),
-            built: Rc::clone(&self.root),
-            root: Rc::clone(&self.root),
-            building: Rc::clone(&self.building),
+            shared: Rc::clone(&self.shared),
+            built: Rc::clone(&self.shared.root),
         }
     }
 }
 
 impl WeakProvider {
-    /// Liefert den Provider, auf den dieser Verweis zeigt.
+    /// Liefert den Provider, auf den dieser Verweis zeigt; `None`, wenn er weggefallen ist.
     #[must_use]
     pub fn upgrade(&self) -> Option<Provider> {
-        Some(self.provider.clone())
+        Some(Provider {
+            shared: self.shared.upgrade()?,
+            built: Rc::clone(&self.built),
+        })
     }
 }
 
@@ -131,12 +139,14 @@ impl ProviderBuilder {
     /// Baut den Provider mit allen registrierten Diensten.
     #[must_use]
     pub fn build(self) -> Provider {
-        let built = Rc::<Built>::default();
+        let root = Rc::<Built>::default();
         Provider {
-            services: self.services,
-            root: Rc::clone(&built),
-            built,
-            building: Rc::default(),
+            built: Rc::clone(&root),
+            shared: Rc::new(Shared {
+                services: self.services,
+                root,
+                building: RefCell::default(),
+            }),
         }
     }
 
