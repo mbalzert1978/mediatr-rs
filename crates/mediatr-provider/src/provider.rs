@@ -53,9 +53,11 @@ impl Provider {
         if !self.building.borrow_mut().insert(id) {
             return None;
         }
-        let service = recipe(self);
-        self.building.borrow_mut().remove(&id);
-        Some(service)
+        let _building = Building {
+            types: &self.building,
+            id,
+        };
+        Some(recipe(self))
     }
 
     /// Beginnt einen neuen Scope mit denselben Diensten; `scoped`-Dienste baut er neu.
@@ -125,6 +127,18 @@ impl ProviderBuilder {
         let recipe: Recipe<T> = Box::new(recipe);
         self.services.insert(TypeId::of::<T>(), Rc::new(recipe));
         self
+    }
+}
+
+/// Hält den Typ `id` in `types`, solange er lebt; gibt ihn beim Fallen frei, auch nach einem Panic der Bauanleitung.
+struct Building<'a> {
+    types: &'a RefCell<HashSet<TypeId>>,
+    id: TypeId,
+}
+
+impl Drop for Building<'_> {
+    fn drop(&mut self) {
+        self.types.borrow_mut().remove(&self.id);
     }
 }
 

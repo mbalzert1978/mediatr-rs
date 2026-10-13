@@ -1,6 +1,7 @@
 //! Tests für den Abschnitt „Provider-Crate `mediatr-provider`“ in `TESTLIST.md`.
 
 use std::cell::Cell;
+use std::panic::{self, AssertUnwindSafe};
 use std::rc::Rc;
 
 use mediatr_provider::Provider;
@@ -203,6 +204,28 @@ fn mutually_dependent_recipes_get_none_for_inner_query() {
     let team = provider.get::<Team>().unwrap();
 
     assert!(team.lead.as_ref().unwrap().team.is_none());
+}
+
+/// Eine Verbindung zu einem Server, der nicht immer erreichbar ist.
+struct Connection;
+
+#[test]
+fn recipe_runs_again_after_caught_panic() {
+    let server_up = Rc::new(Cell::new(false));
+    let reachable = Rc::clone(&server_up);
+    let provider = Provider::builder()
+        .transient(move |_| {
+            assert!(reachable.get(), "Server nicht erreichbar");
+            Connection
+        })
+        .build();
+    let failed = panic::catch_unwind(AssertUnwindSafe(|| provider.get::<Connection>()));
+    assert!(failed.is_err());
+    server_up.set(true);
+
+    let connection = provider.get::<Connection>();
+
+    assert!(connection.is_some());
 }
 
 /// Liefert eine Bauanleitung für `Config` und den Zähler ihrer Läufe.
