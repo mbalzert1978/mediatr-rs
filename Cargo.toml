@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+mediatr-provider = { path = "crates/mediatr-provider" }
 
 [lints]
 workspace = true

@@ -20,7 +20,7 @@ Quelle: MediatR `test/MediatR.Tests/SendTests.cs`, `SendVoidInterfaceTests.cs`, 
 
 Quelle: MediatR `Mediator(IServiceProvider)` speichert keine Handler; es holt sie bei jedem `Send` über `GetRequiredService` (`src/MediatR/Mediator.cs`, `Wrappers/RequestHandlerWrapper.cs`). Nutzer sehen nur `Mediator::builder()`; Registry und Provider liegen dahinter.
 
-- [ ] Handler bekommt einen Sender per Konstruktor (DI, wie `ISender`) und schickt darüber einen Request → seine Antwort enthält die Antwort des inneren Handlers
+- [x] Handler bekommt einen Sender per Konstruktor (DI, wie `ISender`) und schickt darüber einen Request → seine Antwort enthält die Antwort des inneren Handlers · `handler_sends_inner_request_through_injected_sender`
 - [ ] Handler bekommt einen Sender per Konstruktor, der innere Request scheitert → der Handler gibt den Fehler über seinen eigenen Fehlertyp weiter
 
 ## Provider-Crate `mediatr-provider`
@@ -35,3 +35,5 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] Dienst mit `scoped` registriert → die Bauanleitung läuft einmal pro Scope; ein neuer Scope baut neu · `scoped_runs_recipe_once_per_scope`
 - [x] Dienst mit `singleton` registriert → ein neuer Scope liefert dasselbe Objekt wie der Provider · `singleton_returns_same_object_in_new_scope`
 - [x] Bauanleitung fragt den Provider nach einem anderen registrierten Dienst → der gebaute Dienst enthält diesen Dienst · `recipe_gets_other_service_from_provider`
+- [ ] Bauanleitung von `singleton` fragt nach einem `scoped`-Dienst, erste Abfrage kommt aus einem Scope → das Singleton enthält den `scoped`-Dienst des Providers, nicht den des Scopes
+- [ ] Bauanleitung fragt den Provider nach ihrem eigenen Typ → diese Abfrage liefert `None`, kein Panic und keine Endlosschleife
