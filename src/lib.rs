@@ -4,5 +4,5 @@ mod erased;
 mod mediator;
 mod request;
 
-pub use mediator::{Mediator, MediatorBuilder, MissingHandler, Sender, WeakMediator};
+pub use mediator::{Mediator, MediatorBuilder, SendError, Sender, WeakMediator};
 pub use request::{Request, RequestHandler};

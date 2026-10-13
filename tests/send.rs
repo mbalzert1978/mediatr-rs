@@ -3,7 +3,7 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use mediatr_rs::{Mediator, MissingHandler, Request, RequestHandler, Sender};
+use mediatr_rs::{Mediator, Request, RequestHandler, SendError, Sender};
 
 struct Ping(String);
 
@@ -12,13 +12,13 @@ struct Pong(String);
 
 impl Request for Ping {
     type Response = Pong;
-    type Error = MissingHandler;
+    type Error = SendError;
 }
 
 struct PingHandler;
 
 impl RequestHandler<Ping> for PingHandler {
-    async fn handle(&self, request: Ping) -> Result<Pong, MissingHandler> {
+    async fn handle(&self, request: Ping) -> Result<Pong, SendError> {
         Ok(Pong(format!("{} Pong", request.0)))
     }
 }
@@ -35,7 +35,7 @@ async fn send_returns_handler_response() {
 struct ReplacementPingHandler;
 
 impl RequestHandler<Ping> for ReplacementPingHandler {
-    async fn handle(&self, request: Ping) -> Result<Pong, MissingHandler> {
+    async fn handle(&self, request: Ping) -> Result<Pong, SendError> {
         Ok(Pong(format!("{} Replacement", request.0)))
     }
 }
@@ -67,7 +67,7 @@ struct VoidPing;
 
 impl Request for VoidPing {
     type Response = ();
-    type Error = MissingHandler;
+    type Error = SendError;
 }
 
 struct VoidPingHandler {
@@ -75,7 +75,7 @@ struct VoidPingHandler {
 }
 
 impl RequestHandler<VoidPing> for VoidPingHandler {
-    async fn handle(&self, _request: VoidPing) -> Result<(), MissingHandler> {
+    async fn handle(&self, _request: VoidPing) -> Result<(), SendError> {
         self.called.set(true);
         Ok(())
     }
@@ -121,20 +121,20 @@ async fn send_without_handler_returns_err() {
 
     let response = mediator.send(Ping("Ping".to_owned())).await;
 
-    assert_eq!(response, Err(MissingHandler));
+    assert_eq!(response, Err(SendError::NoHandler));
 }
 
 struct Reject;
 
 #[derive(Debug, PartialEq)]
 enum RejectError {
-    MissingHandler,
+    Undeliverable,
     Rejected,
 }
 
-impl From<MissingHandler> for RejectError {
-    fn from(_: MissingHandler) -> Self {
-        Self::MissingHandler
+impl From<SendError> for RejectError {
+    fn from(_: SendError) -> Self {
+        Self::Undeliverable
     }
 }
 
@@ -166,7 +166,7 @@ async fn send_without_handler_converts_missing_handler_into_request_error() {
 
     let response = mediator.send(Reject).await;
 
-    assert_eq!(response, Err(RejectError::MissingHandler));
+    assert_eq!(response, Err(RejectError::Undeliverable));
 }
 
 #[tokio::test]

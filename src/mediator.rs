@@ -42,14 +42,18 @@ pub trait Sender<R: Request> {
     ///
     /// # Errors
     ///
-    /// Den Fehler des Handlers, oder [`MissingHandler`] als `R::Error`,
-    /// wenn für `R` kein Handler registriert ist.
+    /// Den Fehler des Handlers, oder einen [`SendError`] als `R::Error`,
+    /// wenn `send` den Request nicht zustellen kann.
     fn send(&self, request: R) -> impl Future<Output = Result<R::Response, R::Error>>;
 }
 
-/// Für den Request-Typ ist kein Handler registriert; [`Sender::send`] liefert ihn als `R::Error`.
+/// Warum [`Sender::send`] einen Request nicht zustellen kann; `send` liefert ihn als `R::Error`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct MissingHandler;
+#[non_exhaustive]
+pub enum SendError {
+    /// Für den Request-Typ ist kein Handler registriert.
+    NoHandler,
+}
 
 impl Mediator {
     /// Beginnt einen Mediator ohne Handler.
@@ -64,7 +68,7 @@ impl<R: Request + 'static> Sender<R> for Mediator {
         let handler = self
             .provider
             .get::<ErasedHandler<R>>()
-            .ok_or(MissingHandler)?;
+            .ok_or(SendError::NoHandler)?;
         handler(request).await
     }
 }
@@ -72,7 +76,7 @@ impl<R: Request + 'static> Sender<R> for Mediator {
 impl<R: Request + 'static> Sender<R> for WeakMediator {
     async fn send(&self, request: R) -> HandlerResult<R> {
         let mediator = Mediator {
-            provider: self.provider.upgrade().ok_or(MissingHandler)?,
+            provider: self.provider.upgrade().ok_or(SendError::NoHandler)?,
         };
         mediator.send(request).await
     }
@@ -134,10 +138,12 @@ impl MediatorBuilder {
     }
 }
 
-impl fmt::Display for MissingHandler {
+impl fmt::Display for SendError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("kein Handler für diesen Request-Typ registriert")
+        match self {
+            Self::NoHandler => f.write_str("kein Handler für diesen Request-Typ registriert"),
+        }
     }
 }
 
-impl Error for MissingHandler {}
+impl Error for SendError {}

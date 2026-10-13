@@ -3,7 +3,7 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use mediatr_rs::{Mediator, MissingHandler, Request, RequestHandler, Sender, WeakMediator};
+use mediatr_rs::{Mediator, Request, RequestHandler, SendError, Sender, WeakMediator};
 
 #[derive(Clone)]
 struct Customer {
@@ -28,12 +28,12 @@ struct GetCustomer {
 #[derive(Debug)]
 enum CustomerError {
     NotFound,
-    MissingHandler,
+    Undeliverable,
 }
 
-impl From<MissingHandler> for CustomerError {
-    fn from(_: MissingHandler) -> Self {
-        Self::MissingHandler
+impl From<SendError> for CustomerError {
+    fn from(_: SendError) -> Self {
+        Self::Undeliverable
     }
 }
 
@@ -72,12 +72,12 @@ struct Confirmation {
 enum OrderError {
     /// Der Kunde ließ sich nicht holen; der Grund bleibt erhalten.
     Customer(CustomerError),
-    MissingHandler,
+    Undeliverable,
 }
 
-impl From<MissingHandler> for OrderError {
-    fn from(_: MissingHandler) -> Self {
-        Self::MissingHandler
+impl From<SendError> for OrderError {
+    fn from(_: SendError) -> Self {
+        Self::Undeliverable
     }
 }
 

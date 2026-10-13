@@ -2,7 +2,7 @@
 
 use std::future::Future;
 
-use crate::MissingHandler;
+use crate::SendError;
 
 /// Eine Nachricht, die genau ein Handler mit einer Antwort beantwortet.
 ///
@@ -10,12 +10,12 @@ use crate::MissingHandler;
 ///
 /// `Response` ist der einzige Typ, den ein Handler für diesen Request liefert.
 /// `Error` ist der einzige Fehlertyp, den `send` für diesen Request liefert.
-/// `From<MissingHandler>` liefert einen Wert, der „kein Handler registriert“ bedeutet.
+/// `From<SendError>` liefert einen Wert, der „`send` kann den Request nicht zustellen“ bedeutet.
 pub trait Request {
     /// Typ der Antwort, die `send` für diesen Request liefert.
     type Response;
     /// Typ des Fehlers, den `send` für diesen Request liefert.
-    type Error: From<MissingHandler>;
+    type Error: From<SendError>;
 }
 
 /// Was ein Handler für `R` liefert: die Antwort oder den Fehler von `R`.
