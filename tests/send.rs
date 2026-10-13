@@ -128,13 +128,13 @@ struct Reject;
 
 #[derive(Debug, PartialEq)]
 enum RejectError {
-    Undeliverable,
+    Undeliverable(SendError),
     Rejected,
 }
 
 impl From<SendError> for RejectError {
-    fn from(_: SendError) -> Self {
-        Self::Undeliverable
+    fn from(error: SendError) -> Self {
+        Self::Undeliverable(error)
     }
 }
 
@@ -166,7 +166,10 @@ async fn send_without_handler_converts_missing_handler_into_request_error() {
 
     let response = mediator.send(Reject).await;
 
-    assert_eq!(response, Err(RejectError::Undeliverable));
+    assert_eq!(
+        response,
+        Err(RejectError::Undeliverable(SendError::NoHandler))
+    );
 }
 
 #[tokio::test]

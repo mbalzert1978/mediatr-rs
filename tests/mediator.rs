@@ -1,6 +1,6 @@
 //! Tests für den Abschnitt „Mediator — Fassade und DI“ in `TESTLIST.md`.
 
-use std::cell::Cell;
+use std::cell::{Cell, OnceCell};
 use std::rc::Rc;
 
 use mediatr_rs::{Mediator, Request, RequestHandler, SendError, Sender, WeakMediator};
@@ -28,12 +28,12 @@ struct GetCustomer {
 #[derive(Debug)]
 enum CustomerError {
     NotFound,
-    Undeliverable,
+    Undeliverable(SendError),
 }
 
 impl From<SendError> for CustomerError {
-    fn from(_: SendError) -> Self {
-        Self::Undeliverable
+    fn from(error: SendError) -> Self {
+        Self::Undeliverable(error)
     }
 }
 
@@ -266,6 +266,39 @@ impl Sender<GetCustomer> for FixedCustomer {
     async fn send(&self, _request: GetCustomer) -> Result<Customer, CustomerError> {
         Ok(self.0.clone())
     }
+}
+
+#[tokio::test]
+async fn singleton_handler_sending_after_mediator_dropped_gets_mediator_dropped() {
+    let order = || PlaceOrder {
+        customer_id: 7,
+        amount: 100,
+    };
+    let handed_out = Rc::new(OnceCell::new());
+    let keep = Rc::clone(&handed_out);
+    let mediator = Mediator::builder()
+        .register(CustomerDirectory {
+            customers: vec![ada()],
+        })
+        .singleton(move |sender: WeakMediator| {
+            keep.get_or_init(|| sender.clone());
+            PlaceOrderHandler { sender }
+        })
+        .build();
+    mediator.send(order()).await.unwrap();
+    let orders = PlaceOrderHandler {
+        sender: handed_out.get().unwrap().clone(),
+    };
+    drop(mediator);
+
+    let result = orders.handle(order()).await;
+
+    assert!(matches!(
+        result,
+        Err(OrderError::Customer(CustomerError::Undeliverable(
+            SendError::MediatorDropped
+        )))
+    ));
 }
 
 #[tokio::test]

@@ -53,6 +53,8 @@ pub trait Sender<R: Request> {
 pub enum SendError {
     /// Für den Request-Typ ist kein Handler registriert.
     NoHandler,
+    /// Der Mediator, über den ein [`WeakMediator`] sendet, ist weggefallen.
+    MediatorDropped,
 }
 
 impl Mediator {
@@ -76,7 +78,7 @@ impl<R: Request + 'static> Sender<R> for Mediator {
 impl<R: Request + 'static> Sender<R> for WeakMediator {
     async fn send(&self, request: R) -> HandlerResult<R> {
         let mediator = Mediator {
-            provider: self.provider.upgrade().ok_or(SendError::NoHandler)?,
+            provider: self.provider.upgrade().ok_or(SendError::MediatorDropped)?,
         };
         mediator.send(request).await
     }
@@ -142,6 +144,7 @@ impl fmt::Display for SendError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NoHandler => f.write_str("kein Handler für diesen Request-Typ registriert"),
+            Self::MediatorDropped => f.write_str("der Mediator ist weggefallen"),
         }
     }
 }
