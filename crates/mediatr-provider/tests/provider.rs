@@ -268,6 +268,29 @@ fn scoped_recipe_runs_again_after_caught_panic() {
     assert!(connection.is_some());
 }
 
+/// Liest Daten über eine Verbindung, falls es eine gibt.
+struct Repository {
+    connection: Option<Rc<Connection>>,
+}
+
+#[test]
+fn recipe_runs_again_after_caught_panic_in_dependency() {
+    let (server_up, recipe) = connection_recipe();
+    let provider = Provider::builder()
+        .transient(recipe)
+        .transient(|provider| Repository {
+            connection: provider.get::<Connection>(),
+        })
+        .build();
+    let failed = panic::catch_unwind(AssertUnwindSafe(|| provider.get::<Repository>()));
+    assert!(failed.is_err());
+    server_up.set(true);
+
+    let repository = provider.get::<Repository>().unwrap();
+
+    assert!(repository.connection.is_some());
+}
+
 /// Liefert den Schalter für den Server (anfangs aus) und eine Bauanleitung für `Connection`, die mit einem Panic abbricht, solange er aus ist.
 fn connection_recipe() -> (Rc<Cell<bool>>, impl Fn(&Provider) -> Connection) {
     let server_up = Rc::new(Cell::new(false));
