@@ -2,4 +2,4 @@
 
 mod provider;
 
-pub use provider::{Provider, ProviderBuilder};
+pub use provider::{Provider, ProviderBuilder, WeakProvider};

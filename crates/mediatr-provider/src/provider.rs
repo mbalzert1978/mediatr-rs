@@ -30,6 +30,13 @@ pub struct Provider {
     building: Rc<RefCell<HashSet<TypeId>>>,
 }
 
+/// Verweis auf einen [`Provider`], den [`Provider::downgrade`] liefert; [`WeakProvider::upgrade`] macht daraus wieder einen Provider.
+// Noch stark: Erst der Testlisten-Punkt „Singleton wird freigegeben“ verlangt, dass er den Provider nicht am Leben hält.
+#[derive(Debug, Clone)]
+pub struct WeakProvider {
+    provider: Provider,
+}
+
 /// Sammelt Dienste und baut daraus einen [`Provider`].
 ///
 /// Eine Bauanleitung bekommt den abfragenden Provider und holt darüber andere Dienste.
@@ -65,6 +72,14 @@ impl Provider {
         }
     }
 
+    /// Liefert einen Verweis auf diesen Provider, den eine Bauanleitung sich merken kann.
+    #[must_use]
+    pub fn downgrade(&self) -> WeakProvider {
+        WeakProvider {
+            provider: self.clone(),
+        }
+    }
+
     /// Liefert den Provider, aus dem dieser Scope stammt.
     fn root(&self) -> Self {
         Self {
@@ -73,6 +88,14 @@ impl Provider {
             root: Rc::clone(&self.root),
             building: Rc::clone(&self.building),
         }
+    }
+}
+
+impl WeakProvider {
+    /// Liefert den Provider, auf den dieser Verweis zeigt.
+    #[must_use]
+    pub fn upgrade(&self) -> Option<Provider> {
+        Some(self.provider.clone())
     }
 }
 

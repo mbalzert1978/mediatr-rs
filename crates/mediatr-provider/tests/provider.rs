@@ -141,6 +141,19 @@ fn cloned_scope_returns_same_scoped_service() {
     assert_eq!(calls.get(), 1);
 }
 
+#[test]
+fn upgraded_weak_provider_returns_same_singleton() {
+    let provider = Provider::builder().singleton(|_| Config).build();
+    let weak = provider.downgrade();
+
+    let upgraded = weak.upgrade().unwrap();
+
+    assert!(Rc::ptr_eq(
+        &provider.get::<Config>().unwrap(),
+        &upgraded.get::<Config>().unwrap()
+    ));
+}
+
 /// Einstellungen, die sich beim Bau auf übergeordnete Einstellungen stützen, falls es welche gibt.
 struct Settings {
     parent: Option<Rc<Settings>>,

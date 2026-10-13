@@ -25,6 +25,7 @@ Quelle: MediatR `Mediator(IServiceProvider)` speichert keine Handler; es holt si
 - [x] Handler mit `transient` registriert → jedes `send` baut den Handler neu · `transient_builds_handler_on_every_send`
 - [x] Handler, der einen Sender per Konstruktor bekommt, wird ohne Mediator getestet und bekommt eine Attrappe statt des Senders → er verarbeitet die Antwort der Attrappe · `handler_processes_response_of_fake_sender`
 - [ ] Handler mit Sender per Konstruktor ist als `singleton` registriert, der Mediator wird fallen gelassen → der Handler wird freigegeben (sein `Drop` läuft)
+- [ ] Handler mit Sender ist als `singleton` registriert und schickt einen Request, nachdem der Mediator weggefallen ist → `send` liefert `Err` (`MissingHandler`), kein Panic
 
 ## Provider-Crate `mediatr-provider`
 
@@ -49,3 +50,7 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] Bauanleitung von `scoped` bricht mit einem Panic ab, der Aufrufer fängt ihn → die nächste Abfrage im selben Scope baut den Dienst · `scoped_recipe_runs_again_after_caught_panic`
 - [x] Bauanleitung fragt nach einem anderen Dienst, dessen Bauanleitung mit einem Panic abbricht, der Aufrufer fängt ihn → die nächste Abfrage baut den Dienst samt dem anderen Dienst · `recipe_runs_again_after_caught_panic_in_dependency`
 - [x] Scope geklont → Klon und Original liefern denselben `scoped`-Dienst; die Bauanleitung läuft nur einmal · `cloned_scope_returns_same_scoped_service`
+- [x] Schwacher Verweis (`downgrade`) auf einen lebenden Provider → `upgrade` liefert einen Provider, der dasselbe Singleton liefert · `upgraded_weak_provider_returns_same_singleton`
+- [ ] Bauanleitung von `singleton` merkt sich den Provider schwach, der Provider fällt weg → das Singleton wird freigegeben (sein `Drop` läuft)
+- [ ] Schwacher Verweis, nachdem der Provider weggefallen ist → `upgrade` liefert `None`
+- [ ] Schwacher Verweis auf einen Scope, der Scope fällt weg, der Provider lebt → `upgrade` liefert `None`
