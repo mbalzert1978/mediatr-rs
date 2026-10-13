@@ -23,7 +23,9 @@ type Recipe<T> = Box<dyn Fn(&Provider) -> Rc<T>>;
 #[derive(Debug, Clone)]
 pub struct Provider {
     services: Services,
-    built: Built,
+    built: Rc<Built>,
+    /// Der Speicher des Providers, aus dem alle Scopes stammen; dort liegen die `scoped`-Dienste eines Singletons.
+    root: Rc<Built>,
 }
 
 /// Sammelt Dienste und baut daraus einen [`Provider`].
@@ -56,7 +58,17 @@ impl Provider {
     pub fn scope(&self) -> Self {
         Self {
             services: self.services.clone(),
-            built: Built::default(),
+            built: Rc::default(),
+            root: Rc::clone(&self.root),
+        }
+    }
+
+    /// Liefert den Provider, aus dem dieser Scope stammt.
+    fn root(&self) -> Self {
+        Self {
+            services: self.services.clone(),
+            built: Rc::clone(&self.root),
+            root: Rc::clone(&self.root),
         }
     }
 }
@@ -75,11 +87,13 @@ impl ProviderBuilder {
         self.recipe(move |provider| Rc::new(recipe(provider)))
     }
 
-    /// Registriert `recipe`; die erste Abfrage baut den Dienst, jede weitere liefert dasselbe Objekt.
+    /// Registriert `recipe`; die erste Abfrage baut den Dienst mit dem Provider statt mit dem Scope, jede weitere liefert dasselbe Objekt.
     #[must_use]
     pub fn singleton<T: 'static>(self, recipe: impl Fn(&Provider) -> T + 'static) -> Self {
         let service = OnceCell::new();
-        self.recipe(move |provider| Rc::clone(service.get_or_init(|| Rc::new(recipe(provider)))))
+        self.recipe(move |provider| {
+            Rc::clone(service.get_or_init(|| Rc::new(recipe(&provider.root()))))
+        })
     }
 
     /// Registriert `recipe`; die erste Abfrage in einem Scope baut den Dienst, jede weitere im selben Scope liefert dasselbe Objekt.
@@ -91,9 +105,11 @@ impl ProviderBuilder {
     /// Baut den Provider mit allen registrierten Diensten.
     #[must_use]
     pub fn build(self) -> Provider {
+        let built = Rc::<Built>::default();
         Provider {
             services: self.services,
-            built: Built::default(),
+            root: Rc::clone(&built),
+            built,
         }
     }
 

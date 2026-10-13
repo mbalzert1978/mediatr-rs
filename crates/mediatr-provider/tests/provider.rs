@@ -101,6 +101,33 @@ fn recipe_gets_other_service_from_provider() {
     assert_eq!(greeting.0, "Hallo Welt");
 }
 
+/// Eine Sitzung, die pro Scope neu entsteht; `0` ist ihre laufende Nummer.
+struct Session(u32);
+
+/// Schreibt für die ganze Anwendung mit; hält die Sitzung, die es beim Bau bekam.
+struct AuditLog {
+    session: Rc<Session>,
+}
+
+#[test]
+fn singleton_built_from_scope_gets_scoped_service_of_provider() {
+    let opened = Cell::new(0_u32);
+    let provider = Provider::builder()
+        .scoped(move |_| {
+            opened.set(opened.get().saturating_add(1));
+            Session(opened.get())
+        })
+        .singleton(|provider| AuditLog {
+            session: provider.get::<Session>().unwrap(),
+        })
+        .build();
+
+    let log = provider.scope().get::<AuditLog>().unwrap();
+    let provider_session = provider.get::<Session>().unwrap();
+
+    assert_eq!(log.session.0, provider_session.0);
+}
+
 /// Liefert eine Bauanleitung für `Config` und den Zähler ihrer Läufe.
 fn counting_recipe() -> (Rc<Cell<u32>>, impl Fn(&Provider) -> Config) {
     let calls = Rc::new(Cell::new(0_u32));
