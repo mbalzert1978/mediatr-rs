@@ -3,28 +3,29 @@
 use std::error::Error;
 use std::fmt;
 
-use crate::registry::Registry;
 use crate::request::HandlerResult;
-use crate::{Request, RequestHandler};
+use crate::{HandlerProvider, Request, RequestHandler};
 
-/// Leitet Requests an den Handler weiter, der für ihren Typ registriert ist.
-#[derive(Debug, Default)]
-pub struct Mediator {
-    registry: Registry,
+/// Leitet Requests an den Handler weiter, den der Provider `P` für ihren Typ liefert.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Mediator<P> {
+    provider: P,
+}
+
+/// Baut einen [`Mediator`]; entsteht über [`Mediator::builder`].
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct MediatorBuilder<P> {
+    provider: P,
 }
 
 /// Für den Request-Typ ist kein Handler registriert; [`Mediator::send`] liefert ihn als `R::Error`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MissingHandler;
 
-impl Mediator {
-    /// Registriert `handler` für Requests vom Typ `R`.
-    pub fn register<R, H>(&mut self, handler: H)
-    where
-        R: Request + 'static,
-        H: RequestHandler<R> + 'static,
-    {
-        self.registry.insert(handler);
+impl<P> Mediator<P> {
+    /// Beginnt einen Mediator, der seine Handler von `provider` holt.
+    pub fn builder(provider: P) -> MediatorBuilder<P> {
+        MediatorBuilder { provider }
     }
 
     /// Schickt `request` an seinen Handler und liefert dessen Antwort.
@@ -32,10 +33,23 @@ impl Mediator {
     /// # Errors
     ///
     /// Den Fehler des Handlers, oder [`MissingHandler`] als `R::Error`,
-    /// wenn für `R` kein Handler registriert ist.
-    pub async fn send<R: Request + 'static>(&self, request: R) -> HandlerResult<R> {
-        let handler = self.registry.get::<R>().ok_or(MissingHandler)?;
-        handler(request).await
+    /// wenn der Provider für `R` keinen Handler liefert.
+    pub async fn send<R>(&self, request: R) -> HandlerResult<R>
+    where
+        R: Request,
+        P: HandlerProvider<R>,
+    {
+        let handler = self.provider.handler().ok_or(MissingHandler)?;
+        handler.handle(request).await
+    }
+}
+
+impl<P> MediatorBuilder<P> {
+    /// Baut den Mediator.
+    pub fn build(self) -> Mediator<P> {
+        Mediator {
+            provider: self.provider,
+        }
     }
 }
 

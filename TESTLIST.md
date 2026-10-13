@@ -20,7 +20,7 @@ Quelle: MediatR `test/MediatR.Tests/SendTests.cs`, `SendVoidInterfaceTests.cs`, 
 
 Quelle: MediatR `Mediator(IServiceProvider)` speichert keine Handler; es holt sie bei jedem `Send` über `GetRequiredService` (`src/MediatR/Mediator.cs`, `Wrappers/RequestHandlerWrapper.cs`).
 
-- [ ] Mediator per Builder mit einem Provider gebaut → `send` holt den Handler über diesen Provider
+- [x] Mediator per Builder mit einem Provider gebaut → `send` holt den Handler über diesen Provider · `send_fetches_handler_from_provider`
 - [ ] Handler bekommt einen Sender per Konstruktor (DI, wie `ISender`) und schickt darüber einen Request → seine Antwort enthält die Antwort des inneren Handlers
 - [ ] Handler bekommt einen Sender per Konstruktor, der innere Request scheitert → der Handler gibt den Fehler über seinen eigenen Fehlertyp weiter
 
@@ -28,7 +28,7 @@ Quelle: MediatR `Mediator(IServiceProvider)` speichert keine Handler; es holt si
 
 Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSingleton`, `AddScoped`, `AddTransient`). Der Provider registriert und baut Handler; das Weiterleiten kennt er nicht.
 
-- [ ] Handler mit `instance` registriert → jede Anfrage liefert dasselbe Handler-Objekt
-- [ ] Handler mit `transient` registriert → die Bauanleitung läuft bei jeder Anfrage neu
-- [ ] Handler mit `singleton` registriert → die Bauanleitung läuft einmal, bei der ersten Anfrage
+- [ ] Handler mit `instance` registriert → jede Abfrage beim Provider liefert dasselbe Handler-Objekt
+- [ ] Handler mit `transient` registriert → die Bauanleitung läuft bei jeder Abfrage beim Provider neu
+- [ ] Handler mit `singleton` registriert → die Bauanleitung läuft einmal, bei der ersten Abfrage beim Provider
 - [ ] Handler mit `scoped` registriert → die Bauanleitung läuft einmal pro Scope; ein neuer Scope baut neu

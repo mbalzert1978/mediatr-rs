@@ -3,7 +3,7 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use mediatr_rs::{Mediator, MissingHandler, Request, RequestHandler};
+use mediatr_rs::{Mediator, MissingHandler, Registry, Request, RequestHandler};
 
 struct Ping(String);
 
@@ -25,8 +25,9 @@ impl RequestHandler<Ping> for PingHandler {
 
 #[tokio::test]
 async fn send_returns_handler_response() {
-    let mut mediator = Mediator::default();
-    mediator.register(PingHandler);
+    let mut registry = Registry::default();
+    registry.register(PingHandler);
+    let mediator = Mediator::builder(registry).build();
 
     let response = mediator.send(Ping("Ping".to_owned())).await.unwrap();
 
@@ -43,9 +44,10 @@ impl RequestHandler<Ping> for ReplacementPingHandler {
 
 #[tokio::test]
 async fn register_twice_keeps_last_handler() {
-    let mut mediator = Mediator::default();
-    mediator.register(PingHandler);
-    mediator.register(ReplacementPingHandler);
+    let mut registry = Registry::default();
+    registry.register(PingHandler);
+    registry.register(ReplacementPingHandler);
+    let mediator = Mediator::builder(registry).build();
 
     let response = mediator.send(Ping("Ping".to_owned())).await.unwrap();
 
@@ -54,8 +56,9 @@ async fn register_twice_keeps_last_handler() {
 
 #[tokio::test]
 async fn register_accepts_async_closure() {
-    let mut mediator = Mediator::default();
-    mediator.register(async |request: Ping| Ok(Pong(format!("{} Closure", request.0))));
+    let mut registry = Registry::default();
+    registry.register(async |request: Ping| Ok(Pong(format!("{} Closure", request.0))));
+    let mediator = Mediator::builder(registry).build();
 
     let response = mediator.send(Ping("Ping".to_owned())).await.unwrap();
 
@@ -83,10 +86,11 @@ impl RequestHandler<VoidPing> for VoidPingHandler {
 #[tokio::test]
 async fn send_runs_handler_for_unit_response() {
     let called = Rc::new(Cell::new(false));
-    let mut mediator = Mediator::default();
-    mediator.register(VoidPingHandler {
+    let mut registry = Registry::default();
+    registry.register(VoidPingHandler {
         called: Rc::clone(&called),
     });
+    let mediator = Mediator::builder(registry).build();
 
     mediator.send(VoidPing).await.unwrap();
 
@@ -96,11 +100,12 @@ async fn send_runs_handler_for_unit_response() {
 #[tokio::test]
 async fn send_reaches_only_handler_of_its_request_type() {
     let called = Rc::new(Cell::new(false));
-    let mut mediator = Mediator::default();
-    mediator.register(PingHandler);
-    mediator.register(VoidPingHandler {
+    let mut registry = Registry::default();
+    registry.register(PingHandler);
+    registry.register(VoidPingHandler {
         called: Rc::clone(&called),
     });
+    let mediator = Mediator::builder(registry).build();
 
     let response = mediator.send(Ping("Ping".to_owned())).await.unwrap();
 
@@ -114,7 +119,7 @@ async fn send_reaches_only_handler_of_its_request_type() {
 
 #[tokio::test]
 async fn send_without_handler_returns_err() {
-    let mediator = Mediator::default();
+    let mediator = Mediator::builder(Registry::default()).build();
 
     let response = mediator.send(Ping("Ping".to_owned())).await;
 
@@ -150,8 +155,9 @@ impl RequestHandler<Reject> for RejectHandler {
 
 #[tokio::test]
 async fn send_returns_handler_error() {
-    let mut mediator = Mediator::default();
-    mediator.register(RejectHandler);
+    let mut registry = Registry::default();
+    registry.register(RejectHandler);
+    let mediator = Mediator::builder(registry).build();
 
     let response = mediator.send(Reject).await;
 
@@ -160,7 +166,7 @@ async fn send_returns_handler_error() {
 
 #[tokio::test]
 async fn send_without_handler_converts_missing_handler_into_request_error() {
-    let mediator = Mediator::default();
+    let mediator = Mediator::builder(Registry::default()).build();
 
     let response = mediator.send(Reject).await;
 
@@ -169,7 +175,7 @@ async fn send_without_handler_converts_missing_handler_into_request_error() {
 
 #[tokio::test]
 async fn send_error_propagates_as_boxed_error() {
-    let mediator = Mediator::default();
+    let mediator = Mediator::builder(Registry::default()).build();
 
     let result: Result<Pong, Box<dyn std::error::Error>> =
         async { Ok(mediator.send(Ping("Ping".to_owned())).await?) }.await;

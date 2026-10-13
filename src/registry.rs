@@ -7,24 +7,24 @@ use std::pin::Pin;
 use std::rc::Rc;
 
 use crate::request::HandlerResult;
-use crate::{Request, RequestHandler};
+use crate::{HandlerProvider, Request, RequestHandler};
 
 /// Ein Handler mit gelöschtem Typ: nimmt einen `R` und liefert später dessen Antwort oder Fehler.
-// dyn: `send` kennt nur `R`, nicht den Handler-Typ. Handler verschiedener Typen
+// dyn: `handler` kennt nur `R`, nicht den Handler-Typ. Handler verschiedener Typen
 // und ihre Futures liegen deshalb hinter einem gemeinsamen Typ je `R`.
 pub(crate) type ErasedHandler<R> =
     Box<dyn Fn(R) -> Pin<Box<dyn Future<Output = HandlerResult<R>>>>>;
 
-/// Handler verschiedener Typen, je Request-Typ einer.
+/// Provider, der zu jedem Request-Typ einen registrierten Handler hält.
 #[derive(Debug, Default)]
-pub(crate) struct Registry {
+pub struct Registry {
     // dyn: Hier liegen Handler verschiedener Typen zusammen.
     handlers: HashMap<TypeId, Box<dyn Any>>,
 }
 
 impl Registry {
-    /// Legt `handler` für Requests vom Typ `R` ab.
-    pub(crate) fn insert<R, H>(&mut self, handler: H)
+    /// Registriert `handler` für Requests vom Typ `R`; ein früherer Handler für `R` fällt weg.
+    pub fn register<R, H>(&mut self, handler: H)
     where
         R: Request + 'static,
         H: RequestHandler<R> + 'static,
@@ -35,10 +35,15 @@ impl Registry {
             Box::new(move |request| Box::pin(call(Rc::clone(&handler), request)));
         self.handlers.insert(TypeId::of::<R>(), Box::new(erased));
     }
+}
 
-    /// Liefert den Handler für Requests vom Typ `R`, falls einer abgelegt ist.
-    pub(crate) fn get<R: Request + 'static>(&self) -> Option<&ErasedHandler<R>> {
-        self.handlers.get(&TypeId::of::<R>())?.downcast_ref()
+impl<R: Request + 'static> HandlerProvider<R> for Registry {
+    fn handler(&self) -> Option<impl RequestHandler<R>> {
+        let erased = self
+            .handlers
+            .get(&TypeId::of::<R>())?
+            .downcast_ref::<ErasedHandler<R>>()?;
+        Some(move |request: R| erased(request))
     }
 }
 
