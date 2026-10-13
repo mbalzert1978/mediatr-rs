@@ -1,5 +1,8 @@
 //! Der Mediator leitet einen Request an seinen Handler weiter.
 
+use std::error::Error;
+use std::fmt;
+
 use crate::registry::Registry;
 use crate::{Request, RequestHandler};
 
@@ -34,3 +37,11 @@ impl Mediator {
         handler(request).await
     }
 }
+
+impl fmt::Display for MissingHandler {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("kein Handler für diesen Request-Typ registriert")
+    }
+}
+
+impl Error for MissingHandler {}

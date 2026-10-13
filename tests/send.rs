@@ -128,3 +128,16 @@ async fn send_returns_handler_error() {
 
     assert_eq!(response, Err(RejectError::Rejected));
 }
+
+#[tokio::test]
+async fn send_error_propagates_as_boxed_error() {
+    let mediator = Mediator::default();
+
+    let result: Result<Pong, Box<dyn std::error::Error>> =
+        async { Ok(mediator.send(Ping("Ping".to_owned())).await?) }.await;
+
+    assert_eq!(
+        result.unwrap_err().to_string(),
+        "kein Handler für diesen Request-Typ registriert"
+    );
+}
