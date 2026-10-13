@@ -128,6 +128,18 @@ fn singleton_built_from_scope_gets_scoped_service_of_provider() {
     assert_eq!(log.session.0, provider_session.0);
 }
 
+#[test]
+fn cloned_scope_returns_same_scoped_service() {
+    let (calls, recipe) = counting_recipe();
+    let scope = Provider::builder().scoped(recipe).build().scope();
+    let clone = scope.clone();
+
+    scope.get::<Config>().unwrap();
+    clone.get::<Config>().unwrap();
+
+    assert_eq!(calls.get(), 1);
+}
+
 /// Liefert eine Bauanleitung für `Config` und den Zähler ihrer Läufe.
 fn counting_recipe() -> (Rc<Cell<u32>>, impl Fn(&Provider) -> Config) {
     let calls = Rc::new(Cell::new(0_u32));
