@@ -248,6 +248,25 @@ fn recipe_runs_again_after_caught_panic() {
     assert!(connection.is_some());
 }
 
+#[test]
+fn singleton_recipe_runs_again_after_caught_panic() {
+    let server_up = Rc::new(Cell::new(false));
+    let reachable = Rc::clone(&server_up);
+    let provider = Provider::builder()
+        .singleton(move |_| {
+            assert!(reachable.get(), "Server nicht erreichbar");
+            Connection
+        })
+        .build();
+    let failed = panic::catch_unwind(AssertUnwindSafe(|| provider.get::<Connection>()));
+    assert!(failed.is_err());
+    server_up.set(true);
+
+    let connection = provider.get::<Connection>();
+
+    assert!(connection.is_some());
+}
+
 /// Liefert eine Bauanleitung für `Config` und den Zähler ihrer Läufe.
 fn counting_recipe() -> (Rc<Cell<u32>>, impl Fn(&Provider) -> Config) {
     let calls = Rc::new(Cell::new(0_u32));
