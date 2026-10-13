@@ -180,6 +180,26 @@ fn scoped_recipe_asking_for_own_type_gets_none() {
     assert!(settings.parent.is_none());
 }
 
+/// Ein Ordner mit übergeordnetem Ordner und Vorlage, falls es sie gibt.
+struct Folder {
+    parent: Option<Rc<Folder>>,
+    template: Option<Rc<Folder>>,
+}
+
+#[test]
+fn recipe_asking_twice_for_own_type_gets_none_both_times() {
+    let provider = Provider::builder()
+        .transient(|provider| Folder {
+            parent: provider.get::<Folder>(),
+            template: provider.get::<Folder>(),
+        })
+        .build();
+
+    let folder = provider.get::<Folder>().unwrap();
+
+    assert!(folder.parent.is_none() && folder.template.is_none());
+}
+
 /// Ein Team mit seiner Leitung, falls es eine gibt.
 struct Team {
     lead: Option<Rc<Employee>>,
