@@ -23,7 +23,7 @@ Du liest nur. Dein einziger schreibender Befehl ist `scripts/review-stamp.sh`. K
 
 ## Bericht
 
-```
+```text
 Urteil: PASS | FAIL
 Geprüfte Dateien: <liste>
 Verstöße:
