@@ -184,6 +184,16 @@ fn singleton_holding_weak_provider_is_released_with_provider() {
     assert!(!running.get());
 }
 
+#[test]
+fn upgrade_after_provider_dropped_returns_none() {
+    let provider = Provider::builder().singleton(|_| Config).build();
+    let weak = provider.downgrade();
+
+    drop(provider);
+
+    assert!(weak.upgrade().is_none());
+}
+
 /// Einstellungen, die sich beim Bau auf übergeordnete Einstellungen stützen, falls es welche gibt.
 struct Settings {
     parent: Option<Rc<Settings>>,
