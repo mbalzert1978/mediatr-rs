@@ -158,6 +158,19 @@ fn recipe_asking_for_own_type_gets_none() {
     assert!(settings.parent.is_none());
 }
 
+#[test]
+fn singleton_recipe_asking_for_own_type_gets_none() {
+    let provider = Provider::builder()
+        .singleton(|provider| Settings {
+            parent: provider.get::<Settings>(),
+        })
+        .build();
+
+    let settings = provider.get::<Settings>().unwrap();
+
+    assert!(settings.parent.is_none());
+}
+
 /// Ein Team mit seiner Leitung, falls es eine gibt.
 struct Team {
     lead: Option<Rc<Employee>>,
