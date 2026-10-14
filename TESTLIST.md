@@ -106,12 +106,18 @@ Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `ExceptionTests.cs`, `Micr
 - [x] Derselbe Handler-Typ zweimal mit `subscribe` und `Handler::transient` für dieselbe Notification registriert → `publish` führt ihn einmal aus, und zwar den zuerst registrierten · `publish_runs_handler_type_subscribed_transient_twice_once_with_first_registration`
 - [x] Derselbe Handler-Typ erst mit `Handler::transient`, dann mit `Handler::instance` für dieselbe Notification registriert → `publish` baut und führt nur den mit `Handler::transient` registrierten aus · `publish_runs_handler_type_subscribed_transient_then_instance_once_with_transient`
 - [x] Zwei verschiedene Handler-Typen mit `subscribe` und `Handler::transient` für dieselbe Notification registriert → `publish` führt beide aus, in der Reihenfolge der Registrierung · `publish_runs_two_handler_types_subscribed_transient_in_registration_order`
+- [ ] Handler von Notification A meldet über den Mediator, den er bekommt, Notification B, deren Handler über seinen Mediator einen Request schickt → alle Handler laufen, `publish` liefert `Ok(())`, kein Panic
 
 ## Notification — Publish-Strategie
 
-Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `NotificationPublisherTests.cs`, `MicrosoftExtensionsDI/NotificationPublisherTests.cs`; `src/MediatR/NotificationPublishers/TaskWhenAllPublisher.cs` (startet alle Handler, meldet den ersten Fehler erst, wenn alle fertig sind).
+Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `NotificationPublisherTests.cs`, `MicrosoftExtensionsDI/NotificationPublisherTests.cs`; `src/MediatR/NotificationPublishers/TaskWhenAllPublisher.cs` (startet alle Handler, meldet den ersten Fehler erst, wenn alle fertig sind). Default bleibt „nacheinander“ wie `ForeachAwaitPublisher`: Laufen Handler verschränkt, löst ein `RefCell`-Borrow über ein `await` eine Panic aus; „alle gleichzeitig“ gibt es deshalb nur bewusst gewählt.
 
-- [ ] Mediator mit eigener Publish-Strategie, Notification mit zwei Handlern → die eigene Strategie ruft beide Handler auf, beide laufen
+- [x] Mediator mit eigener Publish-Strategie, die Handler in umgekehrter Reihenfolge aufruft, Notification mit zwei Handlern → beide laufen, in der Reihenfolge der eigenen Strategie · `custom_strategy_runs_both_handlers_in_its_own_order`
+- [ ] Mediator mit eigener Publish-Strategie, Request mit registriertem Handler → `send` liefert die Antwort des Handlers
+- [ ] Mediator mit eigener Publish-Strategie, die kein `Clone` hat → lässt sich klonen, und der Klon erreicht dieselben Handler
+- [ ] Mediator und `MediatorBuilder` mit eigener Publish-Strategie, die kein `Debug` hat, mit `{:?}` formatiert → die Ausgabe nennt die Strategie
+- [ ] Mediator mit eigener Publish-Strategie, Handler mit `Handler::transient` meldet über den Mediator, den er bekommt, eine andere Notification → auch deren Handler laufen in der Reihenfolge der eigenen Strategie
+- [ ] Mediator mit eigener Publish-Strategie, Handler mit `Handler::singleton` meldet über den `WeakMediator`, den er bekommt, eine andere Notification → auch deren Handler laufen in der Reihenfolge der eigenen Strategie
 - [ ] Strategie „alle gleichzeitig“, zwei Handler, die beide warten (`await`) → der zweite Handler startet, bevor der erste fertig ist
 - [ ] Strategie „alle gleichzeitig“, Notification mit drei Handlern, keiner scheitert → `publish` liefert `Ok(())`, jeder Handler lief genau einmal
 - [ ] Strategie „alle gleichzeitig“, der erste von zwei Handlern liefert einen Fehler → der zweite Handler läuft trotzdem, `publish` liefert den Fehler des ersten

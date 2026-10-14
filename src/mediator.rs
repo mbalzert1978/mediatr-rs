@@ -3,19 +3,24 @@
 use std::error::Error;
 use std::fmt;
 use std::future::Future;
+use std::marker::PhantomData;
 
 use mediatr_provider::{Provider, ProviderBuilder, Registration, WeakProvider};
 
 use crate::erased::{ErasedHandler, ErasedNotificationHandler, erase, erase_notification_handler};
 use crate::request::HandlerResult;
-use crate::{Notification, NotificationHandler, Request, RequestHandler};
+use crate::{
+    Notification, NotificationHandler, PublishStrategy, Request, RequestHandler, Sequential,
+};
 
 /// Stellt Requests und Notifications den Handlern zu, die für ihren Typ registriert sind.
 ///
 /// Entsteht über [`Mediator::builder`]. Verschickt wird über [`Sender`] und [`Publisher`].
+/// `S` ist die [`PublishStrategy`], nach der `publish` die Handler laufen lässt.
 #[derive(Debug, Clone)]
-pub struct Mediator {
+pub struct Mediator<S = Sequential> {
     provider: Provider,
+    strategy: PhantomData<S>,
 }
 
 /// Verweis auf einen [`Mediator`], der dessen Handler nicht am Leben hält; ein [`Handler::singleton`] bekommt ihn als [`Sender`] und [`Publisher`].
@@ -29,10 +34,11 @@ pub struct Handler<H> {
     registration: Registration<H>,
 }
 
-/// Sammelt Handler und baut daraus einen [`Mediator`].
-#[derive(Debug, Clone, Default)]
-pub struct MediatorBuilder {
+/// Sammelt Handler und baut daraus einen [`Mediator`] mit der Publish-Strategie `S`.
+#[derive(Debug, Clone)]
+pub struct MediatorBuilder<S = Sequential> {
     provider: ProviderBuilder,
+    strategy: PhantomData<S>,
 }
 
 /// Schickt Requests vom Typ `R` an ihren Handler; ein Handler bekommt einen Sender per Konstruktor.
@@ -62,7 +68,8 @@ pub trait Publisher<N: Notification> {
     ///
     /// # Errors
     ///
-    /// Den ersten Fehler eines Handlers; die Handler danach laufen nicht mehr.
+    /// Den Fehler eines Handlers, wie die [`PublishStrategy`] des Mediators ihn liefert;
+    /// bei [`Sequential`] ist es der erste, und die Handler danach laufen nicht mehr.
     /// Oder einen [`SendError`] als `N::Error`, wenn `publish` die Notification nicht zustellen kann.
     fn publish(&self, notification: N) -> impl Future<Output = Result<(), N::Error>>;
 }
@@ -85,7 +92,17 @@ impl Mediator {
     }
 }
 
-impl<R: Request + 'static> Sender<R> for Mediator {
+impl<S> Mediator<S> {
+    /// Mediator, der über `provider` an die Handler kommt.
+    fn new(provider: Provider) -> Self {
+        Self {
+            provider,
+            strategy: PhantomData,
+        }
+    }
+}
+
+impl<S, R: Request + 'static> Sender<R> for Mediator<S> {
     async fn send(&self, request: R) -> HandlerResult<R> {
         let handler = self
             .provider
@@ -95,29 +112,31 @@ impl<R: Request + 'static> Sender<R> for Mediator {
     }
 }
 
-impl<N: Notification + 'static> Publisher<N> for Mediator {
+impl<S: PublishStrategy, N: Notification + 'static> Publisher<N> for Mediator<S> {
     async fn publish(&self, notification: N) -> Result<(), N::Error> {
-        for handler in self.provider.all::<ErasedNotificationHandler<N>>() {
-            handler(&notification).await?;
-        }
-        Ok(())
+        let handlers = self.provider.all::<ErasedNotificationHandler<N>>();
+        S::publish(
+            handlers
+                .iter()
+                .map(|handler| handler(&notification))
+                .collect(),
+        )
+        .await
     }
 }
 
 impl<R: Request + 'static> Sender<R> for WeakMediator {
     async fn send(&self, request: R) -> HandlerResult<R> {
-        let mediator = Mediator {
-            provider: self.provider.upgrade().ok_or(SendError::MediatorDropped)?,
-        };
+        let mediator: Mediator =
+            Mediator::new(self.provider.upgrade().ok_or(SendError::MediatorDropped)?);
         mediator.send(request).await
     }
 }
 
 impl<N: Notification + 'static> Publisher<N> for WeakMediator {
     async fn publish(&self, notification: N) -> Result<(), N::Error> {
-        let mediator = Mediator {
-            provider: self.provider.upgrade().ok_or(SendError::MediatorDropped)?,
-        };
+        let mediator: Mediator =
+            Mediator::new(self.provider.upgrade().ok_or(SendError::MediatorDropped)?);
         mediator.publish(notification).await
     }
 }
@@ -136,9 +155,7 @@ impl<H: 'static> Handler<H> {
     pub fn transient(make: impl Fn(Mediator) -> H + 'static) -> Self {
         Self {
             registration: Registration::transient(move |provider| {
-                make(Mediator {
-                    provider: provider.clone(),
-                })
+                make(Mediator::new(provider.clone()))
             }),
         }
     }
@@ -166,7 +183,16 @@ impl<H> fmt::Debug for Handler<H> {
     }
 }
 
-impl MediatorBuilder {
+impl<S> Default for MediatorBuilder<S> {
+    fn default() -> Self {
+        Self {
+            provider: ProviderBuilder::default(),
+            strategy: PhantomData,
+        }
+    }
+}
+
+impl<S> MediatorBuilder<S> {
     /// Registriert `handler` für Requests vom Typ `R`; ein früherer Handler für `R` fällt weg.
     #[must_use]
     pub fn register<R, H>(self, handler: Handler<H>) -> Self
@@ -176,6 +202,7 @@ impl MediatorBuilder {
     {
         Self {
             provider: self.provider.register(handler.registration.map(erase)),
+            ..self
         }
     }
 
@@ -193,15 +220,14 @@ impl MediatorBuilder {
                     .map(erase_notification_handler)
                     .unique_by::<H>(),
             ),
+            ..self
         }
     }
 
     /// Baut den Mediator mit allen registrierten Handlern.
     #[must_use]
-    pub fn build(self) -> Mediator {
-        Mediator {
-            provider: self.provider.build(),
-        }
+    pub fn build(self) -> Mediator<S> {
+        Mediator::new(self.provider.build())
     }
 }
 
