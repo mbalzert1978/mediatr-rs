@@ -8,9 +8,9 @@ use mediatr_rs::{Handler, Mediator, Sender};
 mod processors_fixtures;
 
 use processors_fixtures::{
-    InquiryLog, PriceList, QuoteArchive, QuotePrice, QuoteShipping, ShippingTable,
-    checked_and_exported, inbox_stamp, outbox_stamp, price_check, price_export, price_lock,
-    price_through_all_stages, shipping_through_general_stages, timer,
+    InquiryLog, PriceError, PriceList, QuoteArchive, QuotePrice, QuoteShipping, RetiredItems,
+    ShippingTable, checked_and_exported, inbox_stamp, outbox_stamp, price_check, price_export,
+    price_lock, price_through_all_stages, shipping_through_general_stages, timer,
 };
 
 #[tokio::test]
@@ -118,6 +118,29 @@ async fn processors_run_outside_behaviors_and_other_request_only_through_general
         (
             price_through_all_stages(),
             shipping_through_general_stages()
+        )
+    );
+}
+
+#[tokio::test]
+async fn failing_handler_skips_post_processor_and_send_returns_handler_error() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .post_processor(QuoteArchive {
+            journal: Rc::clone(&journal),
+        })
+        .register(Handler::instance(RetiredItems {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let price = mediator.send(QuotePrice { sku: 7 }).await;
+
+    assert_eq!(
+        (price, journal.borrow().clone()),
+        (
+            Err(PriceError::Discontinued),
+            vec!["Artikel 7 ausgelaufen".to_owned()]
         )
     );
 }

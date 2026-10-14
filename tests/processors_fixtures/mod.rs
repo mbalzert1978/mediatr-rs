@@ -12,9 +12,22 @@ pub struct QuotePrice {
     pub sku: u32,
 }
 
+/// Warum eine Preisanfrage scheitert.
+#[derive(Debug, PartialEq)]
+pub enum PriceError {
+    Discontinued,
+    Undeliverable(SendError),
+}
+
+impl From<SendError> for PriceError {
+    fn from(error: SendError) -> Self {
+        Self::Undeliverable(error)
+    }
+}
+
 impl Request for QuotePrice {
     type Response = u32;
-    type Error = SendError;
+    type Error = PriceError;
 }
 
 /// Berechnet Preise und schreibt jede Berechnung ins Protokoll.
@@ -23,7 +36,7 @@ pub struct PriceList {
 }
 
 impl RequestHandler<QuotePrice> for PriceList {
-    async fn handle(&self, request: QuotePrice) -> Result<u32, SendError> {
+    async fn handle(&self, request: QuotePrice) -> Result<u32, PriceError> {
         self.journal
             .borrow_mut()
             .push(format!("Preis berechnet für {}", request.sku));
@@ -199,7 +212,7 @@ pub fn price_lock(journal: &Rc<RefCell<Vec<String>>>) -> PriceLock {
 }
 
 impl PipelineBehavior<QuotePrice> for PriceLock {
-    async fn handle(&self, request: QuotePrice, next: Next<QuotePrice>) -> Result<u32, SendError> {
+    async fn handle(&self, request: QuotePrice, next: Next<QuotePrice>) -> Result<u32, PriceError> {
         self.journal.borrow_mut().push("Preis gesperrt".to_owned());
         let price = next.run(request).await;
         self.journal
@@ -237,4 +250,18 @@ pub fn shipping_through_general_stages() -> Vec<String> {
     ]
     .map(str::to_owned)
     .to_vec()
+}
+
+/// Preisliste für ausgelaufene Artikel: Sie schreibt die Anfrage ins Protokoll und kennt keinen Preis mehr.
+pub struct RetiredItems {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl RequestHandler<QuotePrice> for RetiredItems {
+    async fn handle(&self, request: QuotePrice) -> Result<u32, PriceError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Artikel {} ausgelaufen", request.sku));
+        Err(PriceError::Discontinued)
+    }
 }
