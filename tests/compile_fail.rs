@@ -25,3 +25,8 @@ fn post_processor_makes_send_for_non_clone_request_not_compile() {
 fn pre_processor_registered_after_first_handler_does_not_compile() {
     trybuild::TestCases::new().compile_fail("tests/ui/pre_processor_after_handler.rs");
 }
+
+#[test]
+fn post_processor_registered_after_first_handler_does_not_compile() {
+    trybuild::TestCases::new().compile_fail("tests/ui/post_processor_after_handler.rs");
+}

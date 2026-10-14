@@ -167,7 +167,7 @@ Quelle: MediatR `test/MediatR.Tests/Pipeline/RequestPreProcessorTests.cs`, `Pipe
 - [x] Nachverarbeiter registriert, Request ohne `Clone` → `send` kompiliert nicht · `post_processor_makes_send_for_non_clone_request_not_compile`
 - [x] Derselbe Vorverarbeiter-Typ zweimal registriert → er läuft pro `send` einmal · `same_pre_processor_type_registered_twice_runs_once_per_send`
 - [x] Vorverarbeiter nach dem ersten Handler registriert → kompiliert nicht · `pre_processor_registered_after_first_handler_does_not_compile`
-- [ ] Nachverarbeiter nach dem ersten Handler registriert → kompiliert nicht
+- [x] Nachverarbeiter nach dem ersten Handler registriert → kompiliert nicht · `post_processor_registered_after_first_handler_does_not_compile`
 
 ## Pipeline — Fehler-Handler und Fehler-Aktionen
 
