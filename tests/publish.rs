@@ -355,3 +355,18 @@ async fn singleton_handler_publishing_after_mediator_dropped_gets_mediator_dropp
 
     assert_eq!(result, Err(SendError::MediatorDropped));
 }
+
+#[tokio::test]
+async fn singleton_handler_publishing_while_mediator_alive_runs_handlers() {
+    let labels = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .singleton(|publisher: WeakMediator| CheckoutHandler { publisher })
+        .subscribe(ShippingDesk {
+            labels: Rc::clone(&labels),
+        })
+        .build();
+
+    mediator.send(Checkout { order_id: 42 }).await.unwrap();
+
+    assert_eq!(*labels.borrow(), [42]);
+}

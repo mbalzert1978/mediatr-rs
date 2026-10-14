@@ -109,9 +109,11 @@ impl<R: Request + 'static> Sender<R> for WeakMediator {
 }
 
 impl<N: Notification + 'static> Publisher<N> for WeakMediator {
-    async fn publish(&self, _notification: N) -> Result<(), N::Error> {
-        self.provider.upgrade().ok_or(SendError::MediatorDropped)?;
-        Ok(())
+    async fn publish(&self, notification: N) -> Result<(), N::Error> {
+        let mediator = Mediator {
+            provider: self.provider.upgrade().ok_or(SendError::MediatorDropped)?,
+        };
+        mediator.publish(notification).await
     }
 }
 
