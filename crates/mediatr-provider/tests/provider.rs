@@ -1,6 +1,6 @@
 //! Tests für den Abschnitt „Provider-Crate `mediatr-provider`“ in `TESTLIST.md`.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::panic::{self, AssertUnwindSafe};
 use std::rc::Rc;
 
@@ -889,4 +889,31 @@ fn unique_then_mapped_registration_twice_all_returns_first() {
         .collect();
 
     assert_eq!(titles, ["Rechnung 1"]);
+}
+
+#[test]
+fn mapped_singleton_passes_same_object_to_f_on_every_get() {
+    let seen = Rc::new(RefCell::new(Vec::new()));
+    let provider = Provider::builder()
+        .register(
+            Registration::singleton(|_| Invoice {
+                heading: "Rechnung 1".to_owned(),
+            })
+            .map({
+                let seen = Rc::clone(&seen);
+                move |invoice: Rc<Invoice>| {
+                    seen.borrow_mut().push(Rc::clone(&invoice));
+                    Document(invoice.heading.clone())
+                }
+            }),
+        )
+        .build();
+
+    provider.get::<Document>().unwrap();
+    provider.get::<Document>().unwrap();
+
+    assert!(matches!(
+        seen.borrow().as_slice(),
+        [first, second] if Rc::ptr_eq(first, second)
+    ));
 }
