@@ -18,10 +18,16 @@ pub struct Mediator {
     provider: Provider,
 }
 
-/// Verweis auf einen [`Mediator`], der dessen Handler nicht am Leben hält; ein `singleton`-Handler bekommt ihn als [`Sender`] und [`Publisher`].
+/// Verweis auf einen [`Mediator`], der dessen Handler nicht am Leben hält; ein [`Handler::singleton`] bekommt ihn als [`Sender`] und [`Publisher`].
 #[derive(Debug, Clone)]
 pub struct WeakMediator {
     provider: WeakProvider,
+}
+
+/// Wie der Mediator einen Handler vom Typ `H` bekommt; [`MediatorBuilder::register`] und [`MediatorBuilder::subscribe`] nehmen ihn.
+#[derive(Debug)]
+pub struct Handler<H> {
+    registration: Registration<H>,
 }
 
 /// Sammelt Handler und baut daraus einen [`Mediator`].
@@ -117,88 +123,68 @@ impl<N: Notification + 'static> Publisher<N> for WeakMediator {
     }
 }
 
-impl MediatorBuilder {
-    /// Registriert `handler` für Requests vom Typ `R`; ein früherer Handler für `R` fällt weg.
+impl<H: 'static> Handler<H> {
+    /// Handler `handler`; jede Nachricht erreicht dasselbe Objekt.
     #[must_use]
-    pub fn register<R, H>(self, handler: H) -> Self
-    where
-        R: Request + 'static,
-        H: RequestHandler<R> + 'static,
-    {
+    pub fn instance(handler: H) -> Self {
         Self {
-            provider: self
-                .provider
-                .register(Registration::instance(erase(handler))),
+            registration: Registration::instance(handler),
         }
     }
 
-    /// Registriert `make` für Requests vom Typ `R`; jedes `send` baut den Handler damit neu und gibt ihm den [`Mediator`] als [`Sender`] und [`Publisher`].
+    /// Handler aus `make`; jede Nachricht baut ihn damit neu und gibt ihm den [`Mediator`] als [`Sender`] und [`Publisher`].
     #[must_use]
-    pub fn transient<R, H>(self, make: impl Fn(Mediator) -> H + 'static) -> Self
-    where
-        R: Request + 'static,
-        H: RequestHandler<R> + 'static,
-    {
+    pub fn transient(make: impl Fn(Mediator) -> H + 'static) -> Self {
         Self {
-            provider: self
-                .provider
-                .register(Registration::transient(move |provider| {
-                    erase(make(Mediator {
-                        provider: provider.clone(),
-                    }))
-                })),
+            registration: Registration::transient(move |provider| {
+                make(Mediator {
+                    provider: provider.clone(),
+                })
+            }),
         }
     }
 
-    /// Registriert `make` für Requests vom Typ `R`; das erste `send` baut den Handler damit, jedes weitere nutzt denselben Handler.
+    /// Handler aus `make`; die erste Nachricht baut ihn damit, jede weitere erreicht denselben Handler.
     ///
     /// Der Handler bekommt einen [`WeakMediator`] als [`Sender`] und [`Publisher`], damit er den Mediator nicht selbst am Leben hält.
     #[must_use]
-    pub fn singleton<R, H>(self, make: impl Fn(WeakMediator) -> H + 'static) -> Self
+    pub fn singleton(make: impl Fn(WeakMediator) -> H + 'static) -> Self {
+        Self {
+            registration: Registration::singleton(move |provider| {
+                make(WeakMediator {
+                    provider: provider.downgrade(),
+                })
+            }),
+        }
+    }
+}
+
+impl MediatorBuilder {
+    /// Registriert `handler` für Requests vom Typ `R`; ein früherer Handler für `R` fällt weg.
+    #[must_use]
+    pub fn register<R, H>(self, handler: Handler<H>) -> Self
     where
         R: Request + 'static,
         H: RequestHandler<R> + 'static,
     {
         Self {
-            provider: self
-                .provider
-                .register(Registration::singleton(move |provider| {
-                    erase(make(WeakMediator {
-                        provider: provider.downgrade(),
-                    }))
-                })),
+            provider: self.provider.register(handler.registration.map(erase)),
         }
     }
 
     /// Registriert `handler` für Notifications vom Typ `N`; ist für `N` schon ein Handler vom Typ `H` registriert, fällt `handler` weg.
     #[must_use]
-    pub fn subscribe<N, H>(self, handler: H) -> Self
+    pub fn subscribe<N, H>(self, handler: Handler<H>) -> Self
     where
         N: Notification + 'static,
         H: NotificationHandler<N> + 'static,
     {
         Self {
             provider: self.provider.register(
-                Registration::instance(erase_notification_handler(handler)).unique_by::<H>(),
-            ),
-        }
-    }
-
-    /// Registriert `make` für Notifications vom Typ `N`; jedes `publish` baut den Handler damit neu und gibt ihm den [`Mediator`] als [`Sender`] und [`Publisher`]. Ist für `N` schon ein Handler vom Typ `H` registriert, fällt `make` weg.
-    #[must_use]
-    pub fn subscribe_transient<N, H>(self, make: impl Fn(Mediator) -> H + 'static) -> Self
-    where
-        N: Notification + 'static,
-        H: NotificationHandler<N> + 'static,
-    {
-        Self {
-            provider: self.provider.register(
-                Registration::transient(move |provider| {
-                    erase_notification_handler(make(Mediator {
-                        provider: provider.clone(),
-                    }))
-                })
-                .unique_by::<H>(),
+                handler
+                    .registration
+                    .map(erase_notification_handler)
+                    .unique_by::<H>(),
             ),
         }
     }

@@ -3,7 +3,7 @@
 use std::cell::{Cell, OnceCell};
 use std::rc::Rc;
 
-use mediatr_rs::{Mediator, Request, RequestHandler, SendError, Sender, WeakMediator};
+use mediatr_rs::{Handler, Mediator, Request, RequestHandler, SendError, Sender, WeakMediator};
 
 #[derive(Clone)]
 struct Customer {
@@ -118,10 +118,10 @@ impl<S: Sender<GetCustomer>> RequestHandler<PlaceOrder> for PlaceOrderHandler<S>
 #[tokio::test]
 async fn handler_processes_data_fetched_through_injected_sender() {
     let mediator = Mediator::builder()
-        .register(CustomerDirectory {
+        .register(Handler::instance(CustomerDirectory {
             customers: vec![ada()],
-        })
-        .transient(|sender| PlaceOrderHandler { sender })
+        }))
+        .register(Handler::transient(|sender| PlaceOrderHandler { sender }))
         .build();
 
     let confirmation = mediator
@@ -144,8 +144,8 @@ async fn handler_processes_data_fetched_through_injected_sender() {
 #[tokio::test]
 async fn handler_wraps_failed_inner_request_in_own_error() {
     let mediator = Mediator::builder()
-        .register(CustomerDirectory { customers: vec![] })
-        .transient(|sender| PlaceOrderHandler { sender })
+        .register(Handler::instance(CustomerDirectory { customers: vec![] }))
+        .register(Handler::transient(|sender| PlaceOrderHandler { sender }))
         .build();
 
     let result = mediator
@@ -166,13 +166,13 @@ async fn transient_builds_handler_on_every_send() {
     let built = Rc::new(Cell::new(0_u32));
     let counter = Rc::clone(&built);
     let mediator = Mediator::builder()
-        .register(CustomerDirectory {
+        .register(Handler::instance(CustomerDirectory {
             customers: vec![ada()],
-        })
-        .transient(move |sender| {
+        }))
+        .register(Handler::transient(move |sender| {
             counter.set(counter.get().saturating_add(1));
             PlaceOrderHandler { sender }
-        })
+        }))
         .build();
 
     for amount in [100, 250] {
@@ -193,13 +193,13 @@ async fn singleton_builds_handler_only_on_first_send() {
     let built = Rc::new(Cell::new(0_u32));
     let counter = Rc::clone(&built);
     let mediator = Mediator::builder()
-        .register(CustomerDirectory {
+        .register(Handler::instance(CustomerDirectory {
             customers: vec![ada()],
-        })
-        .singleton(move |sender| {
+        }))
+        .register(Handler::singleton(move |sender| {
             counter.set(counter.get().saturating_add(1));
             PlaceOrderHandler { sender }
-        })
+        }))
         .build();
 
     for amount in [100, 250] {
@@ -238,13 +238,13 @@ async fn singleton_handler_with_sender_is_released_with_mediator() {
     let line_open = Rc::new(Cell::new(true));
     let line = Rc::clone(&line_open);
     let mediator = Mediator::builder()
-        .register(CustomerDirectory {
+        .register(Handler::instance(CustomerDirectory {
             customers: vec![ada()],
-        })
-        .singleton(move |sender| WarehouseOrderHandler {
+        }))
+        .register(Handler::singleton(move |sender| WarehouseOrderHandler {
             orders: PlaceOrderHandler { sender },
             line_open: Rc::clone(&line),
-        })
+        }))
         .build();
     mediator
         .send(PlaceOrder {
@@ -277,13 +277,13 @@ async fn singleton_handler_sending_after_mediator_dropped_gets_mediator_dropped(
     let handed_out = Rc::new(OnceCell::new());
     let keep = Rc::clone(&handed_out);
     let mediator = Mediator::builder()
-        .register(CustomerDirectory {
+        .register(Handler::instance(CustomerDirectory {
             customers: vec![ada()],
-        })
-        .singleton(move |sender: WeakMediator| {
+        }))
+        .register(Handler::singleton(move |sender: WeakMediator| {
             keep.get_or_init(|| sender.clone());
             PlaceOrderHandler { sender }
-        })
+        }))
         .build();
     mediator.send(order()).await.unwrap();
     let orders = PlaceOrderHandler {

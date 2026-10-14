@@ -3,7 +3,7 @@
 use std::cell::{Cell, OnceCell};
 use std::rc::Rc;
 
-use mediatr_rs::{Mediator, Request, RequestHandler, SendError, Sender, WeakMediator};
+use mediatr_rs::{Handler, Mediator, Request, RequestHandler, SendError, Sender, WeakMediator};
 
 struct Ping(String);
 
@@ -25,7 +25,9 @@ impl RequestHandler<Ping> for PingHandler {
 
 #[tokio::test]
 async fn send_returns_handler_response() {
-    let mediator = Mediator::builder().register(PingHandler).build();
+    let mediator = Mediator::builder()
+        .register(Handler::instance(PingHandler))
+        .build();
 
     let response = mediator.send(Ping("Ping".to_owned())).await.unwrap();
 
@@ -43,8 +45,8 @@ impl RequestHandler<Ping> for ReplacementPingHandler {
 #[tokio::test]
 async fn register_twice_keeps_last_handler() {
     let mediator = Mediator::builder()
-        .register(PingHandler)
-        .register(ReplacementPingHandler)
+        .register(Handler::instance(PingHandler))
+        .register(Handler::instance(ReplacementPingHandler))
         .build();
 
     let response = mediator.send(Ping("Ping".to_owned())).await.unwrap();
@@ -55,7 +57,9 @@ async fn register_twice_keeps_last_handler() {
 #[tokio::test]
 async fn register_accepts_async_closure() {
     let mediator = Mediator::builder()
-        .register(async |request: Ping| Ok(Pong(format!("{} Closure", request.0))))
+        .register(Handler::instance(async |request: Ping| {
+            Ok(Pong(format!("{} Closure", request.0)))
+        }))
         .build();
 
     let response = mediator.send(Ping("Ping".to_owned())).await.unwrap();
@@ -85,9 +89,9 @@ impl RequestHandler<VoidPing> for VoidPingHandler {
 async fn send_runs_handler_for_unit_response() {
     let called = Rc::new(Cell::new(false));
     let mediator = Mediator::builder()
-        .register(VoidPingHandler {
+        .register(Handler::instance(VoidPingHandler {
             called: Rc::clone(&called),
-        })
+        }))
         .build();
 
     mediator.send(VoidPing).await.unwrap();
@@ -99,10 +103,10 @@ async fn send_runs_handler_for_unit_response() {
 async fn send_reaches_only_handler_of_its_request_type() {
     let called = Rc::new(Cell::new(false));
     let mediator = Mediator::builder()
-        .register(PingHandler)
-        .register(VoidPingHandler {
+        .register(Handler::instance(PingHandler))
+        .register(Handler::instance(VoidPingHandler {
             called: Rc::clone(&called),
-        })
+        }))
         .build();
 
     let response = mediator.send(Ping("Ping".to_owned())).await.unwrap();
@@ -153,7 +157,9 @@ impl RequestHandler<Reject> for RejectHandler {
 
 #[tokio::test]
 async fn send_returns_handler_error() {
-    let mediator = Mediator::builder().register(RejectHandler).build();
+    let mediator = Mediator::builder()
+        .register(Handler::instance(RejectHandler))
+        .build();
 
     let response = mediator.send(Reject).await;
 
@@ -190,10 +196,10 @@ async fn mediator_dropped_error_propagates_as_boxed_error() {
     let handed_out = Rc::new(OnceCell::new());
     let keep = Rc::clone(&handed_out);
     let mediator = Mediator::builder()
-        .singleton(move |sender: WeakMediator| {
+        .register(Handler::singleton(move |sender: WeakMediator| {
             keep.get_or_init(|| sender.clone());
             PingHandler
-        })
+        }))
         .build();
     mediator.send(Ping("Ping".to_owned())).await.unwrap();
     let sender = handed_out.get().unwrap().clone();
@@ -213,12 +219,12 @@ async fn register_twice_does_not_call_first_handler() {
     let first_called = Rc::new(Cell::new(false));
     let second_called = Rc::new(Cell::new(false));
     let mediator = Mediator::builder()
-        .register(VoidPingHandler {
+        .register(Handler::instance(VoidPingHandler {
             called: Rc::clone(&first_called),
-        })
-        .register(VoidPingHandler {
+        }))
+        .register(Handler::instance(VoidPingHandler {
             called: Rc::clone(&second_called),
-        })
+        }))
         .build();
 
     mediator.send(VoidPing).await.unwrap();

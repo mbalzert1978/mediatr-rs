@@ -24,11 +24,11 @@ Quelle: MediatR `Mediator(IServiceProvider)` speichert keine Handler; es holt si
 
 - [x] Handler bekommt einen Sender per Konstruktor (DI, wie `ISender`), holt darüber Daten eines anderen Handlers und verarbeitet sie → seine Antwort enthält die verarbeiteten Daten · `handler_processes_data_fetched_through_injected_sender`
 - [x] Handler bekommt einen Sender per Konstruktor, der innere Request scheitert → der Handler gibt den Fehler, in seinen eigenen Fehlertyp verpackt, unverändert weiter · `handler_wraps_failed_inner_request_in_own_error`
-- [x] Handler mit `transient` registriert → jedes `send` baut den Handler neu · `transient_builds_handler_on_every_send`
+- [x] Handler mit `Handler::transient` registriert → jedes `send` baut den Handler neu · `transient_builds_handler_on_every_send`
 - [x] Handler, der einen Sender per Konstruktor bekommt, wird ohne Mediator getestet und bekommt eine Attrappe statt des Senders → er verarbeitet die Antwort der Attrappe · `handler_processes_response_of_fake_sender`
-- [x] Handler mit `singleton` registriert → nur das erste `send` baut den Handler, jedes weitere nutzt denselben · `singleton_builds_handler_only_on_first_send`
-- [x] Handler mit Sender per Konstruktor ist als `singleton` registriert, der Mediator wird fallen gelassen → der Handler wird freigegeben (sein `Drop` läuft) · `singleton_handler_with_sender_is_released_with_mediator`
-- [x] Handler mit Sender ist als `singleton` registriert und schickt einen Request, nachdem der Mediator weggefallen ist → `send` liefert `Err(SendError::MediatorDropped)`, kein Panic · `singleton_handler_sending_after_mediator_dropped_gets_mediator_dropped`
+- [x] Handler mit `Handler::singleton` registriert → nur das erste `send` baut den Handler, jedes weitere nutzt denselben · `singleton_builds_handler_only_on_first_send`
+- [x] Handler mit Sender per Konstruktor ist als `Handler::singleton` registriert, der Mediator wird fallen gelassen → der Handler wird freigegeben (sein `Drop` läuft) · `singleton_handler_with_sender_is_released_with_mediator`
+- [x] Handler mit Sender ist als `Handler::singleton` registriert und schickt einen Request, nachdem der Mediator weggefallen ist → `send` liefert `Err(SendError::MediatorDropped)`, kein Panic · `singleton_handler_sending_after_mediator_dropped_gets_mediator_dropped`
 
 ## Provider-Crate `mediatr-provider`
 
@@ -96,15 +96,15 @@ Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `ExceptionTests.cs`, `Micr
 - [x] Derselbe Handler-Typ zweimal für dieselbe Notification registriert → `publish` führt ihn einmal aus, und zwar den zuerst registrierten · `publish_runs_handler_type_registered_twice_once_with_first_registration`
 - [x] Request-Handler bekommt einen Publisher per Konstruktor und meldet darüber ein Ereignis → die Handler dieser Notification laufen · `request_handler_publishes_through_injected_publisher`
 - [x] Handler, der einen Publisher per Konstruktor bekommt, wird ohne Mediator getestet und bekommt eine Attrappe → die Attrappe sieht die gemeldete Notification · `handler_publishes_to_fake_publisher`
-- [x] Handler mit Publisher ist als `singleton` registriert und meldet eine Notification, nachdem der Mediator weggefallen ist → `publish` liefert `Err(SendError::MediatorDropped)`, kein Panic · `singleton_handler_publishing_after_mediator_dropped_gets_mediator_dropped`
-- [x] Handler mit Publisher ist als `singleton` registriert und meldet eine Notification, solange der Mediator lebt → die Handler dieser Notification laufen · `singleton_handler_publishing_while_mediator_alive_runs_handlers`
+- [x] Handler mit Publisher ist als `Handler::singleton` registriert und meldet eine Notification, nachdem der Mediator weggefallen ist → `publish` liefert `Err(SendError::MediatorDropped)`, kein Panic · `singleton_handler_publishing_after_mediator_dropped_gets_mediator_dropped`
+- [x] Handler mit Publisher ist als `Handler::singleton` registriert und meldet eine Notification, solange der Mediator lebt → die Handler dieser Notification laufen · `singleton_handler_publishing_while_mediator_alive_runs_handlers`
 - [x] Fehler von `publish` → lässt sich mit `?` als `Box<dyn std::error::Error>` weitergeben · `publish_error_propagates_as_boxed_error`
-- [x] Notification-Handler mit `subscribe_transient` registriert → jedes `publish` baut den Handler neu · `subscribe_transient_builds_handler_on_every_publish`
-- [x] Notification-Handler mit `subscribe_transient` meldet über den Mediator, den er bekommt, eine andere Notification → deren Handler laufen · `subscribe_transient_handler_publishes_through_received_mediator`
-- [x] Derselbe Handler-Typ einmal mit `subscribe`, einmal mit `subscribe_transient` für dieselbe Notification registriert → `publish` führt ihn einmal aus, und zwar den zuerst registrierten · `publish_runs_handler_type_subscribed_and_subscribed_transient_once_with_first_registration`
-- [x] Derselbe Handler-Typ zweimal mit `subscribe_transient` für dieselbe Notification registriert → `publish` führt ihn einmal aus, und zwar den zuerst registrierten · `publish_runs_handler_type_subscribed_transient_twice_once_with_first_registration`
-- [ ] Derselbe Handler-Typ erst mit `subscribe_transient`, dann mit `subscribe` für dieselbe Notification registriert → `publish` baut und führt nur den mit `subscribe_transient` registrierten aus
-- [ ] Zwei verschiedene Handler-Typen mit `subscribe_transient` für dieselbe Notification registriert → `publish` führt beide aus, in der Reihenfolge der Registrierung
+- [x] Notification-Handler mit `subscribe` und `Handler::transient` registriert → jedes `publish` baut den Handler neu · `subscribe_transient_builds_handler_on_every_publish`
+- [x] Notification-Handler mit `subscribe` und `Handler::transient` meldet über den Mediator, den er bekommt, eine andere Notification → deren Handler laufen · `subscribe_transient_handler_publishes_through_received_mediator`
+- [x] Derselbe Handler-Typ einmal mit `Handler::instance`, einmal mit `Handler::transient` für dieselbe Notification registriert → `publish` führt ihn einmal aus, und zwar den zuerst registrierten · `publish_runs_handler_type_subscribed_and_subscribed_transient_once_with_first_registration`
+- [x] Derselbe Handler-Typ zweimal mit `subscribe` und `Handler::transient` für dieselbe Notification registriert → `publish` führt ihn einmal aus, und zwar den zuerst registrierten · `publish_runs_handler_type_subscribed_transient_twice_once_with_first_registration`
+- [ ] Derselbe Handler-Typ erst mit `Handler::transient`, dann mit `Handler::instance` für dieselbe Notification registriert → `publish` baut und führt nur den mit `Handler::transient` registrierten aus
+- [ ] Zwei verschiedene Handler-Typen mit `subscribe` und `Handler::transient` für dieselbe Notification registriert → `publish` führt beide aus, in der Reihenfolge der Registrierung
 
 ## Notification — Publish-Strategie
 
@@ -126,7 +126,7 @@ Quelle: MediatR `test/MediatR.Tests/PipelineTests.cs`, `MicrosoftExtensionsDI/Pi
 - [ ] Zwei Behaviors für alle Request-Typen und eins nur für einen Request-Typ → dieser Request läuft durch alle drei in Registrierungsreihenfolge, ein anderer Request nur durch die zwei allgemeinen; beide bekommen die Antwort ihres Handlers
 - [ ] Zwei Behaviors für alle Request-Typen, jedes dreimal abwechselnd registriert → jedes läuft pro `send` genau einmal, in der Reihenfolge seiner ersten Registrierung
 - [ ] Zuerst ein Behavior nur für einen Request-Typ ohne Antwort, dann eins für alle Request-Typen registriert → beide laufen in Registrierungsreihenfolge vor dem Handler
-- [ ] Handler mit `transient` registriert und von einem Behavior umschlossen → ein `send` baut den Handler genau einmal, das Behavior läuft genau einmal um ihn herum
+- [ ] Handler mit `Handler::transient` registriert und von einem Behavior umschlossen → ein `send` baut den Handler genau einmal, das Behavior läuft genau einmal um ihn herum
 - [ ] Behavior ruft den nächsten Schritt nicht auf und liefert selbst eine Antwort → `send` liefert diese Antwort, der Handler läuft nicht
 - [ ] Behavior setzt eine Frist, der Handler eines Requests mit Antwort braucht länger → `send` liefert `Err` statt einer Antwort, der Handler wird nicht fertig
 - [ ] Behavior setzt eine Frist, der Handler eines Requests ohne Antwort (Antworttyp `()`) braucht länger → `send` liefert `Err`, der Handler wird nicht fertig

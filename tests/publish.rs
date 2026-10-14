@@ -6,8 +6,8 @@ use std::fmt;
 use std::rc::Rc;
 
 use mediatr_rs::{
-    Mediator, Notification, NotificationHandler, Publisher, Request, RequestHandler, SendError,
-    Sender, WeakMediator,
+    Handler, Mediator, Notification, NotificationHandler, Publisher, Request, RequestHandler,
+    SendError, Sender, WeakMediator,
 };
 
 /// Ereignis: Die Bestellung mit dieser Nummer ist eingegangen.
@@ -35,9 +35,9 @@ impl NotificationHandler<OrderPlaced> for ShippingDesk {
 async fn publish_runs_registered_handler() {
     let labels = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .subscribe(ShippingDesk {
+        .subscribe(Handler::instance(ShippingDesk {
             labels: Rc::clone(&labels),
-        })
+        }))
         .build();
 
     mediator
@@ -89,12 +89,12 @@ impl NotificationHandler<OrderPlaced> for Billing {
 async fn publish_runs_both_handlers_in_registration_order() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .subscribe(Warehouse {
+        .subscribe(Handler::instance(Warehouse {
             journal: Rc::clone(&journal),
-        })
-        .subscribe(Billing {
+        }))
+        .subscribe(Handler::instance(Billing {
             journal: Rc::clone(&journal),
-        })
+        }))
         .build();
 
     mediator
@@ -165,10 +165,10 @@ impl NotificationHandler<OrderCancelled> for CancellationMail {
 async fn publish_returns_first_handler_error_and_skips_second_handler() {
     let sent = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .subscribe(Refund)
-        .subscribe(CancellationMail {
+        .subscribe(Handler::instance(Refund))
+        .subscribe(Handler::instance(CancellationMail {
             sent: Rc::clone(&sent),
-        })
+        }))
         .build();
 
     let result = mediator.publish(OrderCancelled { order_id: 7 }).await;
@@ -211,8 +211,8 @@ impl TwoDesks {
 async fn publish_runs_handler_type_registered_twice_once_with_first_registration() {
     let desks = TwoDesks::default();
     let mediator = Mediator::builder()
-        .subscribe(desks.front())
-        .subscribe(desks.back())
+        .subscribe(Handler::instance(desks.front()))
+        .subscribe(Handler::instance(desks.back()))
         .build();
 
     mediator
@@ -228,12 +228,12 @@ async fn publish_reaches_only_handlers_of_its_notification_type() {
     let labels = Rc::new(RefCell::new(Vec::new()));
     let sent = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .subscribe(ShippingDesk {
+        .subscribe(Handler::instance(ShippingDesk {
             labels: Rc::clone(&labels),
-        })
-        .subscribe(CancellationMail {
+        }))
+        .subscribe(Handler::instance(CancellationMail {
             sent: Rc::clone(&sent),
-        })
+        }))
         .build();
 
     mediator
@@ -273,12 +273,12 @@ impl NotificationHandler<OrderPlaced> for Packing {
 async fn publish_starts_second_handler_after_first_handler_finished_waiting() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .subscribe(Packing {
+        .subscribe(Handler::instance(Packing {
             journal: Rc::clone(&journal),
-        })
-        .subscribe(Billing {
+        }))
+        .subscribe(Handler::instance(Billing {
             journal: Rc::clone(&journal),
-        })
+        }))
         .build();
 
     mediator
@@ -325,10 +325,12 @@ impl<P: Publisher<OrderPlaced>> RequestHandler<Checkout> for CheckoutHandler<P> 
 async fn request_handler_publishes_through_injected_publisher() {
     let labels = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .transient(|publisher| CheckoutHandler { publisher })
-        .subscribe(ShippingDesk {
+        .register(Handler::transient(|publisher| CheckoutHandler {
+            publisher,
+        }))
+        .subscribe(Handler::instance(ShippingDesk {
             labels: Rc::clone(&labels),
-        })
+        }))
         .build();
 
     mediator.send(Checkout { order_id: 42 }).await.unwrap();
@@ -367,13 +369,13 @@ async fn singleton_handler_publishing_after_mediator_dropped_gets_mediator_dropp
     let handed_out = Rc::new(OnceCell::new());
     let keep = Rc::clone(&handed_out);
     let mediator = Mediator::builder()
-        .singleton(move |publisher: WeakMediator| {
+        .register(Handler::singleton(move |publisher: WeakMediator| {
             keep.get_or_init(|| publisher.clone());
             CheckoutHandler { publisher }
-        })
-        .subscribe(ShippingDesk {
+        }))
+        .subscribe(Handler::instance(ShippingDesk {
             labels: Rc::new(RefCell::new(Vec::new())),
-        })
+        }))
         .build();
     mediator.send(Checkout { order_id: 41 }).await.unwrap();
     let checkout = CheckoutHandler {
@@ -390,10 +392,12 @@ async fn singleton_handler_publishing_after_mediator_dropped_gets_mediator_dropp
 async fn singleton_handler_publishing_while_mediator_alive_runs_handlers() {
     let labels = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .singleton(|publisher: WeakMediator| CheckoutHandler { publisher })
-        .subscribe(ShippingDesk {
+        .register(Handler::singleton(|publisher: WeakMediator| {
+            CheckoutHandler { publisher }
+        }))
+        .subscribe(Handler::instance(ShippingDesk {
             labels: Rc::clone(&labels),
-        })
+        }))
         .build();
 
     mediator.send(Checkout { order_id: 42 }).await.unwrap();
@@ -403,7 +407,9 @@ async fn singleton_handler_publishing_while_mediator_alive_runs_handlers() {
 
 #[tokio::test]
 async fn publish_error_propagates_as_boxed_error() {
-    let mediator = Mediator::builder().subscribe(Refund).build();
+    let mediator = Mediator::builder()
+        .subscribe(Handler::instance(Refund))
+        .build();
 
     let result: Result<(), Box<dyn Error>> =
         async { Ok(mediator.publish(OrderCancelled { order_id: 7 }).await?) }.await;
@@ -420,12 +426,12 @@ async fn subscribe_transient_builds_handler_on_every_publish() {
     let counter = Rc::clone(&builds);
     let labels = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .subscribe_transient(move |_publisher: Mediator| {
+        .subscribe(Handler::transient(move |_publisher: Mediator| {
             counter.set(counter.get().saturating_add(1));
             ShippingDesk {
                 labels: Rc::clone(&labels),
             }
-        })
+        }))
         .build();
 
     mediator
@@ -484,13 +490,13 @@ impl NotificationHandler<FraudSuspected> for FraudDesk {
 async fn subscribe_transient_handler_publishes_through_received_mediator() {
     let cases = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .subscribe_transient(|publisher| FraudCheck {
+        .subscribe(Handler::transient(|publisher| FraudCheck {
             publisher,
             blocked: vec![13],
-        })
-        .subscribe(FraudDesk {
+        }))
+        .subscribe(Handler::instance(FraudDesk {
             cases: Rc::clone(&cases),
-        })
+        }))
         .build();
 
     mediator
@@ -507,8 +513,8 @@ async fn publish_runs_handler_type_subscribed_and_subscribed_transient_once_with
     let desks = TwoDesks::default();
     let back = desks.clone();
     let mediator = Mediator::builder()
-        .subscribe(desks.front())
-        .subscribe_transient(move |_publisher: Mediator| back.back())
+        .subscribe(Handler::instance(desks.front()))
+        .subscribe(Handler::transient(move |_publisher: Mediator| back.back()))
         .build();
 
     mediator
@@ -524,8 +530,12 @@ async fn publish_runs_handler_type_subscribed_transient_twice_once_with_first_re
     let desks = TwoDesks::default();
     let (first, second) = (desks.clone(), desks.clone());
     let mediator = Mediator::builder()
-        .subscribe_transient(move |_publisher: Mediator| first.front())
-        .subscribe_transient(move |_publisher: Mediator| second.back())
+        .subscribe(Handler::transient(move |_publisher: Mediator| {
+            first.front()
+        }))
+        .subscribe(Handler::transient(move |_publisher: Mediator| {
+            second.back()
+        }))
         .build();
 
     mediator

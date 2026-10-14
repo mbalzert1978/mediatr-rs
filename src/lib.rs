@@ -5,6 +5,8 @@ mod mediator;
 mod notification;
 mod request;
 
-pub use mediator::{Mediator, MediatorBuilder, Publisher, SendError, Sender, WeakMediator};
+pub use mediator::{
+    Handler, Mediator, MediatorBuilder, Publisher, SendError, Sender, WeakMediator,
+};
 pub use notification::{Notification, NotificationHandler};
 pub use request::{Request, RequestHandler};

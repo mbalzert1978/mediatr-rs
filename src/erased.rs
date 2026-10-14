@@ -15,13 +15,11 @@ pub(crate) type ErasedHandler<R> =
     Box<dyn Fn(R) -> Pin<Box<dyn Future<Output = HandlerResult<R>>>>>;
 
 /// Verpackt `handler` als [`ErasedHandler`].
-pub(crate) fn erase<R, H>(handler: H) -> ErasedHandler<R>
+pub(crate) fn erase<R, H>(handler: Rc<H>) -> ErasedHandler<R>
 where
     R: Request + 'static,
     H: RequestHandler<R> + 'static,
 {
-    // Rc reicht, solange kein Testlisten-Punkt Threads verlangt; dann Arc.
-    let handler = Rc::new(handler);
     Box::new(move |request| Box::pin(call(Rc::clone(&handler), request)))
 }
 
@@ -36,12 +34,11 @@ pub(crate) type ErasedNotificationHandler<N> =
     Box<dyn for<'a> Fn(&'a N) -> Pin<Box<dyn Future<Output = NotificationResult<N>> + 'a>>>;
 
 /// Verpackt `handler` als [`ErasedNotificationHandler`].
-pub(crate) fn erase_notification_handler<N, H>(handler: H) -> ErasedNotificationHandler<N>
+pub(crate) fn erase_notification_handler<N, H>(handler: Rc<H>) -> ErasedNotificationHandler<N>
 where
     N: Notification + 'static,
     H: NotificationHandler<N> + 'static,
 {
-    let handler = Rc::new(handler);
     Box::new(move |notification| Box::pin(notify(Rc::clone(&handler), notification)))
 }
 
