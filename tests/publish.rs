@@ -3,7 +3,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use mediatr_rs::{Mediator, Notification, NotificationHandler, Publisher, SendError};
+use mediatr_rs::{
+    Mediator, Notification, NotificationHandler, Publisher, Request, RequestHandler, SendError,
+    Sender,
+};
 
 /// Ereignis: Die Bestellung mit dieser Nummer ist eingegangen.
 struct OrderPlaced {
@@ -261,4 +264,44 @@ async fn publish_starts_second_handler_after_first_handler_finished_waiting() {
             "Rechnung für 42"
         ]
     );
+}
+
+/// Schließt die Bestellung mit dieser Nummer ab.
+struct Checkout {
+    order_id: u32,
+}
+
+impl Request for Checkout {
+    type Response = ();
+    type Error = SendError;
+}
+
+/// Schließt Bestellungen ab und meldet sie über den Publisher, den er per Konstruktor bekommt.
+struct CheckoutHandler {
+    publisher: Mediator,
+}
+
+impl RequestHandler<Checkout> for CheckoutHandler {
+    async fn handle(&self, checkout: Checkout) -> Result<(), SendError> {
+        self.publisher
+            .publish(OrderPlaced {
+                order_id: checkout.order_id,
+            })
+            .await
+    }
+}
+
+#[tokio::test]
+async fn request_handler_publishes_through_injected_publisher() {
+    let labels = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .transient(|publisher| CheckoutHandler { publisher })
+        .subscribe(ShippingDesk {
+            labels: Rc::clone(&labels),
+        })
+        .build();
+
+    mediator.send(Checkout { order_id: 42 }).await.unwrap();
+
+    assert_eq!(*labels.borrow(), [42]);
 }

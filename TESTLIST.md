@@ -90,7 +90,7 @@ Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `ExceptionTests.cs`, `Micr
 - [x] Erster Handler wartet (`await`), bevor er fertig ist → der zweite Handler startet erst danach · `publish_starts_second_handler_after_first_handler_finished_waiting`
 - [x] Erster von zwei Handlern liefert einen Fehler → `publish` gibt genau diesen Fehler zurück, der zweite Handler läuft nicht · `publish_returns_first_handler_error_and_skips_second_handler`
 - [x] Derselbe Handler-Typ zweimal für dieselbe Notification registriert → `publish` führt ihn einmal aus, und zwar den zuerst registrierten · `publish_runs_handler_type_registered_twice_once_with_first_registration`
-- [ ] Request-Handler bekommt einen Publisher per Konstruktor und meldet darüber ein Ereignis → die Handler dieser Notification laufen
+- [x] Request-Handler bekommt einen Publisher per Konstruktor und meldet darüber ein Ereignis → die Handler dieser Notification laufen · `request_handler_publishes_through_injected_publisher`
 - [ ] Handler, der einen Publisher per Konstruktor bekommt, wird ohne Mediator getestet und bekommt eine Attrappe → die Attrappe sieht die gemeldete Notification
 - [ ] Handler mit Publisher ist als `singleton` registriert und meldet eine Notification, nachdem der Mediator weggefallen ist → `publish` liefert `Err(SendError::MediatorDropped)`, kein Panic
 - [ ] Fehler von `publish` → lässt sich mit `?` als `Box<dyn std::error::Error>` weitergeben
