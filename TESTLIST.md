@@ -106,7 +106,7 @@ Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `ExceptionTests.cs`, `Micr
 - [x] Derselbe Handler-Typ zweimal mit `subscribe` und `Handler::transient` für dieselbe Notification registriert → `publish` führt ihn einmal aus, und zwar den zuerst registrierten · `publish_runs_handler_type_subscribed_transient_twice_once_with_first_registration`
 - [x] Derselbe Handler-Typ erst mit `Handler::transient`, dann mit `Handler::instance` für dieselbe Notification registriert → `publish` baut und führt nur den mit `Handler::transient` registrierten aus · `publish_runs_handler_type_subscribed_transient_then_instance_once_with_transient`
 - [x] Zwei verschiedene Handler-Typen mit `subscribe` und `Handler::transient` für dieselbe Notification registriert → `publish` führt beide aus, in der Reihenfolge der Registrierung · `publish_runs_two_handler_types_subscribed_transient_in_registration_order`
-- [ ] Handler von Notification A meldet über den Mediator, den er bekommt, Notification B, deren Handler über seinen Mediator einen Request schickt → alle Handler laufen, `publish` liefert `Ok(())`, kein Panic
+- [x] Handler von Notification A meldet über den Mediator, den er bekommt, Notification B, deren Handler über seinen Mediator einen Request schickt → alle Handler laufen, `publish` liefert `Ok(())`, kein Panic · `nested_publish_and_send_through_received_mediators_run_all_handlers_without_panic`
 
 ## Notification — Publish-Strategie
 

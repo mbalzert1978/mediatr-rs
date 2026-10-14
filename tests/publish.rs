@@ -588,3 +588,59 @@ async fn publish_runs_two_handler_types_subscribed_transient_in_registration_ord
         ["Ware reserviert für 42", "Rechnung für 42"]
     );
 }
+
+/// Sperrt den Kunden der Bestellung mit dieser Nummer.
+struct BlockCustomer {
+    order_id: u32,
+}
+
+impl Request for BlockCustomer {
+    type Response = ();
+    type Error = SendError;
+}
+
+/// Führt die Sperrliste und trägt jede Bestellnummer ein, deren Kunde gesperrt wird.
+struct Blocklist {
+    order_ids: Rc<RefCell<Vec<u32>>>,
+}
+
+impl RequestHandler<BlockCustomer> for Blocklist {
+    async fn handle(&self, request: BlockCustomer) -> Result<(), SendError> {
+        self.order_ids.borrow_mut().push(request.order_id);
+        Ok(())
+    }
+}
+
+/// Ermittelt bei jedem Betrugsverdacht und lässt den Kunden über den Mediator sperren, den sie per Konstruktor bekommt.
+struct FraudInvestigator {
+    sender: Mediator,
+}
+
+impl NotificationHandler<FraudSuspected> for FraudInvestigator {
+    async fn handle(&self, event: &FraudSuspected) -> Result<(), SendError> {
+        self.sender
+            .send(BlockCustomer {
+                order_id: event.order_id,
+            })
+            .await
+    }
+}
+
+#[tokio::test]
+async fn nested_publish_and_send_through_received_mediators_run_all_handlers_without_panic() {
+    let blocked = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .subscribe(Handler::transient(|publisher| FraudCheck {
+            publisher,
+            blocked: vec![13],
+        }))
+        .subscribe(Handler::transient(|sender| FraudInvestigator { sender }))
+        .register(Handler::instance(Blocklist {
+            order_ids: Rc::clone(&blocked),
+        }))
+        .build();
+
+    let published = mediator.publish(OrderPlaced { order_id: 13 }).await;
+
+    assert_eq!((published, blocked.borrow().clone()), (Ok(()), vec![13]));
+}
