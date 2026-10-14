@@ -84,6 +84,20 @@ fn singleton_all_returns_same_object_as_get() {
 }
 
 #[test]
+fn scoped_all_returns_same_object_as_get_within_scope() {
+    let provider = Provider::builder().scoped(|_| Config).build();
+    let first = provider.scope();
+    let second = provider.scope();
+
+    let single = first.get::<Config>().unwrap();
+    let same_scope = first.all::<Config>();
+    let other_scope = second.all::<Config>();
+
+    assert!(matches!(same_scope.as_slice(), [config] if Rc::ptr_eq(config, &single)));
+    assert!(matches!(other_scope.as_slice(), [config] if !Rc::ptr_eq(config, &single)));
+}
+
+#[test]
 fn transient_runs_recipe_on_every_get() {
     let (calls, recipe) = counting_recipe();
     let provider = Provider::builder().transient(recipe).build();
