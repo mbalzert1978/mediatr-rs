@@ -136,7 +136,7 @@ Quelle: MediatR `test/MediatR.Tests/PipelineTests.cs`, `MicrosoftExtensionsDI/Pi
 
 - [x] Zwei Behaviors für einen Request-Typ → das zuerst registrierte läuft außen: außen-vorher, innen-vorher, Handler, innen-nachher, außen-nachher; `send` liefert die Antwort des Handlers · `two_behaviors_wrap_handler_first_registered_outermost`
 - [x] Behavior klont den nächsten Schritt und ruft ihn nach einem Fehler des Handlers noch einmal auf → der Handler läuft zweimal, `send` liefert die Antwort des zweiten Laufs · `behavior_retries_cloned_next_after_handler_error_and_returns_second_response`
-- [ ] Zwei Behaviors für einen Request ohne Antwort (Antworttyp `()`) → sie umschließen den Handler in derselben Reihenfolge, das zuerst registrierte außen
+- [x] Zwei Behaviors für einen Request ohne Antwort (Antworttyp `()`) → sie umschließen den Handler in derselben Reihenfolge, das zuerst registrierte außen · `two_behaviors_wrap_unit_response_handler_first_registered_outermost`
 - [ ] Zwei Behaviors für alle Request-Typen → sie umschließen den Handler jedes Requests, das zuerst registrierte außen; `send` liefert die Antwort des Handlers
 - [ ] Zwei Behaviors für alle Request-Typen, Request ohne Antwort (Antworttyp `()`) → sie umschließen den Handler in derselben Reihenfolge, das zuerst registrierte außen
 - [ ] Zwei Behaviors für alle Request-Typen und eins nur für einen Request-Typ → dieser Request läuft durch alle drei in Registrierungsreihenfolge, ein anderer Request nur durch die zwei allgemeinen; beide bekommen die Antwort ihres Handlers
