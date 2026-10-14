@@ -1,6 +1,8 @@
 //! Tests für den Abschnitt „Notification — `publish`“ in `TESTLIST.md`.
 
 use std::cell::{OnceCell, RefCell};
+use std::error::Error;
+use std::fmt;
 use std::rc::Rc;
 
 use mediatr_rs::{
@@ -122,6 +124,17 @@ impl From<SendError> for CancellationError {
         Self::Undeliverable(error)
     }
 }
+
+impl fmt::Display for CancellationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Undeliverable(error) => write!(f, "Storno nicht zustellbar: {error}"),
+            Self::PaymentProviderDown => f.write_str("Zahlungsdienst nicht erreichbar"),
+        }
+    }
+}
+
+impl Error for CancellationError {}
 
 impl Notification for OrderCancelled {
     type Error = CancellationError;
@@ -369,4 +382,17 @@ async fn singleton_handler_publishing_while_mediator_alive_runs_handlers() {
     mediator.send(Checkout { order_id: 42 }).await.unwrap();
 
     assert_eq!(*labels.borrow(), [42]);
+}
+
+#[tokio::test]
+async fn publish_error_propagates_as_boxed_error() {
+    let mediator = Mediator::builder().subscribe(Refund).build();
+
+    let result: Result<(), Box<dyn Error>> =
+        async { Ok(mediator.publish(OrderCancelled { order_id: 7 }).await?) }.await;
+
+    assert_eq!(
+        result.unwrap_err().to_string(),
+        "Zahlungsdienst nicht erreichbar"
+    );
 }

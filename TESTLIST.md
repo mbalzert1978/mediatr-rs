@@ -94,7 +94,7 @@ Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `ExceptionTests.cs`, `Micr
 - [x] Handler, der einen Publisher per Konstruktor bekommt, wird ohne Mediator getestet und bekommt eine Attrappe → die Attrappe sieht die gemeldete Notification · `handler_publishes_to_fake_publisher`
 - [x] Handler mit Publisher ist als `singleton` registriert und meldet eine Notification, nachdem der Mediator weggefallen ist → `publish` liefert `Err(SendError::MediatorDropped)`, kein Panic · `singleton_handler_publishing_after_mediator_dropped_gets_mediator_dropped`
 - [x] Handler mit Publisher ist als `singleton` registriert und meldet eine Notification, solange der Mediator lebt → die Handler dieser Notification laufen · `singleton_handler_publishing_while_mediator_alive_runs_handlers`
-- [ ] Fehler von `publish` → lässt sich mit `?` als `Box<dyn std::error::Error>` weitergeben
+- [x] Fehler von `publish` → lässt sich mit `?` als `Box<dyn std::error::Error>` weitergeben · `publish_error_propagates_as_boxed_error`
 - [ ] Notification-Handler mit `transient` registriert → jedes `publish` baut den Handler neu
 
 ## Notification — Publish-Strategie
