@@ -616,9 +616,11 @@ struct Invoice {
 /// Ein druckfertiges Dokument mit seinem Titel.
 struct Document(String);
 
-/// Macht aus `invoice` ein Dokument mit ihrer Überschrift als Titel.
-fn invoice_document(invoice: Invoice) -> Document {
-    Document(invoice.heading)
+/// Macht aus einer Rechnung ein Dokument mit ihrer Überschrift als Titel.
+impl From<Invoice> for Document {
+    fn from(invoice: Invoice) -> Self {
+        Self(invoice.heading)
+    }
 }
 
 #[test]
@@ -628,13 +630,13 @@ fn unique_instance_twice_from_same_source_type_all_returns_first() {
             Invoice {
                 heading: "Rechnung 1".to_owned(),
             },
-            invoice_document,
+            Document::from,
         )
         .unique_instance(
             Invoice {
                 heading: "Rechnung 2".to_owned(),
             },
-            invoice_document,
+            Document::from,
         )
         .build();
 
@@ -645,4 +647,42 @@ fn unique_instance_twice_from_same_source_type_all_returns_first() {
         .collect();
 
     assert_eq!(titles, ["Rechnung 1"]);
+}
+
+/// Ein Lieferschein mit seiner Überschrift.
+struct DeliveryNote {
+    heading: String,
+}
+
+/// Macht aus einem Lieferschein ein Dokument mit seiner Überschrift als Titel.
+impl From<DeliveryNote> for Document {
+    fn from(note: DeliveryNote) -> Self {
+        Self(note.heading)
+    }
+}
+
+#[test]
+fn unique_instance_from_different_source_types_all_returns_both_in_order() {
+    let provider = Provider::builder()
+        .unique_instance(
+            Invoice {
+                heading: "Rechnung 1".to_owned(),
+            },
+            Document::from,
+        )
+        .unique_instance(
+            DeliveryNote {
+                heading: "Lieferschein 1".to_owned(),
+            },
+            Document::from,
+        )
+        .build();
+
+    let titles: Vec<_> = provider
+        .all::<Document>()
+        .iter()
+        .map(|document| document.0.clone())
+        .collect();
+
+    assert_eq!(titles, ["Rechnung 1", "Lieferschein 1"]);
 }

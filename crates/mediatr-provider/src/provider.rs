@@ -139,7 +139,7 @@ impl ProviderBuilder {
         self.recipe(move |_| Rc::clone(&service))
     }
 
-    /// Registriert `into(source)` wie [`instance`](Self::instance); hat `unique_instance` für `T` schon einen Dienst aus einem `S` registriert, fällt dieser weg.
+    /// Registriert `into(source)` wie [`instance`](Self::instance); hat `unique_instance` für `T` schon einen Dienst aus einem `S` registriert, registriert dieser Aufruf nichts.
     #[must_use]
     pub fn unique_instance<S: 'static, T: 'static>(
         mut self,
