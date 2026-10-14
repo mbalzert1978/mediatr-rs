@@ -326,7 +326,7 @@ async fn handler_processes_response_of_fake_sender() {
 
 #[test]
 fn handler_debug_names_handler_type_without_debug() {
-    let handler = Handler::instance(CustomerDirectory {
+    let handler: Handler<_> = Handler::instance(CustomerDirectory {
         customers: vec![ada()],
     });
 

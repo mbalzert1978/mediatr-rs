@@ -116,7 +116,7 @@ Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `NotificationPublisherTest
 - [ ] Mediator mit eigener Publish-Strategie, Request mit registriertem Handler → `send` liefert die Antwort des Handlers
 - [ ] Mediator mit eigener Publish-Strategie, die kein `Clone` hat → lässt sich klonen, und der Klon erreicht dieselben Handler
 - [ ] Mediator und `MediatorBuilder` mit eigener Publish-Strategie, die kein `Debug` hat, mit `{:?}` formatiert → die Ausgabe nennt die Strategie
-- [ ] Mediator mit eigener Publish-Strategie, Handler mit `Handler::transient` meldet über den Mediator, den er bekommt, eine andere Notification → auch deren Handler laufen in der Reihenfolge der eigenen Strategie
+- [x] Mediator mit eigener Publish-Strategie, Handler mit `Handler::transient` meldet über den Mediator, den er bekommt, eine andere Notification → auch deren Handler laufen in der Reihenfolge der eigenen Strategie · `custom_strategy_transient_handler_publishes_through_received_mediator_in_its_order`
 - [ ] Mediator mit eigener Publish-Strategie, Handler mit `Handler::singleton` meldet über den `WeakMediator`, den er bekommt, eine andere Notification → auch deren Handler laufen in der Reihenfolge der eigenen Strategie
 - [ ] Strategie „alle gleichzeitig“, zwei Handler, die beide warten (`await`) → der zweite Handler startet, bevor der erste fertig ist
 - [ ] Strategie „alle gleichzeitig“, Notification mit drei Handlern, keiner scheitert → `publish` liefert `Ok(())`, jeder Handler lief genau einmal

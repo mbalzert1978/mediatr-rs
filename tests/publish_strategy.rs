@@ -5,8 +5,8 @@ use std::future::Future;
 use std::rc::Rc;
 
 use mediatr_rs::{
-    Handler, MediatorBuilder, Notification, NotificationHandler, PublishStrategy, Publisher,
-    SendError,
+    Handler, Mediator, MediatorBuilder, Notification, NotificationHandler, PublishStrategy,
+    Publisher, SendError,
 };
 
 /// Ereignis: Das Paket mit dieser Sendungsnummer ist angekommen.
@@ -82,4 +82,77 @@ async fn custom_strategy_runs_both_handlers_in_its_own_order() {
         *journal.borrow(),
         ["Empfänger benachrichtigt 7", "eingelagert 7"]
     );
+}
+
+/// Ereignis: Das Paket mit dieser Sendungsnummer soll zugestellt werden.
+struct DeliveryDue {
+    tracking: u32,
+}
+
+impl Notification for DeliveryDue {
+    type Error = SendError;
+}
+
+/// Meldet für jedes angekommene Paket über seinen Publisher, dass es zugestellt werden soll.
+struct Dispatcher {
+    publisher: Mediator<NewestFirst>,
+}
+
+impl NotificationHandler<ParcelArrived> for Dispatcher {
+    async fn handle(&self, event: &ParcelArrived) -> Result<(), SendError> {
+        self.publisher
+            .publish(DeliveryDue {
+                tracking: event.tracking,
+            })
+            .await
+    }
+}
+
+/// Plant für jedes fällige Paket einen Kurier und schreibt das ins Protokoll.
+struct CourierPlanner {
+    journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl NotificationHandler<DeliveryDue> for CourierPlanner {
+    async fn handle(&self, event: &DeliveryDue) -> Result<(), SendError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Kurier geplant {}", event.tracking));
+        Ok(())
+    }
+}
+
+/// Kündigt jedes fällige Paket an der Haustür an und schreibt das ins Protokoll.
+struct DoorNotice {
+    journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl NotificationHandler<DeliveryDue> for DoorNotice {
+    async fn handle(&self, event: &DeliveryDue) -> Result<(), SendError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Tür-Hinweis {}", event.tracking));
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn custom_strategy_transient_handler_publishes_through_received_mediator_in_its_order() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = MediatorBuilder::<NewestFirst>::default()
+        .subscribe(Handler::transient(|publisher| Dispatcher { publisher }))
+        .subscribe(Handler::instance(CourierPlanner {
+            journal: Rc::clone(&journal),
+        }))
+        .subscribe(Handler::instance(DoorNotice {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    mediator
+        .publish(ParcelArrived { tracking: 7 })
+        .await
+        .unwrap();
+
+    assert_eq!(*journal.borrow(), ["Tür-Hinweis 7", "Kurier geplant 7"]);
 }

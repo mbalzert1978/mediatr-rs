@@ -30,8 +30,10 @@ pub struct WeakMediator {
 }
 
 /// Wie der Mediator einen Handler vom Typ `H` bekommt; [`MediatorBuilder::register`] und [`MediatorBuilder::subscribe`] nehmen ihn.
-pub struct Handler<H> {
+/// `S` ist die Publish-Strategie des Mediators, für den der Handler bestimmt ist.
+pub struct Handler<H, S = Sequential> {
     registration: Registration<H>,
+    strategy: PhantomData<S>,
 }
 
 /// Sammelt Handler und baut daraus einen [`Mediator`] mit der Publish-Strategie `S`.
@@ -141,23 +143,19 @@ impl<N: Notification + 'static> Publisher<N> for WeakMediator {
     }
 }
 
-impl<H: 'static> Handler<H> {
+impl<H: 'static, S: 'static> Handler<H, S> {
     /// Handler `handler`; jede Nachricht erreicht dasselbe Objekt.
     #[must_use]
     pub fn instance(handler: H) -> Self {
-        Self {
-            registration: Registration::instance(handler),
-        }
+        Self::new(Registration::instance(handler))
     }
 
     /// Handler aus `make`; jede Nachricht baut ihn damit neu und gibt ihm den [`Mediator`] als [`Sender`] und [`Publisher`].
     #[must_use]
-    pub fn transient(make: impl Fn(Mediator) -> H + 'static) -> Self {
-        Self {
-            registration: Registration::transient(move |provider| {
-                make(Mediator::new(provider.clone()))
-            }),
-        }
+    pub fn transient(make: impl Fn(Mediator<S>) -> H + 'static) -> Self {
+        Self::new(Registration::transient(move |provider| {
+            make(Mediator::new(provider.clone()))
+        }))
     }
 
     /// Handler aus `make`; die erste Nachricht baut ihn damit, jede weitere erreicht denselben Handler.
@@ -165,17 +163,23 @@ impl<H: 'static> Handler<H> {
     /// Der Handler bekommt einen [`WeakMediator`] als [`Sender`] und [`Publisher`], damit er den Mediator nicht selbst am Leben hält.
     #[must_use]
     pub fn singleton(make: impl Fn(WeakMediator) -> H + 'static) -> Self {
+        Self::new(Registration::singleton(move |provider| {
+            make(WeakMediator {
+                provider: provider.downgrade(),
+            })
+        }))
+    }
+
+    /// Handler, den `registration` baut.
+    fn new(registration: Registration<H>) -> Self {
         Self {
-            registration: Registration::singleton(move |provider| {
-                make(WeakMediator {
-                    provider: provider.downgrade(),
-                })
-            }),
+            registration,
+            strategy: PhantomData,
         }
     }
 }
 
-impl<H> fmt::Debug for Handler<H> {
+impl<H, S> fmt::Debug for Handler<H, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Handler")
             .field("registration", &self.registration)
@@ -195,7 +199,7 @@ impl<S> Default for MediatorBuilder<S> {
 impl<S> MediatorBuilder<S> {
     /// Registriert `handler` für Requests vom Typ `R`; ein früherer Handler für `R` fällt weg.
     #[must_use]
-    pub fn register<R, H>(self, handler: Handler<H>) -> Self
+    pub fn register<R, H>(self, handler: Handler<H, S>) -> Self
     where
         R: Request + 'static,
         H: RequestHandler<R> + 'static,
@@ -208,7 +212,7 @@ impl<S> MediatorBuilder<S> {
 
     /// Registriert `handler` für Notifications vom Typ `N`; ist für `N` schon ein Handler vom Typ `H` registriert, fällt `handler` weg.
     #[must_use]
-    pub fn subscribe<N, H>(self, handler: Handler<H>) -> Self
+    pub fn subscribe<N, H>(self, handler: Handler<H, S>) -> Self
     where
         N: Notification + 'static,
         H: NotificationHandler<N> + 'static,
