@@ -2,16 +2,17 @@
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
+use std::time::Duration;
 
 use mediatr_rs::{Concurrent, Handler, Mediator, MediatorBuilder, Publisher, Sender};
 
 mod behaviors_fixtures;
 
 use behaviors_fixtures::{
-    AuditTrail, BookReceipt, LoadingDock, LookupStock, ReceiptBook, ReorderCheck, RetryOnce,
-    ShelfLabeling, ShelfLock, SlowStockLedger, StockCache, StockCounted, StockLedger,
-    audit_and_stopwatch, audited_and_timed, audited_locked_and_timed, checkpoint,
-    labeled_and_reordered_together, passed_checkpoints,
+    AuditTrail, BookReceipt, Deadline, LoadingDock, LookupStock, ReceiptBook, RemoteWarehouse,
+    ReorderCheck, RetryOnce, ShelfLabeling, ShelfLock, SlowStockLedger, StockCache, StockCounted,
+    StockError, StockLedger, audit_and_stopwatch, audited_and_timed, audited_locked_and_timed,
+    checkpoint, labeled_and_reordered_together, passed_checkpoints,
 };
 
 #[tokio::test]
@@ -431,4 +432,27 @@ async fn behavior_answering_without_next_returns_its_response_and_handler_does_n
     let stock = mediator.send(LookupStock { sku: 4 }).await;
 
     assert_eq!((stock, journal.borrow().len()), (Ok(7), 0));
+}
+
+#[tokio::test(start_paused = true)]
+async fn behavior_deadline_shorter_than_handler_returns_err_and_handler_does_not_finish() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .behavior_for::<LookupStock>(Deadline {
+            limit: Duration::from_secs(5),
+        })
+        .register(Handler::instance(RemoteWarehouse {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let stock = mediator.send(LookupStock { sku: 4 }).await;
+
+    assert_eq!(
+        (stock, journal.borrow().clone()),
+        (
+            Err(StockError::Timeout),
+            vec!["Außenlager sucht 4".to_owned()]
+        )
+    );
 }

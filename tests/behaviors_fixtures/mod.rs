@@ -1,5 +1,6 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
+use std::time::Duration;
 
 use mediatr_rs::{
     Next, Notification, NotificationHandler, PipelineBehavior, Request, RequestHandler, SendError,
@@ -306,5 +307,40 @@ impl PipelineBehavior<LookupStock> for StockCache {
         _next: Next<LookupStock>,
     ) -> Result<u32, StockError> {
         Ok(self.cached)
+    }
+}
+
+/// Führt den Bestand im Außenlager; die Suche dort dauert eine Stunde.
+pub struct RemoteWarehouse {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl RequestHandler<LookupStock> for RemoteWarehouse {
+    async fn handle(&self, request: LookupStock) -> Result<u32, StockError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Außenlager sucht {}", request.sku));
+        tokio::time::sleep(Duration::from_hours(1)).await;
+        self.journal
+            .borrow_mut()
+            .push(format!("Außenlager fand {}", request.sku));
+        Ok(12)
+    }
+}
+
+/// Bricht eine Bestandsabfrage ab, die länger als `limit` dauert.
+pub struct Deadline {
+    pub limit: Duration,
+}
+
+impl PipelineBehavior<LookupStock> for Deadline {
+    async fn handle(
+        &self,
+        request: LookupStock,
+        next: Next<LookupStock>,
+    ) -> Result<u32, StockError> {
+        tokio::time::timeout(self.limit, next.run(request))
+            .await
+            .unwrap_or(Err(StockError::Timeout))
     }
 }
