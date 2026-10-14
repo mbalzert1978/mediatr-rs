@@ -44,11 +44,22 @@ pub struct Handler<H, S = Sequential, P = ()> {
 }
 
 /// Sammelt Behaviors und Handler und baut daraus einen [`Mediator`] mit der Publish-Strategie `S` und der Kette `P` der Behaviors.
-pub struct MediatorBuilder<S = Sequential, P = ()> {
+///
+/// `F` sagt, ob schon ein Handler registriert ist; Behaviors nimmt der Builder nur davor,
+/// weil jeder Handler die Kette der Behaviors schon in seinem Typ trägt.
+pub struct MediatorBuilder<S = Sequential, P = (), F = NoHandlers> {
     provider: ProviderBuilder,
     behaviors: P,
-    strategy: PhantomData<S>,
+    types: PhantomData<(S, F)>,
 }
+
+/// [`MediatorBuilder`] ohne Handler; er nimmt noch Behaviors.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub struct NoHandlers;
+
+/// [`MediatorBuilder`] mit mindestens einem Handler; er nimmt keine Behaviors mehr.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub struct WithHandlers;
 
 /// Schickt Requests vom Typ `R` an ihren Handler; ein Handler bekommt einen Sender per Konstruktor.
 ///
@@ -132,12 +143,12 @@ impl<S, P> fmt::Debug for WeakMediator<S, P> {
 }
 
 // Von Hand statt `derive`: `derive(Debug)` verlangte `S: Debug`; `PhantomData` nennt die Strategie auch ohne.
-impl<S, P: fmt::Debug> fmt::Debug for MediatorBuilder<S, P> {
+impl<S, P: fmt::Debug, F> fmt::Debug for MediatorBuilder<S, P, F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MediatorBuilder")
             .field("provider", &self.provider)
             .field("behaviors", &self.behaviors)
-            .field("strategy", &self.strategy)
+            .field("types", &self.types)
             .finish()
     }
 }
@@ -248,12 +259,12 @@ impl<H, S, P> fmt::Debug for Handler<H, S, P> {
 }
 
 // Von Hand statt `derive`: `derive(Clone)` verlangte `S: Clone`, obwohl nur `PhantomData` von `S` abhängt.
-impl<S, P: Clone> Clone for MediatorBuilder<S, P> {
+impl<S, P: Clone, F> Clone for MediatorBuilder<S, P, F> {
     fn clone(&self) -> Self {
         Self {
             provider: self.provider.clone(),
             behaviors: self.behaviors.clone(),
-            strategy: PhantomData,
+            types: PhantomData,
         }
     }
 }
@@ -263,12 +274,12 @@ impl<S> Default for MediatorBuilder<S> {
         Self {
             provider: ProviderBuilder::default(),
             behaviors: (),
-            strategy: PhantomData,
+            types: PhantomData,
         }
     }
 }
 
-impl<S, P> MediatorBuilder<S, P> {
+impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     /// Registriert `behavior` für alle Request-Typen; es liegt innerhalb der zuvor registrierten Behaviors.
     ///
     /// [`Sender::send`] verlangt, dass `behavior` [`PipelineBehavior`] für den Request-Typ ist.
@@ -296,13 +307,15 @@ impl<S, P> MediatorBuilder<S, P> {
         MediatorBuilder {
             provider: self.provider,
             behaviors: (self.behaviors, link),
-            strategy: PhantomData,
+            types: PhantomData,
         }
     }
+}
 
+impl<S, P, F> MediatorBuilder<S, P, F> {
     /// Registriert `handler` für Requests vom Typ `R`; ein früherer Handler für `R` fällt weg.
     #[must_use]
-    pub fn register<R, H>(self, handler: Handler<H, S, P>) -> Self
+    pub fn register<R, H>(self, handler: Handler<H, S, P>) -> MediatorBuilder<S, P, WithHandlers>
     where
         R: Request + 'static,
         H: RequestHandler<R> + 'static,
@@ -312,7 +325,7 @@ impl<S, P> MediatorBuilder<S, P> {
 
     /// Registriert `handler` für Notifications vom Typ `N`; ist für `N` schon ein Handler vom Typ `H` registriert, fällt `handler` weg.
     #[must_use]
-    pub fn subscribe<N, H>(self, handler: Handler<H, S, P>) -> Self
+    pub fn subscribe<N, H>(self, handler: Handler<H, S, P>) -> MediatorBuilder<S, P, WithHandlers>
     where
         N: Notification + 'static,
         H: NotificationHandler<N> + 'static,
@@ -339,10 +352,14 @@ impl<S, P> MediatorBuilder<S, P> {
     }
 
     /// Builder, dessen Provider zusätzlich `registration` kennt.
-    fn with_registration<T: 'static>(self, registration: Registration<T>) -> Self {
-        Self {
+    fn with_registration<T: 'static>(
+        self,
+        registration: Registration<T>,
+    ) -> MediatorBuilder<S, P, WithHandlers> {
+        MediatorBuilder {
             provider: self.provider.register(registration),
-            ..self
+            behaviors: self.behaviors,
+            types: PhantomData,
         }
     }
 }

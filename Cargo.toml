@@ -44,3 +44,4 @@ excessive_nesting = "deny"
 
 [dev-dependencies]
 tokio = { version = "1.53.2", features = ["macros", "rt"] }
+trybuild = "1.0.122"

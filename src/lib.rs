@@ -8,7 +8,8 @@ mod request;
 mod strategy;
 
 pub use mediator::{
-    Handler, Mediator, MediatorBuilder, Publisher, SendError, Sender, WeakMediator,
+    Handler, Mediator, MediatorBuilder, NoHandlers, Publisher, SendError, Sender, WeakMediator,
+    WithHandlers,
 };
 pub use notification::{Notification, NotificationHandler};
 pub use pipeline::{Next, PipelineBehavior};

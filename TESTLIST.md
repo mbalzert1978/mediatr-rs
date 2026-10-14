@@ -144,7 +144,7 @@ Quelle: MediatR `test/MediatR.Tests/PipelineTests.cs`, `MicrosoftExtensionsDI/Pi
 - [ ] Dasselbe Behavior zweimal nur für einen Request-Typ registriert → es läuft pro `send` genau einmal
 - [ ] Zwölf Behaviors → sie umschließen den Handler in Registrierungsreihenfolge, das erste außen
 - [ ] Behaviors und Publish-Strategie `Concurrent` zusammen → `send` läuft durch die Behaviors, `publish` lässt die Handler gleichzeitig laufen
-- [ ] Ein Behavior nach dem ersten Handler registriert → kompiliert nicht
+- [x] Ein Behavior nach dem ersten Handler registriert → kompiliert nicht · `behavior_registered_after_first_handler_does_not_compile`
 - [ ] Ein Behavior verlangt mehr vom Request (z. B. `Clone`), ein Request-Typ erfüllt das nicht → `send` für diesen Typ kompiliert nicht
 - [ ] Handler mit `Handler::transient` registriert und von einem Behavior umschlossen → ein `send` baut den Handler genau einmal, das Behavior läuft genau einmal um ihn herum
 - [ ] Behavior ruft den nächsten Schritt nicht auf und liefert selbst eine Antwort → `send` liefert diese Antwort, der Handler läuft nicht
