@@ -686,3 +686,27 @@ fn unique_instance_from_different_source_types_all_returns_both_in_order() {
 
     assert_eq!(titles, ["Rechnung 1", "Lieferschein 1"]);
 }
+
+#[test]
+fn unique_instance_twice_from_same_source_type_get_returns_first() {
+    let provider = Provider::builder()
+        .unique_instance(
+            Invoice {
+                heading: "Rechnung 1".to_owned(),
+            },
+            Document::from,
+        )
+        .unique_instance(
+            Invoice {
+                heading: "Rechnung 2".to_owned(),
+            },
+            Document::from,
+        )
+        .build();
+
+    let title = provider
+        .get::<Document>()
+        .map(|document| document.0.clone());
+
+    assert_eq!(title.as_deref(), Some("Rechnung 1"));
+}

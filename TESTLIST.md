@@ -72,7 +72,7 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] Zwei Dienste desselben Typs mit `scoped` registriert → `all` liefert im selben Scope zwei verschiedene Objekte, je eins pro Bauanleitung · `two_scoped_registrations_of_same_type_build_one_object_each`
 - [x] Zweimal `instance` für denselben Typ, der Provider fällt weg → beide Dienste werden freigegeben (ihr `Drop` läuft) · `both_instances_of_same_type_are_released_with_provider`
 - [x] Zweimal `unique_instance` für denselben Typ, beide aus demselben Quelltyp umgewandelt → `all` liefert nur den zuerst registrierten Dienst · `unique_instance_twice_from_same_source_type_all_returns_first`
-- [ ] Zweimal `unique_instance` für denselben Typ, beide aus demselben Quelltyp umgewandelt → `get` liefert den zuerst registrierten Dienst
+- [x] Zweimal `unique_instance` für denselben Typ, beide aus demselben Quelltyp umgewandelt → `get` liefert den zuerst registrierten Dienst · `unique_instance_twice_from_same_source_type_get_returns_first`
 - [x] Zweimal `unique_instance` für denselben Typ, aus verschiedenen Quelltypen umgewandelt → `all` liefert beide, in der Reihenfolge der Registrierung · `unique_instance_from_different_source_types_all_returns_both_in_order`
 - [ ] `unique_instance` aus demselben Quelltyp für zwei verschiedene Typen → jede Abfrage nach einem der beiden Typen liefert ihren Dienst
 - [ ] Erst `instance`, dann `unique_instance` für denselben Typ → `all` liefert beide, in der Reihenfolge der Registrierung
