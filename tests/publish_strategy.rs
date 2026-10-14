@@ -349,3 +349,50 @@ async fn custom_strategy_singleton_handler_sends_through_received_weak_mediator(
         (Ok(()), vec!["Paket 7 liegt im Lager".to_owned()])
     );
 }
+
+/// Zentrale mit Tag- und Nachtschicht: Jede Schicht meldet über ihren eigenen Publisher ein Paket zur Zustellung, die Nachtschicht das nächste; es gibt sie nur einmal.
+struct ShiftCenter {
+    day: WeakMediator<NewestFirst>,
+    night: WeakMediator<NewestFirst>,
+}
+
+impl NotificationHandler<ParcelArrived> for ShiftCenter {
+    async fn handle(&self, event: &ParcelArrived) -> Result<(), SendError> {
+        self.day
+            .publish(DeliveryDue {
+                tracking: event.tracking,
+            })
+            .await?;
+        self.night
+            .publish(DeliveryDue {
+                tracking: event.tracking.saturating_add(1),
+            })
+            .await
+    }
+}
+
+#[tokio::test]
+async fn custom_strategy_singleton_handler_publishes_through_weak_mediator_and_its_clone() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = MediatorBuilder::<NewestFirst>::default()
+        .subscribe(Handler::singleton(
+            |publisher: WeakMediator<NewestFirst>| ShiftCenter {
+                night: publisher.clone(),
+                day: publisher,
+            },
+        ))
+        .subscribe(Handler::instance(CourierPlanner {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let published = mediator.publish(ParcelArrived { tracking: 7 }).await;
+
+    assert_eq!(
+        (published, journal.borrow().clone()),
+        (
+            Ok(()),
+            vec!["Kurier geplant 7".to_owned(), "Kurier geplant 8".to_owned()]
+        )
+    );
+}
