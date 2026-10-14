@@ -564,3 +564,27 @@ async fn publish_runs_handler_type_subscribed_transient_then_instance_once_with_
 
     assert_eq!(desks.labels(), (vec![42], vec![]));
 }
+
+#[tokio::test]
+async fn publish_runs_two_handler_types_subscribed_transient_in_registration_order() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let (warehouse, billing) = (Rc::clone(&journal), Rc::clone(&journal));
+    let mediator = Mediator::builder()
+        .subscribe(Handler::transient(move |_publisher: Mediator| Warehouse {
+            journal: Rc::clone(&warehouse),
+        }))
+        .subscribe(Handler::transient(move |_publisher: Mediator| Billing {
+            journal: Rc::clone(&billing),
+        }))
+        .build();
+
+    mediator
+        .publish(OrderPlaced { order_id: 42 })
+        .await
+        .unwrap();
+
+    assert_eq!(
+        *journal.borrow(),
+        ["Ware reserviert für 42", "Rechnung für 42"]
+    );
+}

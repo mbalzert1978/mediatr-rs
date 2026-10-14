@@ -105,7 +105,7 @@ Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `ExceptionTests.cs`, `Micr
 - [x] Derselbe Handler-Typ einmal mit `Handler::instance`, einmal mit `Handler::transient` für dieselbe Notification registriert → `publish` führt ihn einmal aus, und zwar den zuerst registrierten · `publish_runs_handler_type_subscribed_and_subscribed_transient_once_with_first_registration`
 - [x] Derselbe Handler-Typ zweimal mit `subscribe` und `Handler::transient` für dieselbe Notification registriert → `publish` führt ihn einmal aus, und zwar den zuerst registrierten · `publish_runs_handler_type_subscribed_transient_twice_once_with_first_registration`
 - [x] Derselbe Handler-Typ erst mit `Handler::transient`, dann mit `Handler::instance` für dieselbe Notification registriert → `publish` baut und führt nur den mit `Handler::transient` registrierten aus · `publish_runs_handler_type_subscribed_transient_then_instance_once_with_transient`
-- [ ] Zwei verschiedene Handler-Typen mit `subscribe` und `Handler::transient` für dieselbe Notification registriert → `publish` führt beide aus, in der Reihenfolge der Registrierung
+- [x] Zwei verschiedene Handler-Typen mit `subscribe` und `Handler::transient` für dieselbe Notification registriert → `publish` führt beide aus, in der Reihenfolge der Registrierung · `publish_runs_two_handler_types_subscribed_transient_in_registration_order`
 
 ## Notification — Publish-Strategie
 
