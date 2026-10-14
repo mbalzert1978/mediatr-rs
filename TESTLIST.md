@@ -132,15 +132,19 @@ Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `NotificationPublisherTest
 
 ## Pipeline — Behaviors
 
-Quelle: MediatR `test/MediatR.Tests/PipelineTests.cs`, `MicrosoftExtensionsDI/PipelineTests.cs`, `MicrosoftExtensionsDI/PipeLineMultiCallToConstructorTest.cs`, `SendTests.cs` (Timeout-Tests); `docs/mediatr-concepts.md` (Behavior bricht ab). Anders als MediatR gelten Behaviors immer für alle Request-Typen (Entscheidung Markus); man registriert sie beim Bau des Mediators, das zuerst registrierte liegt außen.
+Quelle: MediatR `test/MediatR.Tests/PipelineTests.cs`, `MicrosoftExtensionsDI/PipelineTests.cs`, `MicrosoftExtensionsDI/PipeLineMultiCallToConstructorTest.cs`, `SendTests.cs` (Timeout-Tests); `docs/mediatr-concepts.md` (Behavior bricht ab). Wie bei MediatR gibt es Behaviors für alle Request-Typen und Behaviors nur für einen; man registriert beide Arten in freier Reihenfolge vor dem ersten Handler, das zuerst registrierte liegt außen. Ein mehrfach registriertes Behavior läuft wie bei `TryAddEnumerable` nur einmal, an der Stelle seiner ersten Registrierung. Anders als MediatR überspringt `send` kein Behavior, das mehr vom Request verlangt; es kompiliert dann nicht (Entscheidung Markus).
 
 - [x] Zwei Behaviors, ein Request → das zuerst registrierte läuft außen: außen-vorher, innen-vorher, Handler, innen-nachher, außen-nachher; `send` liefert die Antwort des Handlers · `two_behaviors_wrap_handler_first_registered_outermost`
 - [x] Behavior klont den nächsten Schritt und ruft ihn nach einem Fehler des Handlers noch einmal auf → der Handler läuft zweimal, `send` liefert die Antwort des zweiten Laufs · `behavior_retries_cloned_next_after_handler_error_and_returns_second_response`
 - [x] Zwei Behaviors, Request ohne Antwort (Antworttyp `()`) → sie umschließen den Handler in derselben Reihenfolge, das zuerst registrierte außen · `two_behaviors_wrap_unit_response_handler_first_registered_outermost`
 - [x] Zwei Behaviors, Requests zweier Typen mit je eigenem Handler → jeder Request läuft durch beide Behaviors, das zuerst registrierte außen; `send` liefert jeweils die Antwort seines Handlers · `two_behaviors_wrap_handlers_of_every_request_type_first_registered_outermost`
+- [x] Ein Behavior für alle Request-Typen, eins nur für einen, noch eins für alle, in dieser Reihenfolge registriert → ein Request dieses Typs läuft durch alle drei in Registrierungsreihenfolge, das erste außen; ein Request eines anderen Typs nur durch die zwei allgemeinen; beide bekommen die Antwort ihres Handlers · `behavior_for_one_request_type_between_two_for_all_wraps_only_its_requests_in_registration_order`
+- [ ] Zuerst ein Behavior nur für einen Request-Typ ohne Antwort (Antworttyp `()`), dann eins für alle registriert → beide laufen in Registrierungsreihenfolge um den Handler, das erste außen; `send` liefert `Ok(())`
 - [ ] Zwei Behaviors, jedes dreimal abwechselnd registriert → jedes läuft pro `send` genau einmal, in der Reihenfolge seiner ersten Registrierung
+- [ ] Dasselbe Behavior zweimal nur für einen Request-Typ registriert → es läuft pro `send` genau einmal
 - [ ] Zwölf Behaviors → sie umschließen den Handler in Registrierungsreihenfolge, das erste außen
 - [ ] Behaviors und Publish-Strategie `Concurrent` zusammen → `send` läuft durch die Behaviors, `publish` lässt die Handler gleichzeitig laufen
+- [ ] Ein Behavior nach dem ersten Handler registriert → kompiliert nicht
 - [ ] Ein Behavior verlangt mehr vom Request (z. B. `Clone`), ein Request-Typ erfüllt das nicht → `send` für diesen Typ kompiliert nicht
 - [ ] Handler mit `Handler::transient` registriert und von einem Behavior umschlossen → ein `send` baut den Handler genau einmal, das Behavior läuft genau einmal um ihn herum
 - [ ] Behavior ruft den nächsten Schritt nicht auf und liefert selbst eine Antwort → `send` liefert diese Antwort, der Handler läuft nicht

@@ -59,22 +59,20 @@ async fn notify<N: Notification, H: NotificationHandler<N>>(
 pub(crate) type ErasedBehavior<R> =
     Box<dyn Fn(R, Next<R>) -> LocalBoxFuture<'static, HandlerResult<R>>>;
 
-/// Verpackt das Behavior, das `pick` aus `behaviors` holt, als [`ErasedBehavior`].
-pub(crate) fn erase_behavior<R, P, B>(behaviors: Rc<P>, pick: fn(&P) -> &B) -> ErasedBehavior<R>
+/// Verpackt `behavior` als [`ErasedBehavior`].
+pub(crate) fn erase_behavior<R, B>(behavior: Rc<B>) -> ErasedBehavior<R>
 where
     R: Request + 'static,
-    P: 'static,
     B: PipelineBehavior<R> + 'static,
 {
-    Box::new(move |request, next| Box::pin(wrap(Rc::clone(&behaviors), pick, request, next)))
+    Box::new(move |request, next| Box::pin(wrap(Rc::clone(&behavior), request, next)))
 }
 
-/// Ruft das Behavior auf, das `pick` aus `behaviors` holt; die Future besitzt die Behaviors, damit sie ohne Leihe auskommt.
-async fn wrap<R: Request, P, B: PipelineBehavior<R>>(
-    behaviors: Rc<P>,
-    pick: fn(&P) -> &B,
+/// Ruft `behavior` auf; die Future besitzt das Behavior, damit sie ohne Leihe auskommt.
+async fn wrap<R: Request, B: PipelineBehavior<R>>(
+    behavior: Rc<B>,
     request: R,
     next: Next<R>,
 ) -> HandlerResult<R> {
-    pick(&behaviors).handle(request, next).await
+    behavior.handle(request, next).await
 }

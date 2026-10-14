@@ -4,21 +4,26 @@ use std::error::Error;
 use std::fmt;
 use std::future::Future;
 use std::marker::PhantomData;
+use std::rc::Rc;
 
 use mediatr_provider::{Provider, ProviderBuilder, Registration, WeakProvider};
 
-use crate::erased::{ErasedHandler, ErasedNotificationHandler, erase, erase_notification_handler};
-use crate::pipeline::Behaviors;
+use crate::erased::{
+    ErasedBehavior, ErasedHandler, ErasedNotificationHandler, erase, erase_behavior,
+    erase_notification_handler,
+};
+use crate::pipeline::{Behaviors, Closed, Open};
 use crate::request::HandlerResult;
 use crate::{
-    Next, Notification, NotificationHandler, PublishStrategy, Request, RequestHandler, Sequential,
+    Next, Notification, NotificationHandler, PipelineBehavior, PublishStrategy, Request,
+    RequestHandler, Sequential,
 };
 
 /// Stellt Requests und Notifications den Handlern zu, die für ihren Typ registriert sind.
 ///
 /// Entsteht über [`Mediator::builder`]. Verschickt wird über [`Sender`] und [`Publisher`].
 /// `S` ist die [`PublishStrategy`], nach der `publish` die Handler laufen lässt.
-/// `P` ist das Tupel der Behaviors, die jeden Request umschließen; siehe [`Mediator::with_behaviors`].
+/// `P` ist die Kette der Behaviors, die Requests umschließen; siehe [`MediatorBuilder::behavior`].
 pub struct Mediator<S = Sequential, P = ()> {
     provider: Provider,
     types: PhantomData<(S, P)>,
@@ -38,10 +43,11 @@ pub struct Handler<H, S = Sequential, P = ()> {
     types: PhantomData<(S, P)>,
 }
 
-/// Sammelt Handler und baut daraus einen [`Mediator`] mit der Publish-Strategie `S` und den Behaviors `P`.
+/// Sammelt Behaviors und Handler und baut daraus einen [`Mediator`] mit der Publish-Strategie `S` und der Kette `P` der Behaviors.
 pub struct MediatorBuilder<S = Sequential, P = ()> {
     provider: ProviderBuilder,
-    types: PhantomData<(S, P)>,
+    behaviors: P,
+    strategy: PhantomData<S>,
 }
 
 /// Schickt Requests vom Typ `R` an ihren Handler; ein Handler bekommt einen Sender per Konstruktor.
@@ -93,15 +99,6 @@ impl Mediator {
     pub fn builder() -> MediatorBuilder {
         MediatorBuilder::default()
     }
-
-    /// Beginnt einen Mediator ohne Handler, dessen `behaviors` jeden Request umschließen; das erste liegt außen.
-    ///
-    /// `behaviors` ist ein Tupel mit bis zu zwei Behaviors, z. B. `(AuditTrail, Stopwatch)`.
-    /// [`Sender::send`] verlangt, dass jedes davon [`PipelineBehavior`](crate::PipelineBehavior) für den Request-Typ ist.
-    #[must_use]
-    pub fn with_behaviors<P: 'static>(behaviors: P) -> MediatorBuilder<Sequential, P> {
-        MediatorBuilder::new(behaviors)
-    }
 }
 
 impl<S, P> Mediator<S, P> {
@@ -134,12 +131,13 @@ impl<S, P> fmt::Debug for WeakMediator<S, P> {
     }
 }
 
-// Von Hand statt `derive`, aus demselben Grund wie bei `Mediator`.
-impl<S, P> fmt::Debug for MediatorBuilder<S, P> {
+// Von Hand statt `derive`: `derive(Debug)` verlangte `S: Debug`; `PhantomData` nennt die Strategie auch ohne.
+impl<S, P: fmt::Debug> fmt::Debug for MediatorBuilder<S, P> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MediatorBuilder")
             .field("provider", &self.provider)
-            .field("types", &self.types)
+            .field("behaviors", &self.behaviors)
+            .field("strategy", &self.strategy)
             .finish()
     }
 }
@@ -249,33 +247,59 @@ impl<H, S, P> fmt::Debug for Handler<H, S, P> {
     }
 }
 
-// Von Hand statt `derive`, aus demselben Grund wie bei `Mediator`.
-impl<S, P> Clone for MediatorBuilder<S, P> {
+// Von Hand statt `derive`: `derive(Clone)` verlangte `S: Clone`, obwohl nur `PhantomData` von `S` abhängt.
+impl<S, P: Clone> Clone for MediatorBuilder<S, P> {
     fn clone(&self) -> Self {
         Self {
             provider: self.provider.clone(),
-            types: PhantomData,
+            behaviors: self.behaviors.clone(),
+            strategy: PhantomData,
         }
     }
 }
 
 impl<S> Default for MediatorBuilder<S> {
     fn default() -> Self {
-        Self::new(())
-    }
-}
-
-impl<S, P: 'static> MediatorBuilder<S, P> {
-    /// Builder ohne Handler, dessen Mediator jeden Request durch `behaviors` schickt.
-    fn new(behaviors: P) -> Self {
         Self {
-            provider: ProviderBuilder::default().register(Registration::instance(behaviors)),
-            types: PhantomData,
+            provider: ProviderBuilder::default(),
+            behaviors: (),
+            strategy: PhantomData,
         }
     }
 }
 
 impl<S, P> MediatorBuilder<S, P> {
+    /// Registriert `behavior` für alle Request-Typen; es liegt innerhalb der zuvor registrierten Behaviors.
+    ///
+    /// [`Sender::send`] verlangt, dass `behavior` [`PipelineBehavior`] für den Request-Typ ist.
+    #[must_use]
+    pub fn behavior<B: 'static>(self, behavior: B) -> MediatorBuilder<S, (P, Open<B>)> {
+        self.with_behavior(Open(Rc::new(behavior)))
+    }
+
+    /// Registriert `behavior` nur für Requests vom Typ `R`; es liegt innerhalb der zuvor registrierten Behaviors.
+    #[must_use]
+    pub fn behavior_for<R: Request + 'static>(
+        self,
+        behavior: impl PipelineBehavior<R> + 'static,
+    ) -> MediatorBuilder<S, (P, Closed)> {
+        let erased: ErasedBehavior<R> = erase_behavior(Rc::new(behavior));
+        self.with_behavior(Closed(
+            Provider::builder()
+                .register(Registration::instance(erased))
+                .build(),
+        ))
+    }
+
+    /// Builder, dessen Kette der Behaviors zusätzlich mit `link` endet.
+    fn with_behavior<L>(self, link: L) -> MediatorBuilder<S, (P, L)> {
+        MediatorBuilder {
+            provider: self.provider,
+            behaviors: (self.behaviors, link),
+            strategy: PhantomData,
+        }
+    }
+
     /// Registriert `handler` für Requests vom Typ `R`; ein früherer Handler für `R` fällt weg.
     #[must_use]
     pub fn register<R, H>(self, handler: Handler<H, S, P>) -> Self
@@ -301,10 +325,17 @@ impl<S, P> MediatorBuilder<S, P> {
         )
     }
 
-    /// Baut den Mediator mit allen registrierten Handlern.
+    /// Baut den Mediator mit allen registrierten Behaviors und Handlern.
     #[must_use]
-    pub fn build(self) -> Mediator<S, P> {
-        Mediator::new(self.provider.build())
+    pub fn build(self) -> Mediator<S, P>
+    where
+        P: 'static,
+    {
+        Mediator::new(
+            self.provider
+                .register(Registration::instance(self.behaviors))
+                .build(),
+        )
     }
 
     /// Builder, dessen Provider zusätzlich `registration` kennt.

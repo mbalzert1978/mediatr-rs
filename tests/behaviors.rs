@@ -66,7 +66,8 @@ impl PipelineBehavior<LookupStock> for RetryOnce {
 #[tokio::test]
 async fn behavior_retries_cloned_next_after_handler_error_and_returns_second_response() {
     let calls = Rc::new(Cell::new(0));
-    let mediator = Mediator::with_behaviors((RetryOnce,))
+    let mediator = Mediator::builder()
+        .behavior(RetryOnce)
         .register(Handler::instance(SlowStockLedger {
             calls: Rc::clone(&calls),
         }))
@@ -147,7 +148,10 @@ fn audited_and_timed(handled: &str) -> Vec<String> {
 #[tokio::test]
 async fn two_behaviors_wrap_handler_first_registered_outermost() {
     let journal = Rc::new(RefCell::new(Vec::new()));
-    let mediator = Mediator::with_behaviors(audit_and_stopwatch(&journal))
+    let (audit, stopwatch) = audit_and_stopwatch(&journal);
+    let mediator = Mediator::builder()
+        .behavior(audit)
+        .behavior(stopwatch)
         .register(Handler::instance(StockLedger {
             journal: Rc::clone(&journal),
         }))
@@ -188,7 +192,10 @@ impl RequestHandler<BookReceipt> for ReceiptBook {
 #[tokio::test]
 async fn two_behaviors_wrap_unit_response_handler_first_registered_outermost() {
     let journal = Rc::new(RefCell::new(Vec::new()));
-    let mediator = Mediator::with_behaviors(audit_and_stopwatch(&journal))
+    let (audit, stopwatch) = audit_and_stopwatch(&journal);
+    let mediator = Mediator::builder()
+        .behavior(audit)
+        .behavior(stopwatch)
         .register(Handler::instance(ReceiptBook {
             journal: Rc::clone(&journal),
         }))
@@ -205,7 +212,10 @@ async fn two_behaviors_wrap_unit_response_handler_first_registered_outermost() {
 #[tokio::test]
 async fn two_behaviors_wrap_handlers_of_every_request_type_first_registered_outermost() {
     let journal = Rc::new(RefCell::new(Vec::new()));
-    let mediator = Mediator::with_behaviors(audit_and_stopwatch(&journal))
+    let (audit, stopwatch) = audit_and_stopwatch(&journal);
+    let mediator = Mediator::builder()
+        .behavior(audit)
+        .behavior(stopwatch)
         .register(Handler::instance(StockLedger {
             journal: Rc::clone(&journal),
         }))
@@ -224,6 +234,75 @@ async fn two_behaviors_wrap_handlers_of_every_request_type_first_registered_oute
             Ok(()),
             [
                 audited_and_timed("Bestand gelesen für 4"),
+                audited_and_timed("Eingang gebucht für 9")
+            ]
+            .concat()
+        )
+    );
+}
+
+/// Sperrt das Regal, solange der Bestand eines Artikels gelesen wird.
+struct ShelfLock {
+    journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl PipelineBehavior<LookupStock> for ShelfLock {
+    async fn handle(
+        &self,
+        request: LookupStock,
+        next: Next<LookupStock>,
+    ) -> Result<u32, StockError> {
+        self.journal.borrow_mut().push("Regal gesperrt".to_owned());
+        let stock = next.run(request).await;
+        self.journal.borrow_mut().push("Regal frei".to_owned());
+        stock
+    }
+}
+
+/// Was Prüfprotokoll, [`ShelfLock`] und Stoppuhr, in dieser Reihenfolge registriert, um den Protokolleintrag `handled` herum ins Protokoll schreiben.
+fn audited_locked_and_timed(handled: &str) -> Vec<String> {
+    [
+        "Prüfung beginnt",
+        "Regal gesperrt",
+        "Messung startet",
+        handled,
+        "Messung stoppt",
+        "Regal frei",
+        "Prüfung endet",
+    ]
+    .map(str::to_owned)
+    .to_vec()
+}
+
+#[tokio::test]
+async fn behavior_for_one_request_type_between_two_for_all_wraps_only_its_requests_in_registration_order()
+ {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let (audit, stopwatch) = audit_and_stopwatch(&journal);
+    let mediator = Mediator::builder()
+        .behavior(audit)
+        .behavior_for::<LookupStock>(ShelfLock {
+            journal: Rc::clone(&journal),
+        })
+        .behavior(stopwatch)
+        .register(Handler::instance(StockLedger {
+            journal: Rc::clone(&journal),
+        }))
+        .register(Handler::instance(ReceiptBook {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let stock = mediator.send(LookupStock { sku: 4 }).await;
+    let booked = mediator.send(BookReceipt { sku: 9 }).await;
+
+    assert_eq!(
+        (stock, booked, journal.borrow().clone()),
+        (
+            Ok(12),
+            Ok(()),
+            [
+                audited_locked_and_timed("Bestand gelesen für 4"),
                 audited_and_timed("Eingang gebucht für 9")
             ]
             .concat()
