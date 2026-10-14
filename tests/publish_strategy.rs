@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use mediatr_rs::{
     Handler, Mediator, MediatorBuilder, Notification, NotificationHandler, PublishStrategy,
-    Publisher, SendError,
+    Publisher, SendError, WeakMediator,
 };
 
 /// Ereignis: Das Paket mit dieser Sendungsnummer ist angekommen.
@@ -141,6 +141,42 @@ async fn custom_strategy_transient_handler_publishes_through_received_mediator_i
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = MediatorBuilder::<NewestFirst>::default()
         .subscribe(Handler::transient(|publisher| Dispatcher { publisher }))
+        .subscribe(Handler::instance(CourierPlanner {
+            journal: Rc::clone(&journal),
+        }))
+        .subscribe(Handler::instance(DoorNotice {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    mediator
+        .publish(ParcelArrived { tracking: 7 })
+        .await
+        .unwrap();
+
+    assert_eq!(*journal.borrow(), ["Tür-Hinweis 7", "Kurier geplant 7"]);
+}
+
+/// Zentrale, die für jedes angekommene Paket über ihren Publisher meldet, dass es zugestellt werden soll; es gibt sie nur einmal.
+struct DispatchCenter {
+    publisher: WeakMediator<NewestFirst>,
+}
+
+impl NotificationHandler<ParcelArrived> for DispatchCenter {
+    async fn handle(&self, event: &ParcelArrived) -> Result<(), SendError> {
+        self.publisher
+            .publish(DeliveryDue {
+                tracking: event.tracking,
+            })
+            .await
+    }
+}
+
+#[tokio::test]
+async fn custom_strategy_singleton_handler_publishes_through_received_weak_mediator_in_its_order() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = MediatorBuilder::<NewestFirst>::default()
+        .subscribe(Handler::singleton(|publisher| DispatchCenter { publisher }))
         .subscribe(Handler::instance(CourierPlanner {
             journal: Rc::clone(&journal),
         }))

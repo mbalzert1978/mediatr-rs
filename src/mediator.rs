@@ -24,9 +24,11 @@ pub struct Mediator<S = Sequential> {
 }
 
 /// Verweis auf einen [`Mediator`], der dessen Handler nicht am Leben hält; ein [`Handler::singleton`] bekommt ihn als [`Sender`] und [`Publisher`].
+/// `S` ist die Publish-Strategie dieses Mediators.
 #[derive(Debug, Clone)]
-pub struct WeakMediator {
+pub struct WeakMediator<S = Sequential> {
     provider: WeakProvider,
+    strategy: PhantomData<S>,
 }
 
 /// Wie der Mediator einen Handler vom Typ `H` bekommt; [`MediatorBuilder::register`] und [`MediatorBuilder::subscribe`] nehmen ihn.
@@ -127,17 +129,17 @@ impl<S: PublishStrategy, N: Notification + 'static> Publisher<N> for Mediator<S>
     }
 }
 
-impl<R: Request + 'static> Sender<R> for WeakMediator {
+impl<S, R: Request + 'static> Sender<R> for WeakMediator<S> {
     async fn send(&self, request: R) -> HandlerResult<R> {
-        let mediator: Mediator =
+        let mediator: Mediator<S> =
             Mediator::new(self.provider.upgrade().ok_or(SendError::MediatorDropped)?);
         mediator.send(request).await
     }
 }
 
-impl<N: Notification + 'static> Publisher<N> for WeakMediator {
+impl<S: PublishStrategy, N: Notification + 'static> Publisher<N> for WeakMediator<S> {
     async fn publish(&self, notification: N) -> Result<(), N::Error> {
-        let mediator: Mediator =
+        let mediator: Mediator<S> =
             Mediator::new(self.provider.upgrade().ok_or(SendError::MediatorDropped)?);
         mediator.publish(notification).await
     }
@@ -162,10 +164,11 @@ impl<H: 'static, S: 'static> Handler<H, S> {
     ///
     /// Der Handler bekommt einen [`WeakMediator`] als [`Sender`] und [`Publisher`], damit er den Mediator nicht selbst am Leben hält.
     #[must_use]
-    pub fn singleton(make: impl Fn(WeakMediator) -> H + 'static) -> Self {
+    pub fn singleton(make: impl Fn(WeakMediator<S>) -> H + 'static) -> Self {
         Self::new(Registration::singleton(move |provider| {
             make(WeakMediator {
                 provider: provider.downgrade(),
+                strategy: PhantomData,
             })
         }))
     }
