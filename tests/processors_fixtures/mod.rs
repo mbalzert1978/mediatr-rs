@@ -53,3 +53,46 @@ impl RequestPostProcessor<QuotePrice> for QuoteArchive {
             .push(format!("Preis {response} für {} archiviert", request.sku));
     }
 }
+
+/// Prüfschritt Nummer `N` vor jeder Preisberechnung; schreibt in `journal`.
+pub struct PriceCheck<const N: usize> {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+/// Prüfschritt Nummer `N`, der in `journal` schreibt.
+pub fn price_check<const N: usize>(journal: &Rc<RefCell<Vec<String>>>) -> PriceCheck<N> {
+    PriceCheck {
+        journal: Rc::clone(journal),
+    }
+}
+
+impl<const N: usize> RequestPreProcessor<QuotePrice> for PriceCheck<N> {
+    async fn process(&self, _request: &QuotePrice) {
+        self.journal.borrow_mut().push(format!("Prüfung {N}"));
+    }
+}
+
+/// Export Nummer `N` nach jeder Preisberechnung; schreibt in `journal`.
+pub struct PriceExport<const N: usize> {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+/// Export Nummer `N`, der in `journal` schreibt.
+pub fn price_export<const N: usize>(journal: &Rc<RefCell<Vec<String>>>) -> PriceExport<N> {
+    PriceExport {
+        journal: Rc::clone(journal),
+    }
+}
+
+impl<const N: usize> RequestPostProcessor<QuotePrice> for PriceExport<N> {
+    async fn process(&self, _request: &QuotePrice, _response: &u32) {
+        self.journal.borrow_mut().push(format!("Export {N}"));
+    }
+}
+
+/// Was `count` Prüfschritte und `count` Exporte ab Nummer 1 um den Protokolleintrag `handled` eines Handlers herum schreiben.
+pub fn checked_and_exported(count: usize, handled: &str) -> Vec<String> {
+    let checks = (1..=count).map(|n| format!("Prüfung {n}"));
+    let exports = (1..=count).map(|n| format!("Export {n}"));
+    checks.chain([handled.to_owned()]).chain(exports).collect()
+}

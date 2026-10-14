@@ -12,11 +12,11 @@ use crate::erased::{
     ErasedBehavior, ErasedHandler, ErasedNotificationHandler, erase, erase_behavior,
     erase_notification_handler,
 };
-use crate::pipeline::{Behaviors, Closed, Open, PostProcess, PreProcess, Slot};
+use crate::pipeline::{Behaviors, Closed, Open, PostProcess, PreProcess, Slot, Stage};
 use crate::request::HandlerResult;
 use crate::{
     Next, Notification, NotificationHandler, PipelineBehavior, PublishStrategy, Request,
-    RequestHandler, Sequential,
+    RequestHandler, RequestPostProcessor, RequestPreProcessor, Sequential,
 };
 
 /// Stellt Requests und Notifications den Handlern zu, die für ihren Typ registriert sind.
@@ -298,14 +298,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     /// Ist ein Behavior vom Typ `B` schon registriert, läuft nur das erste, an seinem Platz.
     #[must_use]
     pub fn behavior<B: 'static>(self, behavior: B) -> MediatorBuilder<S, (P, Open<B>)> {
-        let slot = Slot(self.slots);
-        self.with_behavior(
-            Open {
-                behavior: Rc::new(behavior),
-                slot,
-            },
-            Registration::instance(slot).unique_by::<B>(),
-        )
+        self.open(behavior, Stage::Around)
     }
 
     /// Registriert `behavior` nur für Requests vom Typ `R`; es liegt innerhalb der zuvor registrierten Behaviors.
@@ -314,18 +307,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
         self,
         behavior: impl PipelineBehavior<R> + 'static,
     ) -> MediatorBuilder<S, (P, Closed)> {
-        let slot = Slot(self.slots);
-        let unique = unique_for::<R, _>(slot, &behavior);
-        let erased: ErasedBehavior<R> = erase_behavior(Rc::new(behavior));
-        self.with_behavior(
-            Closed {
-                provider: Provider::builder()
-                    .register(Registration::instance(erased))
-                    .build(),
-                slot,
-            },
-            unique,
-        )
+        self.closed::<R>(behavior, Stage::Around)
     }
 
     /// Registriert `pre_processor` für alle Request-Typen; er läuft vor dem Handler.
@@ -348,7 +330,59 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
         self,
         post_processor: B,
     ) -> MediatorBuilder<S, (P, Open<PostProcess<B>>)> {
-        self.behavior(PostProcess(post_processor))
+        self.open(PostProcess(post_processor), Stage::After)
+    }
+
+    /// Registriert `pre_processor` nur für Requests vom Typ `R`; er läuft vor dem Handler.
+    #[must_use]
+    pub fn pre_processor_for<R: Request + 'static>(
+        self,
+        pre_processor: impl RequestPreProcessor<R> + 'static,
+    ) -> MediatorBuilder<S, (P, Closed)> {
+        self.behavior_for::<R>(PreProcess(pre_processor))
+    }
+
+    /// Registriert `post_processor` nur für Requests vom Typ `R`; er läuft nach dem Handler.
+    #[must_use]
+    pub fn post_processor_for<R: Request + Clone + 'static>(
+        self,
+        post_processor: impl RequestPostProcessor<R> + 'static,
+    ) -> MediatorBuilder<S, (P, Closed)> {
+        self.closed::<R>(PostProcess(post_processor), Stage::After)
+    }
+
+    /// Builder, dessen Kette zusätzlich mit `behavior` für alle Request-Typen auf der Stufe `stage` endet.
+    fn open<B: 'static>(self, behavior: B, stage: Stage) -> MediatorBuilder<S, (P, Open<B>)> {
+        let slot = Slot(self.slots);
+        self.with_behavior(
+            Open {
+                behavior: Rc::new(behavior),
+                slot,
+                stage,
+            },
+            Registration::instance(slot).unique_by::<B>(),
+        )
+    }
+
+    /// Builder, dessen Kette zusätzlich mit `behavior` nur für Requests vom Typ `R` auf der Stufe `stage` endet.
+    fn closed<R: Request + 'static>(
+        self,
+        behavior: impl PipelineBehavior<R> + 'static,
+        stage: Stage,
+    ) -> MediatorBuilder<S, (P, Closed)> {
+        let slot = Slot(self.slots);
+        let unique = unique_for::<R, _>(slot, &behavior);
+        let erased: ErasedBehavior<R> = erase_behavior(Rc::new(behavior));
+        self.with_behavior(
+            Closed {
+                provider: Provider::builder()
+                    .register(Registration::instance(erased))
+                    .build(),
+                slot,
+                stage,
+            },
+            unique,
+        )
     }
 
     /// Builder, dessen Kette der Behaviors zusätzlich mit `link` endet; `slot` meldet dessen Platz an.

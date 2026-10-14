@@ -42,7 +42,7 @@ pub trait RequestPostProcessor<R: Request> {
     fn process(&self, request: &R, response: &R::Response) -> impl Future<Output = ()>;
 }
 
-pub(crate) use sealed::{Behaviors, Closed, Open, PostProcess, PreProcess, Slot};
+pub(crate) use sealed::{Behaviors, Closed, Open, PostProcess, PreProcess, Slot, Stage};
 
 mod sealed {
     use std::fmt;
@@ -61,10 +61,19 @@ mod sealed {
     /// # Vertrag
     ///
     /// `erase` liefert je Behavior der Kette, das Requests vom Typ `R` umschließt und dessen Platz in `active` steht,
-    /// genau ein gelöschtes Behavior, in Registrierungsreihenfolge, und löst keine Panic aus.
+    /// genau ein gelöschtes Behavior mit seiner Stufe, in Registrierungsreihenfolge, und löst keine Panic aus.
     pub trait Behaviors<R: Request>: 'static {
-        /// Die Behaviors der Kette für `R` mit gelöschtem Typ, deren Platz in `active` steht, in Registrierungsreihenfolge.
-        fn erase(&self, active: &[Slot]) -> Vec<Rc<ErasedBehavior<R>>>;
+        /// Die Behaviors der Kette für `R` mit gelöschtem Typ und ihrer Stufe, deren Platz in `active` steht, in Registrierungsreihenfolge.
+        fn erase(&self, active: &[Slot]) -> Vec<(Stage, Rc<ErasedBehavior<R>>)>;
+    }
+
+    /// Wo ein Behavior in der Pipeline liegt.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub enum Stage {
+        /// Um den Handler, das zuerst registrierte außen.
+        Around,
+        /// Direkt um den Handler, innerhalb aller anderen; läuft nach ihm in Registrierungsreihenfolge.
+        After,
     }
 
     /// Der Platz eines Behaviors in der Kette; `send` lässt nur die Plätze laufen, die der Provider des Mediators behalten hat.
@@ -75,6 +84,7 @@ mod sealed {
     pub struct Open<B> {
         pub(crate) behavior: Rc<B>,
         pub(crate) slot: Slot,
+        pub(crate) stage: Stage,
     }
 
     /// Ein Vorverarbeiter als Behavior: `B` sieht den Request, dann geht dieser weiter.
@@ -89,6 +99,7 @@ mod sealed {
     pub struct Closed {
         pub(crate) provider: Provider,
         pub(crate) slot: Slot,
+        pub(crate) stage: Stage,
     }
 
     // Von Hand statt `derive`: `derive(Clone)` verlangte `B: Clone`, obwohl nur der `Rc` geklont wird.
@@ -97,6 +108,7 @@ mod sealed {
             Self {
                 behavior: Rc::clone(&self.behavior),
                 slot: self.slot,
+                stage: self.stage,
             }
         }
     }
@@ -106,6 +118,7 @@ mod sealed {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             f.debug_struct("Open")
                 .field("slot", &self.slot)
+                .field("stage", &self.stage)
                 .finish_non_exhaustive()
         }
     }
@@ -142,7 +155,7 @@ impl<R: Request + Clone, B: RequestPostProcessor<R>> PipelineBehavior<R> for Pos
 }
 
 impl<R: Request> Behaviors<R> for () {
-    fn erase(&self, _active: &[Slot]) -> Vec<Rc<ErasedBehavior<R>>> {
+    fn erase(&self, _active: &[Slot]) -> Vec<(Stage, Rc<ErasedBehavior<R>>)> {
         Vec::new()
     }
 }
@@ -153,20 +166,28 @@ where
     P: Behaviors<R>,
     B: PipelineBehavior<R> + 'static,
 {
-    fn erase(&self, active: &[Slot]) -> Vec<Rc<ErasedBehavior<R>>> {
+    fn erase(&self, active: &[Slot]) -> Vec<(Stage, Rc<ErasedBehavior<R>>)> {
         let mut behaviors = self.0.erase(active);
         if active.contains(&self.1.slot) {
-            behaviors.push(Rc::new(erase_behavior(Rc::clone(&self.1.behavior))));
+            behaviors.push((
+                self.1.stage,
+                Rc::new(erase_behavior(Rc::clone(&self.1.behavior))),
+            ));
         }
         behaviors
     }
 }
 
 impl<R: Request + 'static, P: Behaviors<R>> Behaviors<R> for (P, Closed) {
-    fn erase(&self, active: &[Slot]) -> Vec<Rc<ErasedBehavior<R>>> {
+    fn erase(&self, active: &[Slot]) -> Vec<(Stage, Rc<ErasedBehavior<R>>)> {
         let mut behaviors = self.0.erase(active);
         if active.contains(&self.1.slot) {
-            behaviors.extend(self.1.provider.get::<ErasedBehavior<R>>());
+            behaviors.extend(
+                self.1
+                    .provider
+                    .get::<ErasedBehavior<R>>()
+                    .map(|behavior| (self.1.stage, behavior)),
+            );
         }
         behaviors
     }
@@ -180,13 +201,22 @@ pub struct Next<R: Request> {
 }
 
 impl<R: Request> Next<R> {
-    /// Pipeline aus `behaviors`, in der Reihenfolge ihrer Registrierung, und `handler`; das erste Behavior liegt außen.
+    /// Pipeline aus `behaviors`, in der Reihenfolge ihrer Registrierung, und `handler`; jedes liegt, wo seine [`Stage`] sagt.
     pub(crate) fn new(
         handler: Rc<ErasedHandler<R>>,
-        mut behaviors: Vec<Rc<ErasedBehavior<R>>>,
+        behaviors: Vec<(Stage, Rc<ErasedBehavior<R>>)>,
     ) -> Self {
-        behaviors.reverse();
-        Self { handler, behaviors }
+        let (after, around): (Vec<_>, Vec<_>) = behaviors
+            .into_iter()
+            .partition(|(stage, _)| *stage == Stage::After);
+        Self {
+            handler,
+            behaviors: after
+                .into_iter()
+                .chain(around.into_iter().rev())
+                .map(|(_, behavior)| behavior)
+                .collect(),
+        }
     }
 
     /// Schickt `request` an den nächsten Schritt und liefert dessen Antwort.
