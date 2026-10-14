@@ -144,3 +144,29 @@ async fn failing_handler_skips_post_processor_and_send_returns_handler_error() {
         )
     );
 }
+
+#[tokio::test]
+async fn same_pre_processor_type_registered_twice_runs_once_per_send() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .pre_processor(InquiryLog {
+            journal: Rc::clone(&journal),
+        })
+        .pre_processor(InquiryLog {
+            journal: Rc::clone(&journal),
+        })
+        .register(Handler::instance(PriceList {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let _price = mediator.send(QuotePrice { sku: 7 }).await;
+
+    assert_eq!(
+        journal.borrow().clone(),
+        vec![
+            "Anfrage für 7 eingegangen".to_owned(),
+            "Preis berechnet für 7".to_owned()
+        ]
+    );
+}
