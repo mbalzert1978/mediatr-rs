@@ -91,10 +91,10 @@ impl<R: Request + 'static> Sender<R> for Mediator {
 
 impl<N: Notification + 'static> Publisher<N> for Mediator {
     async fn publish(&self, notification: N) -> Result<(), N::Error> {
-        match self.provider.get::<ErasedNotificationHandler<N>>() {
-            Some(handler) => handler(&notification).await,
-            None => Ok(()),
+        for handler in self.provider.all::<ErasedNotificationHandler<N>>() {
+            handler(&notification).await?;
         }
+        Ok(())
     }
 }
 

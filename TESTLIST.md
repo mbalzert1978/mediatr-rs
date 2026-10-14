@@ -77,7 +77,7 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `ExceptionTests.cs`, `MicrosoftExtensionsDI/Issue1118Tests.cs`, `MicrosoftExtensionsDI/DuplicateAssemblyResolutionTests.cs`; Standard-Publisher `ForeachAwaitPublisher` (nacheinander, erster Fehler stoppt). Doppelte Handler-Typen: `NotificationHandlerWrapper` behält mit `GroupBy(GetType).First()` den zuerst registrierten, anders als `send`. Andere Strategien stehen unter „Notification — Publish-Strategie“.
 
 - [x] Notification mit einem registrierten Handler → `publish` führt den Handler aus · `publish_runs_registered_handler`
-- [ ] Notification mit zwei Handlern → beide laufen, in der Reihenfolge der Registrierung
+- [x] Notification mit zwei Handlern → beide laufen, in der Reihenfolge der Registrierung · `publish_runs_both_handlers_in_registration_order`
 - [x] Notification ohne registrierten Handler → `publish` liefert `Ok(())`, kein Panic · `publish_without_handler_returns_ok`
 - [ ] Zwei Notification-Typen mit je eigenem Handler → jede Notification erreicht nur ihre Handler
 - [ ] Erster Handler wartet (`await`), bevor er fertig ist → der zweite Handler startet erst danach

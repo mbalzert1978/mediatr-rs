@@ -51,3 +51,54 @@ async fn publish_without_handler_returns_ok() {
 
     assert!(matches!(result, Ok(())));
 }
+
+/// Reserviert für jede eingegangene Bestellung die Ware und schreibt das ins Protokoll.
+struct Warehouse {
+    journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl NotificationHandler<OrderPlaced> for Warehouse {
+    async fn handle(&self, event: &OrderPlaced) -> Result<(), SendError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Ware reserviert für {}", event.order_id));
+        Ok(())
+    }
+}
+
+/// Stellt für jede eingegangene Bestellung eine Rechnung aus und schreibt das ins Protokoll.
+struct Billing {
+    journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl NotificationHandler<OrderPlaced> for Billing {
+    async fn handle(&self, event: &OrderPlaced) -> Result<(), SendError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Rechnung für {}", event.order_id));
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn publish_runs_both_handlers_in_registration_order() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .subscribe(Warehouse {
+            journal: Rc::clone(&journal),
+        })
+        .subscribe(Billing {
+            journal: Rc::clone(&journal),
+        })
+        .build();
+
+    mediator
+        .publish(OrderPlaced { order_id: 42 })
+        .await
+        .unwrap();
+
+    assert_eq!(
+        *journal.borrow(),
+        ["Ware reserviert für 42", "Rechnung für 42"]
+    );
+}
