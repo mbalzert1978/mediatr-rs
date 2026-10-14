@@ -16,11 +16,11 @@ use crate::wrappers::{BehaviorWrapper, wrap_behavior};
 ///
 /// # Vertrag
 ///
-/// `erase` liefert je Behavior der Kette, das Requests vom Typ `R` umschließt und dessen Platz in `active` steht,
+/// `wrap` liefert je Behavior der Kette, das Requests vom Typ `R` umschließt und dessen Platz in `active` steht,
 /// genau ein gelöschtes Behavior mit seiner Stufe, in Registrierungsreihenfolge, und löst keine Panic aus.
 pub trait Behaviors<R: Request>: 'static {
     /// Die Behaviors der Kette für `R` mit gelöschtem Typ und ihrer Stufe, deren Platz in `active` steht, in Registrierungsreihenfolge.
-    fn erase(&self, active: &[Slot]) -> Vec<(Stage, Rc<BehaviorWrapper<R>>)>;
+    fn wrap(&self, active: &[Slot]) -> Vec<(Stage, Rc<BehaviorWrapper<R>>)>;
 }
 
 /// Wo ein Behavior in der Pipeline liegt.
@@ -52,7 +52,7 @@ pub struct PreProcess<B>(pub(crate) B);
 pub struct PostProcess<B>(pub(crate) B);
 
 /// Ein Behavior nur für einen Request-Typ, als Glied der Kette.
-/// Ein eigener [`Provider`] hält es als [`BehaviorWrapper`] dieses Typs, damit `erase` es nur für diesen Typ findet.
+/// Ein eigener [`Provider`] hält es als [`BehaviorWrapper`] dieses Typs, damit `wrap` es nur für diesen Typ findet.
 #[derive(Debug, Clone)]
 pub struct Closed {
     pub(crate) provider: Provider,
@@ -96,7 +96,7 @@ impl<B> fmt::Debug for PostProcess<B> {
 }
 
 impl<R: Request> Behaviors<R> for () {
-    fn erase(&self, _active: &[Slot]) -> Vec<(Stage, Rc<BehaviorWrapper<R>>)> {
+    fn wrap(&self, _active: &[Slot]) -> Vec<(Stage, Rc<BehaviorWrapper<R>>)> {
         Vec::new()
     }
 }
@@ -107,8 +107,8 @@ where
     P: Behaviors<R>,
     B: PipelineBehavior<R> + 'static,
 {
-    fn erase(&self, active: &[Slot]) -> Vec<(Stage, Rc<BehaviorWrapper<R>>)> {
-        let mut behaviors = self.0.erase(active);
+    fn wrap(&self, active: &[Slot]) -> Vec<(Stage, Rc<BehaviorWrapper<R>>)> {
+        let mut behaviors = self.0.wrap(active);
         if active.contains(&self.1.slot) {
             behaviors.push((
                 self.1.stage,
@@ -120,8 +120,8 @@ where
 }
 
 impl<R: Request + 'static, P: Behaviors<R>> Behaviors<R> for (P, Closed) {
-    fn erase(&self, active: &[Slot]) -> Vec<(Stage, Rc<BehaviorWrapper<R>>)> {
-        let mut behaviors = self.0.erase(active);
+    fn wrap(&self, active: &[Slot]) -> Vec<(Stage, Rc<BehaviorWrapper<R>>)> {
+        let mut behaviors = self.0.wrap(active);
         if active.contains(&self.1.slot) {
             behaviors.extend(
                 self.1

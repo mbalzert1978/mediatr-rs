@@ -101,7 +101,7 @@ impl<S, P: Behaviors<R>, R: Request + 'static> Sender<R> for Mediator<S, P> {
         let behaviors = self
             .provider
             .get::<P>()
-            .map_or_else(Vec::new, |behaviors| behaviors.erase(&active));
+            .map_or_else(Vec::new, |behaviors| behaviors.wrap(&active));
         Next::new(handler, &behaviors).run(request).await
     }
 }
