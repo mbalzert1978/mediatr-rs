@@ -12,7 +12,7 @@ use crate::erased::{
     ErasedBehavior, ErasedHandler, ErasedNotificationHandler, erase, erase_behavior,
     erase_notification_handler,
 };
-use crate::pipeline::{Behaviors, Closed, Open, PreProcess, Slot};
+use crate::pipeline::{Behaviors, Closed, Open, PostProcess, PreProcess, Slot};
 use crate::request::HandlerResult;
 use crate::{
     Next, Notification, NotificationHandler, PipelineBehavior, PublishStrategy, Request,
@@ -337,6 +337,18 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
         pre_processor: B,
     ) -> MediatorBuilder<S, (P, Open<PreProcess<B>>)> {
         self.behavior(PreProcess(pre_processor))
+    }
+
+    /// Registriert `post_processor` für alle Request-Typen; er läuft nach dem Handler.
+    ///
+    /// [`Sender::send`] verlangt, dass `post_processor` [`RequestPostProcessor`](crate::RequestPostProcessor) für den Request-Typ ist
+    /// und der Request [`Clone`] ist, denn der Handler verbraucht ihn.
+    #[must_use]
+    pub fn post_processor<B: 'static>(
+        self,
+        post_processor: B,
+    ) -> MediatorBuilder<S, (P, Open<PostProcess<B>>)> {
+        self.behavior(PostProcess(post_processor))
     }
 
     /// Builder, dessen Kette der Behaviors zusätzlich mit `link` endet; `slot` meldet dessen Platz an.

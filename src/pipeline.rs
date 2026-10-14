@@ -28,11 +28,21 @@ pub trait PipelineBehavior<R: Request> {
 ///
 /// `process` endet für jeden Request und löst keine Panic aus.
 pub trait RequestPreProcessor<R: Request> {
-    /// Sieht `request`, bevor die Behaviors und der Handler ihn bekommen.
+    /// Sieht `request`, bevor der Handler ihn bekommt.
     fn process(&self, request: &R) -> impl Future<Output = ()>;
 }
 
-pub(crate) use sealed::{Behaviors, Closed, Open, PreProcess, Slot};
+/// Läuft nach dem Handler von Requests vom Typ `R` und sieht Request samt Antwort.
+///
+/// # Vertrag
+///
+/// `process` endet für jeden Request und löst keine Panic aus.
+pub trait RequestPostProcessor<R: Request> {
+    /// Sieht `request` mit der `response` des Handlers.
+    fn process(&self, request: &R, response: &R::Response) -> impl Future<Output = ()>;
+}
+
+pub(crate) use sealed::{Behaviors, Closed, Open, PostProcess, PreProcess, Slot};
 
 mod sealed {
     use std::fmt;
@@ -70,6 +80,9 @@ mod sealed {
     /// Ein Vorverarbeiter als Behavior: `B` sieht den Request, dann geht dieser weiter.
     pub struct PreProcess<B>(pub(crate) B);
 
+    /// Ein Nachverarbeiter als Behavior: `B` sieht eine Kopie des Requests mit der Antwort des Handlers.
+    pub struct PostProcess<B>(pub(crate) B);
+
     /// Ein Behavior nur für einen Request-Typ, als Glied der Kette.
     /// Ein eigener [`Provider`] hält es als [`ErasedBehavior`] dieses Typs, damit `erase` es nur für diesen Typ findet.
     #[derive(Debug, Clone)]
@@ -103,12 +116,28 @@ mod sealed {
             f.debug_struct("PreProcess").finish_non_exhaustive()
         }
     }
+
+    // Von Hand statt `derive`: `derive(Debug)` verlangte `B: Debug`.
+    impl<B> fmt::Debug for PostProcess<B> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("PostProcess").finish_non_exhaustive()
+        }
+    }
 }
 
 impl<R: Request, B: RequestPreProcessor<R>> PipelineBehavior<R> for PreProcess<B> {
     async fn handle(&self, request: R, next: Next<R>) -> HandlerResult<R> {
         self.0.process(&request).await;
         next.run(request).await
+    }
+}
+
+impl<R: Request + Clone, B: RequestPostProcessor<R>> PipelineBehavior<R> for PostProcess<B> {
+    async fn handle(&self, request: R, next: Next<R>) -> HandlerResult<R> {
+        let copy = request.clone();
+        let response = next.run(request).await?;
+        self.0.process(&copy, &response).await;
+        Ok(response)
     }
 }
 

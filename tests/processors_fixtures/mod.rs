@@ -1,9 +1,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use mediatr_rs::{Request, RequestHandler, RequestPreProcessor, SendError};
+use mediatr_rs::{Request, RequestHandler, RequestPostProcessor, RequestPreProcessor, SendError};
 
 /// Fragt den Preis des Artikels mit dieser Nummer in Cent ab.
+#[derive(Clone)]
 pub struct QuotePrice {
     pub sku: u32,
 }
@@ -37,5 +38,18 @@ impl RequestPreProcessor<QuotePrice> for InquiryLog {
         self.journal
             .borrow_mut()
             .push(format!("Anfrage für {} eingegangen", request.sku));
+    }
+}
+
+/// Legt jeden berechneten Preis mit seiner Anfrage im Archiv ab.
+pub struct QuoteArchive {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl RequestPostProcessor<QuotePrice> for QuoteArchive {
+    async fn process(&self, request: &QuotePrice, response: &u32) {
+        self.journal
+            .borrow_mut()
+            .push(format!("Preis {response} für {} archiviert", request.sku));
     }
 }

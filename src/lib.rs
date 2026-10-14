@@ -12,6 +12,6 @@ pub use mediator::{
     WithHandlers,
 };
 pub use notification::{Notification, NotificationHandler};
-pub use pipeline::{Next, PipelineBehavior, RequestPreProcessor};
+pub use pipeline::{Next, PipelineBehavior, RequestPostProcessor, RequestPreProcessor};
 pub use request::{Request, RequestHandler};
 pub use strategy::{Concurrent, PublishStrategy, Sequential};
