@@ -4,7 +4,7 @@ Siehe Skill `canon-tdd`.
 
 ## Request/Handler — `send`
 
-Quelle: MediatR `test/MediatR.Tests/SendTests.cs`, `SendVoidInterfaceTests.cs`, `ExceptionTests.cs`.
+Quelle: MediatR `test/MediatR.Tests/SendTests.cs`, `SendVoidInterfaceTests.cs`, `ExceptionTests.cs`, `ServiceFactoryTests.cs`, `GenericTypeConstraintsTests.cs`, `MicrosoftExtensionsDI/DerivingRequestsTests.cs`, `MicrosoftExtensionsDI/TypeResolutionTests.cs`. Doppelte Registrierung: `register` ist eine Registrierung von Hand, darum gewinnt wie bei `GetRequiredService` der letzte Handler; der Assembly-Scan (`TryAddTransient`) behielte den ersten.
 
 - [x] Request mit registriertem Handler → `send` liefert die Antwort des Handlers · `send_returns_handler_response`
 - [x] Request ohne Antwort (Antworttyp `()`) → `send` führt den Handler aus · `send_runs_handler_for_unit_response`
@@ -16,6 +16,7 @@ Quelle: MediatR `test/MediatR.Tests/SendTests.cs`, `SendVoidInterfaceTests.cs`, 
 - [x] Fehler von `send`, nachdem der Mediator weggefallen ist → lässt sich mit `?` als `Box<dyn std::error::Error>` weitergeben, sein Text nennt den weggefallenen Mediator · `mediator_dropped_error_propagates_as_boxed_error`
 - [x] Async-Closure als Handler → `register` nimmt sie an, `send` liefert ihre Antwort · `register_accepts_async_closure`
 - [x] Request mit eigenem Fehlertyp ohne registrierten Handler → `send` liefert den aus `SendError::NoHandler` gewandelten Fehler · `send_without_handler_converts_missing_handler_into_request_error`
+- [ ] Zweimal `register` für denselben Request-Typ → `send` ruft den zuerst registrierten Handler nicht auf
 
 ## Mediator — Fassade und DI
 
@@ -31,7 +32,7 @@ Quelle: MediatR `Mediator(IServiceProvider)` speichert keine Handler; es holt si
 
 ## Provider-Crate `mediatr-provider`
 
-Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSingleton`, `AddScoped`, `AddTransient`). Der Container registriert und baut Dienste; vom Mediator weiß er nichts.
+Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSingleton`, `AddScoped`, `AddTransient`); MediatR `test/MediatR.Tests/MicrosoftExtensionsDI/TypeResolutionTests.cs` (`ShouldNotThrowWithMissingEnumerables`). Der Container registriert und baut Dienste; vom Mediator weiß er nichts.
 
 - [x] Dienst mit `instance` registriert → jede Abfrage beim Provider liefert dasselbe Objekt · `instance_returns_same_object_on_every_get`
 - [x] Dienst nicht registriert → die Abfrage beim Provider liefert `None` · `get_without_registration_returns_none`
@@ -70,7 +71,7 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 
 ## Notification — `publish`
 
-Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `NotificationHandlerTests.cs`; Standard-Publisher `ForeachAwaitPublisher` (nacheinander, erster Fehler stoppt). Gleichzeitiges Ausführen (`TaskWhenAllPublisher`) bekommt einen eigenen Abschnitt.
+Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `ExceptionTests.cs`, `MicrosoftExtensionsDI/Issue1118Tests.cs`, `MicrosoftExtensionsDI/DuplicateAssemblyResolutionTests.cs`; Standard-Publisher `ForeachAwaitPublisher` (nacheinander, erster Fehler stoppt). Doppelte Handler-Typen: `NotificationHandlerWrapper` behält mit `GroupBy(GetType).First()` den zuerst registrierten, anders als `send`. Andere Strategien stehen unter „Notification — Publish-Strategie“.
 
 - [x] Notification mit einem registrierten Handler → `publish` führt den Handler aus · `publish_runs_registered_handler`
 - [ ] Notification mit zwei Handlern → beide laufen, in der Reihenfolge der Registrierung
@@ -78,8 +79,75 @@ Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `NotificationHandlerTests.
 - [ ] Zwei Notification-Typen mit je eigenem Handler → jede Notification erreicht nur ihre Handler
 - [ ] Erster Handler wartet (`await`), bevor er fertig ist → der zweite Handler startet erst danach
 - [ ] Erster von zwei Handlern liefert einen Fehler → `publish` gibt genau diesen Fehler zurück, der zweite Handler läuft nicht
-- [ ] Derselbe Handler-Typ zweimal für dieselbe Notification registriert → `publish` führt ihn einmal aus, und zwar den zuletzt registrierten
+- [ ] Derselbe Handler-Typ zweimal für dieselbe Notification registriert → `publish` führt ihn einmal aus, und zwar den zuerst registrierten
 - [ ] Request-Handler bekommt einen Publisher per Konstruktor und meldet darüber ein Ereignis → die Handler dieser Notification laufen
 - [ ] Handler, der einen Publisher per Konstruktor bekommt, wird ohne Mediator getestet und bekommt eine Attrappe → die Attrappe sieht die gemeldete Notification
 - [ ] Handler mit Publisher ist als `singleton` registriert und meldet eine Notification, nachdem der Mediator weggefallen ist → `publish` liefert `Err(SendError::MediatorDropped)`, kein Panic
 - [ ] Fehler von `publish` → lässt sich mit `?` als `Box<dyn std::error::Error>` weitergeben
+- [ ] Notification-Handler mit `transient` registriert → jedes `publish` baut den Handler neu
+
+## Notification — Publish-Strategie
+
+Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `NotificationPublisherTests.cs`, `MicrosoftExtensionsDI/NotificationPublisherTests.cs`; `src/MediatR/NotificationPublishers/TaskWhenAllPublisher.cs` (startet alle Handler, meldet den ersten Fehler erst, wenn alle fertig sind).
+
+- [ ] Mediator mit eigener Publish-Strategie, Notification mit zwei Handlern → die eigene Strategie ruft beide Handler auf, beide laufen
+- [ ] Strategie „alle gleichzeitig“, zwei Handler, die beide warten (`await`) → der zweite Handler startet, bevor der erste fertig ist
+- [ ] Strategie „alle gleichzeitig“, Notification mit drei Handlern, keiner scheitert → `publish` liefert `Ok(())`, jeder Handler lief genau einmal
+- [ ] Strategie „alle gleichzeitig“, der erste von zwei Handlern liefert einen Fehler → der zweite Handler läuft trotzdem, `publish` liefert den Fehler des ersten
+
+## Pipeline — Behaviors
+
+Quelle: MediatR `test/MediatR.Tests/PipelineTests.cs`, `MicrosoftExtensionsDI/PipelineTests.cs`, `MicrosoftExtensionsDI/PipeLineMultiCallToConstructorTest.cs`, `SendTests.cs` (Timeout-Tests); `docs/mediatr-concepts.md` (Behavior bricht ab). Das zuerst registrierte Behavior liegt außen. Doppelte Behavior-Typen: `TryAddEnumerable` behält das zuerst registrierte.
+
+- [ ] Zwei Behaviors für einen Request-Typ → das zuerst registrierte läuft außen: außen-vorher, innen-vorher, Handler, innen-nachher, außen-nachher; `send` liefert die Antwort des Handlers
+- [ ] Zwei Behaviors für einen Request ohne Antwort (Antworttyp `()`) → sie umschließen den Handler in derselben Reihenfolge, das zuerst registrierte außen
+- [ ] Zwei Behaviors für alle Request-Typen → sie umschließen den Handler jedes Requests, das zuerst registrierte außen; `send` liefert die Antwort des Handlers
+- [ ] Zwei Behaviors für alle Request-Typen, Request ohne Antwort (Antworttyp `()`) → sie umschließen den Handler in derselben Reihenfolge, das zuerst registrierte außen
+- [ ] Zwei Behaviors für alle Request-Typen und eins nur für einen Request-Typ → dieser Request läuft durch alle drei in Registrierungsreihenfolge, ein anderer Request nur durch die zwei allgemeinen; beide bekommen die Antwort ihres Handlers
+- [ ] Zwei Behaviors für alle Request-Typen, jedes dreimal abwechselnd registriert → jedes läuft pro `send` genau einmal, in der Reihenfolge seiner ersten Registrierung
+- [ ] Zuerst ein Behavior nur für einen Request-Typ ohne Antwort, dann eins für alle Request-Typen registriert → beide laufen in Registrierungsreihenfolge vor dem Handler
+- [ ] Handler mit `transient` registriert und von einem Behavior umschlossen → ein `send` baut den Handler genau einmal, das Behavior läuft genau einmal um ihn herum
+- [ ] Behavior ruft den nächsten Schritt nicht auf und liefert selbst eine Antwort → `send` liefert diese Antwort, der Handler läuft nicht
+- [ ] Behavior setzt eine Frist, der Handler eines Requests mit Antwort braucht länger → `send` liefert `Err` statt einer Antwort, der Handler wird nicht fertig
+- [ ] Behavior setzt eine Frist, der Handler eines Requests ohne Antwort (Antworttyp `()`) braucht länger → `send` liefert `Err`, der Handler wird nicht fertig
+
+## Pipeline — Vor- und Nachverarbeiter
+
+Quelle: MediatR `test/MediatR.Tests/Pipeline/RequestPreProcessorTests.cs`, `Pipeline/RequestPostProcessorTests.cs`, `MicrosoftExtensionsDI/PipelineTests.cs`. Vor- und Nachverarbeiter laufen außerhalb aller Behaviors; Nachverarbeiter laufen in Registrierungsreihenfolge, nicht umgekehrt.
+
+- [ ] Request mit registriertem Vorverarbeiter → er läuft vor dem Handler und bekommt den Request; `send` liefert die Antwort des Handlers
+- [ ] Request mit registriertem Nachverarbeiter → er läuft nach dem Handler und bekommt Request und Antwort; `send` liefert die Antwort des Handlers
+- [ ] Zwei Vorverarbeiter nur für einen Request-Typ und zwei für alle, ebenso vier Nachverarbeiter → alle Vorverarbeiter laufen in Registrierungsreihenfolge vor dem Handler, alle Nachverarbeiter in Registrierungsreihenfolge danach
+- [ ] Behaviors, Vor- und Nachverarbeiter teils für alle Request-Typen, teils nur für einen → dieser Request läuft durch Vorverarbeiter, Behaviors (außen nach innen), Handler, Nachverarbeiter; ein anderer Request nur durch die allgemeinen, in derselben Reihenfolge
+
+## Pipeline — Fehler-Handler und Fehler-Aktionen
+
+Quelle: MediatR `test/MediatR.Tests/Pipeline/RequestExceptionHandlerTests.cs`, `Pipeline/RequestExceptionActionTests.cs`, `MicrosoftExtensionsDI/PipelineTests.cs`. Ein Fehler-Handler kann eine Ersatzantwort setzen; eine Fehler-Aktion reagiert nur und läuft, wenn kein Fehler-Handler eine Ersatzantwort gesetzt hat (Standard `ApplyForUnhandledExceptions`). MediatR wählt nach der Fehler-Basisklasse; ohne Vererbung laufen sie in Registrierungsreihenfolge.
+
+- [ ] Handler scheitert, eine Fehler-Aktion ist registriert → die Aktion läuft, `send` liefert trotzdem genau den Fehler des Handlers
+- [ ] Handler scheitert, eine Fehler-Aktion ist registriert → sie läuft pro `send` genau einmal
+- [ ] Handler scheitert, zwei Fehler-Aktionen sind registriert → beide laufen, `send` liefert den Fehler des Handlers
+- [ ] Handler scheitert, zwei Fehler-Handler, der erste setzt eine Ersatzantwort → `send` liefert `Ok` mit dieser Ersatzantwort, der zweite Fehler-Handler läuft nicht
+- [ ] Handler scheitert, der Fehler-Handler setzt keine Ersatzantwort → `send` liefert den ursprünglichen Fehler
+- [ ] Handler scheitert, der Fehler-Handler scheitert selbst → `send` liefert den Fehler des Fehler-Handlers, nicht den ursprünglichen
+- [ ] Handler scheitert, ein Fehler-Handler ohne Ersatzantwort ist registriert → er läuft pro `send` genau einmal
+- [ ] Handler scheitert, ein Fehler-Handler setzt eine Ersatzantwort, zusätzlich ist eine Fehler-Aktion registriert → `send` liefert die Ersatzantwort, die Fehler-Aktion läuft nicht
+- [ ] Handler scheitert, ein Fehler-Handler ohne Ersatzantwort und eine Fehler-Aktion sind registriert → beide laufen, `send` liefert den Fehler des Handlers
+- [ ] Ein Behavior scheitert, bevor der Handler läuft → Fehler-Handler und Fehler-Aktion laufen, `send` liefert den Fehler des Behaviors
+
+## Stream-Request — Stream anfordern
+
+Quelle: MediatR `test/MediatR.Tests/CreateStreamTests.cs`; `src/MediatR/Wrappers/StreamRequestHandlerWrapper.cs` (der Stream ist träge: der Handler läuft erst beim Lesen).
+
+- [ ] Stream-Request mit registriertem Stream-Handler → der Stream liefert genau die Elemente des Handlers und endet danach
+- [ ] Handler bekommt einen Sender per Konstruktor und fordert darüber einen Stream an → er bekommt die Elemente des Stream-Handlers
+- [ ] Stream-Request ohne registrierten Stream-Handler → der Stream liefert einen Fehler, kein Panic
+
+## Stream-Request — Stream-Behaviors
+
+Quelle: MediatR `test/MediatR.Tests/StreamPipelineTests.cs`, `Pipeline/Streams/StreamPipelineBehaviorTests.cs`, `MicrosoftExtensionsDI/StreamPipelineTests.cs`. Das „nachher“ eines Stream-Behaviors läuft erst nach dem letzten Element.
+
+- [ ] Zwei Stream-Behaviors für einen Stream-Request-Typ → die Elemente des Handlers kommen unverändert an; Reihenfolge: erstes vorher, zweites vorher, Handler, zweites nachher, erstes nachher
+- [ ] Zwei Stream-Behaviors für alle Stream-Request-Typen → sie umschließen den Handler, das zuerst registrierte außen; die Elemente kommen unverändert an
+- [ ] Zwei Stream-Behaviors für alle Stream-Request-Typen und ein drittes nur für einen → bei diesem Typ laufen alle drei in Registrierungsreihenfolge um den Handler, bei einem anderen Stream-Request-Typ nur die zwei allgemeinen
+- [ ] Handler liefert drei Elemente, ein Stream-Behavior fügt vorne und hinten je eins an → der Stream liefert genau fünf Elemente in dieser Reihenfolge
