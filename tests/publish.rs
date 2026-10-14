@@ -545,3 +545,22 @@ async fn publish_runs_handler_type_subscribed_transient_twice_once_with_first_re
 
     assert_eq!(desks.labels(), (vec![42], vec![]));
 }
+
+#[tokio::test]
+async fn publish_runs_handler_type_subscribed_transient_then_instance_once_with_transient() {
+    let desks = TwoDesks::default();
+    let front = desks.clone();
+    let mediator = Mediator::builder()
+        .subscribe(Handler::transient(move |_publisher: Mediator| {
+            front.front()
+        }))
+        .subscribe(Handler::instance(desks.back()))
+        .build();
+
+    mediator
+        .publish(OrderPlaced { order_id: 42 })
+        .await
+        .unwrap();
+
+    assert_eq!(desks.labels(), (vec![42], vec![]));
+}
