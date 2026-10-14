@@ -314,8 +314,9 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
         self,
         behavior: impl PipelineBehavior<R> + 'static,
     ) -> MediatorBuilder<S, (P, Closed)> {
-        let erased: ErasedBehavior<R> = erase_behavior(Rc::new(behavior));
         let slot = Slot(self.slots);
+        let unique = unique_for::<R, _>(slot, &behavior);
+        let erased: ErasedBehavior<R> = erase_behavior(Rc::new(behavior));
         self.with_behavior(
             Closed {
                 provider: Provider::builder()
@@ -323,7 +324,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
                     .build(),
                 slot,
             },
-            Registration::instance(slot),
+            unique,
         )
     }
 
@@ -389,6 +390,12 @@ impl<S, P, F> MediatorBuilder<S, P, F> {
             types: PhantomData,
         }
     }
+}
+
+/// Meldet `slot` an; der Provider behält nur die erste Meldung je Paar aus Request-Typ `R` und Behavior-Typ `B`.
+// Eigene Funktion, weil `behavior_for` den Behavior-Typ nicht beim Namen kennt; `_behavior` liefert ihn.
+fn unique_for<R: 'static, B: 'static>(slot: Slot, _behavior: &B) -> Registration<Slot> {
+    Registration::instance(slot).unique_by::<(R, B)>()
 }
 
 impl fmt::Display for SendError {

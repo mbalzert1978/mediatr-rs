@@ -160,3 +160,31 @@ async fn two_behaviors_registered_three_times_alternately_run_once_in_first_regi
         (Ok(12), audited_and_timed("Bestand gelesen für 4"))
     );
 }
+
+#[tokio::test]
+async fn same_behavior_registered_twice_for_one_request_type_runs_once() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .behavior_for::<LookupStock>(ShelfLock {
+            journal: Rc::clone(&journal),
+        })
+        .behavior_for::<LookupStock>(ShelfLock {
+            journal: Rc::clone(&journal),
+        })
+        .register(Handler::instance(StockLedger {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let stock = mediator.send(LookupStock { sku: 4 }).await;
+
+    assert_eq!(
+        (stock, journal.borrow().clone()),
+        (
+            Ok(12),
+            ["Regal gesperrt", "Bestand gelesen für 4", "Regal frei"]
+                .map(str::to_owned)
+                .to_vec()
+        )
+    );
+}
