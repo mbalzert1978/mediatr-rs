@@ -917,3 +917,26 @@ fn mapped_singleton_passes_same_object_to_f_on_every_get() {
         [first, second] if Rc::ptr_eq(first, second)
     ));
 }
+
+#[test]
+fn unique_transient_twice_from_same_source_type_all_builds_only_first() {
+    let built = Rc::new(RefCell::new(Vec::new()));
+    let print = |heading: &'static str| {
+        let built = Rc::clone(&built);
+        Registration::transient(move |_| {
+            built.borrow_mut().push(heading);
+            Document::from(Invoice {
+                heading: heading.to_owned(),
+            })
+        })
+        .unique_by::<Invoice>()
+    };
+    let provider = Provider::builder()
+        .register(print("Rechnung 1"))
+        .register(print("Rechnung 2"))
+        .build();
+
+    let _documents = provider.all::<Document>();
+
+    assert_eq!(*built.borrow(), ["Rechnung 1"]);
+}
