@@ -8,11 +8,11 @@ use crate::{Notification, NotificationHandler};
 
 /// Ein Notification-Handler mit gelöschtem Typ: leiht sich ein `N` und meldet später `Ok(())` oder den Fehler.
 // dyn: wie bei `LocalBoxFuture`, je `N`.
-pub(crate) type ErasedNotificationHandler<N> =
+pub(crate) type NotificationHandlerWrapper<N> =
     Box<dyn for<'a> Fn(&'a N) -> LocalBoxFuture<'a, NotificationResult<N>>>;
 
-/// Verpackt `handler` als [`ErasedNotificationHandler`].
-pub(crate) fn erase_notification_handler<N, H>(handler: Rc<H>) -> ErasedNotificationHandler<N>
+/// Verpackt `handler` als [`NotificationHandlerWrapper`].
+pub(crate) fn wrap_notification_handler<N, H>(handler: Rc<H>) -> NotificationHandlerWrapper<N>
 where
     N: Notification + 'static,
     H: NotificationHandler<N> + 'static,

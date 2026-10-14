@@ -7,7 +7,7 @@ use mediatr_provider::Provider;
 
 use crate::PipelineBehavior;
 use crate::Request;
-use crate::wrappers::{ErasedBehavior, erase_behavior};
+use crate::wrappers::{BehaviorWrapper, wrap_behavior};
 
 /// Die Kette der Behaviors eines Mediators: `()` oder ein Paar aus der Kette davor und einem weiteren Behavior.
 ///
@@ -20,7 +20,7 @@ use crate::wrappers::{ErasedBehavior, erase_behavior};
 /// genau ein gelöschtes Behavior mit seiner Stufe, in Registrierungsreihenfolge, und löst keine Panic aus.
 pub trait Behaviors<R: Request>: 'static {
     /// Die Behaviors der Kette für `R` mit gelöschtem Typ und ihrer Stufe, deren Platz in `active` steht, in Registrierungsreihenfolge.
-    fn erase(&self, active: &[Slot]) -> Vec<(Stage, Rc<ErasedBehavior<R>>)>;
+    fn erase(&self, active: &[Slot]) -> Vec<(Stage, Rc<BehaviorWrapper<R>>)>;
 }
 
 /// Wo ein Behavior in der Pipeline liegt.
@@ -52,7 +52,7 @@ pub struct PreProcess<B>(pub(crate) B);
 pub struct PostProcess<B>(pub(crate) B);
 
 /// Ein Behavior nur für einen Request-Typ, als Glied der Kette.
-/// Ein eigener [`Provider`] hält es als [`ErasedBehavior`] dieses Typs, damit `erase` es nur für diesen Typ findet.
+/// Ein eigener [`Provider`] hält es als [`BehaviorWrapper`] dieses Typs, damit `erase` es nur für diesen Typ findet.
 #[derive(Debug, Clone)]
 pub struct Closed {
     pub(crate) provider: Provider,
@@ -96,7 +96,7 @@ impl<B> fmt::Debug for PostProcess<B> {
 }
 
 impl<R: Request> Behaviors<R> for () {
-    fn erase(&self, _active: &[Slot]) -> Vec<(Stage, Rc<ErasedBehavior<R>>)> {
+    fn erase(&self, _active: &[Slot]) -> Vec<(Stage, Rc<BehaviorWrapper<R>>)> {
         Vec::new()
     }
 }
@@ -107,12 +107,12 @@ where
     P: Behaviors<R>,
     B: PipelineBehavior<R> + 'static,
 {
-    fn erase(&self, active: &[Slot]) -> Vec<(Stage, Rc<ErasedBehavior<R>>)> {
+    fn erase(&self, active: &[Slot]) -> Vec<(Stage, Rc<BehaviorWrapper<R>>)> {
         let mut behaviors = self.0.erase(active);
         if active.contains(&self.1.slot) {
             behaviors.push((
                 self.1.stage,
-                Rc::new(erase_behavior(Rc::clone(&self.1.behavior))),
+                Rc::new(wrap_behavior(Rc::clone(&self.1.behavior))),
             ));
         }
         behaviors
@@ -120,13 +120,13 @@ where
 }
 
 impl<R: Request + 'static, P: Behaviors<R>> Behaviors<R> for (P, Closed) {
-    fn erase(&self, active: &[Slot]) -> Vec<(Stage, Rc<ErasedBehavior<R>>)> {
+    fn erase(&self, active: &[Slot]) -> Vec<(Stage, Rc<BehaviorWrapper<R>>)> {
         let mut behaviors = self.0.erase(active);
         if active.contains(&self.1.slot) {
             behaviors.extend(
                 self.1
                     .provider
-                    .get::<ErasedBehavior<R>>()
+                    .get::<BehaviorWrapper<R>>()
                     .map(|behavior| (self.1.stage, behavior)),
             );
         }

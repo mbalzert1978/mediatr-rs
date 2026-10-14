@@ -6,20 +6,20 @@ use std::rc::Rc;
 use crate::Request;
 use crate::pipeline::Stage;
 use crate::request::HandlerResult;
-use crate::wrappers::{ErasedBehavior, ErasedHandler};
+use crate::wrappers::{BehaviorWrapper, RequestHandlerWrapper};
 
 /// Der Rest der Pipeline hinter einem Behavior; [`Next::run`] schickt einen Request hinein.
 pub struct Next<R: Request> {
-    handler: Rc<ErasedHandler<R>>,
+    handler: Rc<RequestHandlerWrapper<R>>,
     /// Die noch ausstehenden Behaviors, das innerste zuerst; `run` nimmt das letzte, also äußerste.
-    behaviors: Vec<Rc<ErasedBehavior<R>>>,
+    behaviors: Vec<Rc<BehaviorWrapper<R>>>,
 }
 
 impl<R: Request> Next<R> {
     /// Pipeline aus `behaviors`, in der Reihenfolge ihrer Registrierung, und `handler`; jedes liegt, wo seine [`Stage`] sagt.
     pub(crate) fn new(
-        handler: Rc<ErasedHandler<R>>,
-        behaviors: &[(Stage, Rc<ErasedBehavior<R>>)],
+        handler: Rc<RequestHandlerWrapper<R>>,
+        behaviors: &[(Stage, Rc<BehaviorWrapper<R>>)],
     ) -> Self {
         let at = |wanted: Stage| {
             behaviors

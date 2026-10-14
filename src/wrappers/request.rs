@@ -8,10 +8,11 @@ use crate::{Request, RequestHandler};
 
 /// Ein Handler mit gelöschtem Typ: nimmt einen `R` und liefert später dessen Antwort oder Fehler.
 // dyn: wie bei `LocalBoxFuture`, je `R`.
-pub(crate) type ErasedHandler<R> = Box<dyn Fn(R) -> LocalBoxFuture<'static, HandlerResult<R>>>;
+pub(crate) type RequestHandlerWrapper<R> =
+    Box<dyn Fn(R) -> LocalBoxFuture<'static, HandlerResult<R>>>;
 
-/// Verpackt `handler` als [`ErasedHandler`].
-pub(crate) fn erase<R, H>(handler: Rc<H>) -> ErasedHandler<R>
+/// Verpackt `handler` als [`RequestHandlerWrapper`].
+pub(crate) fn wrap_request_handler<R, H>(handler: Rc<H>) -> RequestHandlerWrapper<R>
 where
     R: Request + 'static,
     H: RequestHandler<R> + 'static,

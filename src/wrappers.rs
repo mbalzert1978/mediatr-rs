@@ -7,9 +7,9 @@ mod request;
 use std::future::Future;
 use std::pin::Pin;
 
-pub(crate) use behavior::{ErasedBehavior, erase_behavior};
-pub(crate) use notification::{ErasedNotificationHandler, erase_notification_handler};
-pub(crate) use request::{ErasedHandler, erase};
+pub(crate) use behavior::{BehaviorWrapper, wrap_behavior};
+pub(crate) use notification::{NotificationHandlerWrapper, wrap_notification_handler};
+pub(crate) use request::{RequestHandlerWrapper, wrap_request_handler};
 
 /// Eine Future mit gelöschtem Typ, die auf diesem Thread läuft (nicht `Send`) und höchstens `'a` lang leiht.
 // dyn: Handler, Behaviors und ihre Futures verschiedener Typen liegen hinter einem gemeinsamen Typ;

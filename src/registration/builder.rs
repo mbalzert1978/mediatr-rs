@@ -7,7 +7,9 @@ use std::rc::Rc;
 use mediatr_provider::{Provider, ProviderBuilder, Registration};
 
 use crate::pipeline::{Closed, Open, PostProcess, PreProcess, Slot, Stage};
-use crate::wrappers::{ErasedBehavior, erase, erase_behavior, erase_notification_handler};
+use crate::wrappers::{
+    BehaviorWrapper, wrap_behavior, wrap_notification_handler, wrap_request_handler,
+};
 use crate::{
     Handler, Mediator, Notification, NotificationHandler, PipelineBehavior, Request,
     RequestHandler, RequestPostProcessor, RequestPreProcessor, Sequential,
@@ -149,11 +151,11 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     ) -> MediatorBuilder<S, (P, Closed)> {
         let slot = Slot(self.slots);
         let unique = unique_for::<R, _>(slot, &behavior);
-        let erased: ErasedBehavior<R> = erase_behavior(Rc::new(behavior));
+        let wrapper: BehaviorWrapper<R> = wrap_behavior(Rc::new(behavior));
         self.with_behavior(
             Closed {
                 provider: Provider::builder()
-                    .register(Registration::instance(erased))
+                    .register(Registration::instance(wrapper))
                     .build(),
                 slot,
                 stage,
@@ -181,7 +183,7 @@ impl<S, P, F> MediatorBuilder<S, P, F> {
         R: Request + 'static,
         H: RequestHandler<R> + 'static,
     {
-        self.with_registration(handler.registration.map(erase))
+        self.with_registration(handler.registration.map(wrap_request_handler))
     }
 
     /// Registriert `handler` für Notifications vom Typ `N`; ist für `N` schon ein Handler vom Typ `H` registriert, fällt `handler` weg.
@@ -194,7 +196,7 @@ impl<S, P, F> MediatorBuilder<S, P, F> {
         self.with_registration(
             handler
                 .registration
-                .map(erase_notification_handler)
+                .map(wrap_notification_handler)
                 .unique_by::<H>(),
         )
     }

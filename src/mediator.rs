@@ -7,7 +7,7 @@ use mediatr_provider::{Provider, WeakProvider};
 
 use crate::pipeline::{Behaviors, Slot};
 use crate::request::HandlerResult;
-use crate::wrappers::{ErasedHandler, ErasedNotificationHandler};
+use crate::wrappers::{NotificationHandlerWrapper, RequestHandlerWrapper};
 use crate::{
     MediatorBuilder, Next, Notification, PublishStrategy, Publisher, Request, SendError, Sender,
     Sequential,
@@ -89,7 +89,7 @@ impl<S, P: Behaviors<R>, R: Request + 'static> Sender<R> for Mediator<S, P> {
     async fn send(&self, request: R) -> HandlerResult<R> {
         let handler = self
             .provider
-            .get::<ErasedHandler<R>>()
+            .get::<RequestHandlerWrapper<R>>()
             .ok_or(SendError::NoHandler)?;
         // ponytail: liest die behaltenen Plätze bei jedem `send`; einmal beim Bauen merken, wenn das messbar bremst.
         let active: Vec<Slot> = self
@@ -108,7 +108,7 @@ impl<S, P: Behaviors<R>, R: Request + 'static> Sender<R> for Mediator<S, P> {
 
 impl<S: PublishStrategy, P, N: Notification + 'static> Publisher<N> for Mediator<S, P> {
     async fn publish(&self, notification: N) -> Result<(), N::Error> {
-        let handlers = self.provider.all::<ErasedNotificationHandler<N>>();
+        let handlers = self.provider.all::<NotificationHandlerWrapper<N>>();
         S::publish(
             handlers
                 .iter()

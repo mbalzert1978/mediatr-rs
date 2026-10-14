@@ -8,11 +8,11 @@ use crate::{Next, PipelineBehavior, Request};
 
 /// Ein Behavior mit gelöschtem Typ: nimmt einen `R` und den Rest der Pipeline und liefert später die Antwort oder den Fehler.
 // dyn: wie bei `LocalBoxFuture`, je `R`.
-pub(crate) type ErasedBehavior<R> =
+pub(crate) type BehaviorWrapper<R> =
     Box<dyn Fn(R, Next<R>) -> LocalBoxFuture<'static, HandlerResult<R>>>;
 
-/// Verpackt `behavior` als [`ErasedBehavior`].
-pub(crate) fn erase_behavior<R, B>(behavior: Rc<B>) -> ErasedBehavior<R>
+/// Verpackt `behavior` als [`BehaviorWrapper`].
+pub(crate) fn wrap_behavior<R, B>(behavior: Rc<B>) -> BehaviorWrapper<R>
 where
     R: Request + 'static,
     B: PipelineBehavior<R> + 'static,
