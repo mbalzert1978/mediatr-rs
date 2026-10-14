@@ -940,3 +940,14 @@ fn unique_transient_twice_from_same_source_type_all_builds_only_first() {
 
     assert_eq!(*built.borrow(), ["Rechnung 1"]);
 }
+
+#[test]
+fn registration_debug_names_service_type() {
+    let registration = Registration::instance(Invoice {
+        heading: "Rechnung 1".to_owned(),
+    });
+
+    let output = format!("{registration:?}");
+
+    assert!(output.contains("Invoice"), "{output}");
+}

@@ -82,7 +82,7 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] Zweimal `register` für denselben Typ, beide erst mit `unique_by` und demselben Schlüsseltyp, dann mit `map` umgewandelt → `all` liefert nur den zuerst registrierten Dienst · `unique_then_mapped_registration_twice_all_returns_first`
 - [x] `Registration::singleton` mit `map` umgewandelt, zweimal `get` → `f` bekommt beide Male dasselbe Objekt · `mapped_singleton_passes_same_object_to_f_on_every_get`
 - [x] Zweimal `register` mit `Registration::transient` für denselben Typ, beide mit `unique_by` und demselben Schlüsseltyp → `all` baut nur den zuerst registrierten Dienst · `unique_transient_twice_from_same_source_type_all_builds_only_first`
-- [ ] `Registration` mit `{:?}` formatiert → die Ausgabe nennt den Diensttyp
+- [x] `Registration` mit `{:?}` formatiert → die Ausgabe nennt den Diensttyp · `registration_debug_names_service_type`
 
 ## Notification — `publish`
 

@@ -1,6 +1,6 @@
 //! Der Provider liefert Dienste, die sein Builder registriert hat.
 
-use std::any::{Any, TypeId};
+use std::any::{Any, TypeId, type_name};
 use std::cell::{OnceCell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -206,6 +206,7 @@ impl<T: 'static> Registration<T> {
 impl<T> fmt::Debug for Registration<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Registration")
+            .field("service", &type_name::<T>())
             .field("key", &self.key)
             .finish_non_exhaustive()
     }
