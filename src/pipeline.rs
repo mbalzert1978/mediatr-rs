@@ -1,4 +1,4 @@
-//! Behaviors, die den Handler eines Requests umschließen.
+//! Die Pipeline um den Handler eines Requests.
 
 use std::fmt;
 use std::future::Future;
@@ -22,7 +22,17 @@ pub trait PipelineBehavior<R: Request> {
     fn handle(&self, request: R, next: Next<R>) -> impl Future<Output = HandlerResult<R>>;
 }
 
-pub(crate) use sealed::{Behaviors, Closed, Open, Slot};
+/// Läuft vor dem Handler von Requests vom Typ `R` und sieht den Request.
+///
+/// # Vertrag
+///
+/// `process` endet für jeden Request und löst keine Panic aus.
+pub trait RequestPreProcessor<R: Request> {
+    /// Sieht `request`, bevor die Behaviors und der Handler ihn bekommen.
+    fn process(&self, request: &R) -> impl Future<Output = ()>;
+}
+
+pub(crate) use sealed::{Behaviors, Closed, Open, PreProcess, Slot};
 
 mod sealed {
     use std::fmt;
@@ -57,6 +67,9 @@ mod sealed {
         pub(crate) slot: Slot,
     }
 
+    /// Ein Vorverarbeiter als Behavior: `B` sieht den Request, dann geht dieser weiter.
+    pub struct PreProcess<B>(pub(crate) B);
+
     /// Ein Behavior nur für einen Request-Typ, als Glied der Kette.
     /// Ein eigener [`Provider`] hält es als [`ErasedBehavior`] dieses Typs, damit `erase` es nur für diesen Typ findet.
     #[derive(Debug, Clone)]
@@ -82,6 +95,20 @@ mod sealed {
                 .field("slot", &self.slot)
                 .finish_non_exhaustive()
         }
+    }
+
+    // Von Hand statt `derive`: `derive(Debug)` verlangte `B: Debug`.
+    impl<B> fmt::Debug for PreProcess<B> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("PreProcess").finish_non_exhaustive()
+        }
+    }
+}
+
+impl<R: Request, B: RequestPreProcessor<R>> PipelineBehavior<R> for PreProcess<B> {
+    async fn handle(&self, request: R, next: Next<R>) -> HandlerResult<R> {
+        self.0.process(&request).await;
+        next.run(request).await
     }
 }
 

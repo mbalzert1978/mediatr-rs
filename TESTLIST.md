@@ -159,10 +159,13 @@ Quelle: MediatR `test/MediatR.Tests/PipelineTests.cs`, `MicrosoftExtensionsDI/Pi
 
 Quelle: MediatR `test/MediatR.Tests/Pipeline/RequestPreProcessorTests.cs`, `Pipeline/RequestPostProcessorTests.cs`, `MicrosoftExtensionsDI/PipelineTests.cs`. Vor- und Nachverarbeiter laufen außerhalb aller Behaviors; Nachverarbeiter laufen in Registrierungsreihenfolge, nicht umgekehrt.
 
-- [ ] Request mit registriertem Vorverarbeiter → er läuft vor dem Handler und bekommt den Request; `send` liefert die Antwort des Handlers
+- [x] Request mit registriertem Vorverarbeiter → er läuft vor dem Handler und bekommt den Request; `send` liefert die Antwort des Handlers · `pre_processor_runs_before_handler_with_request_and_send_returns_handler_response`
 - [ ] Request mit registriertem Nachverarbeiter → er läuft nach dem Handler und bekommt Request und Antwort; `send` liefert die Antwort des Handlers
 - [ ] Zwei Vorverarbeiter nur für einen Request-Typ und zwei für alle, ebenso vier Nachverarbeiter → alle Vorverarbeiter laufen in Registrierungsreihenfolge vor dem Handler, alle Nachverarbeiter in Registrierungsreihenfolge danach
 - [ ] Behaviors, Vor- und Nachverarbeiter teils für alle Request-Typen, teils nur für einen → dieser Request läuft durch Vorverarbeiter, Behaviors (außen nach innen), Handler, Nachverarbeiter; ein anderer Request nur durch die allgemeinen, in derselben Reihenfolge
+- [ ] Handler scheitert, ein Nachverarbeiter ist registriert → er läuft nicht; `send` liefert den Fehler des Handlers
+- [ ] Nachverarbeiter registriert, Request ohne `Clone` → `send` kompiliert nicht
+- [ ] Derselbe Vorverarbeiter-Typ zweimal registriert → er läuft pro `send` einmal
 
 ## Pipeline — Fehler-Handler und Fehler-Aktionen
 
