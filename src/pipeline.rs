@@ -22,7 +22,7 @@ pub trait PipelineBehavior<R: Request> {
     fn handle(&self, request: R, next: Next<R>) -> impl Future<Output = HandlerResult<R>>;
 }
 
-pub(crate) use sealed::{Behaviors, Closed, Open};
+pub(crate) use sealed::{Behaviors, Closed, Open, Slot};
 
 mod sealed {
     use std::fmt;
@@ -40,38 +40,53 @@ mod sealed {
     ///
     /// # Vertrag
     ///
-    /// `erase` liefert je Behavior der Kette, das Requests vom Typ `R` umschließt, genau ein gelöschtes Behavior,
-    /// in Registrierungsreihenfolge, und löst keine Panic aus.
+    /// `erase` liefert je Behavior der Kette, das Requests vom Typ `R` umschließt und dessen Platz in `active` steht,
+    /// genau ein gelöschtes Behavior, in Registrierungsreihenfolge, und löst keine Panic aus.
     pub trait Behaviors<R: Request>: 'static {
-        /// Die Behaviors der Kette für `R` mit gelöschtem Typ, in Registrierungsreihenfolge.
-        fn erase(&self) -> Vec<Rc<ErasedBehavior<R>>>;
+        /// Die Behaviors der Kette für `R` mit gelöschtem Typ, deren Platz in `active` steht, in Registrierungsreihenfolge.
+        fn erase(&self, active: &[Slot]) -> Vec<Rc<ErasedBehavior<R>>>;
     }
 
+    /// Der Platz eines Behaviors in der Kette; `send` lässt nur die Plätze laufen, die der Provider des Mediators behalten hat.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct Slot(pub(crate) usize);
+
     /// Ein Behavior für alle Request-Typen, als Glied der Kette.
-    pub struct Open<B>(pub(crate) Rc<B>);
+    pub struct Open<B> {
+        pub(crate) behavior: Rc<B>,
+        pub(crate) slot: Slot,
+    }
 
     /// Ein Behavior nur für einen Request-Typ, als Glied der Kette.
     /// Ein eigener [`Provider`] hält es als [`ErasedBehavior`] dieses Typs, damit `erase` es nur für diesen Typ findet.
     #[derive(Debug, Clone)]
-    pub struct Closed(pub(crate) Provider);
+    pub struct Closed {
+        pub(crate) provider: Provider,
+        pub(crate) slot: Slot,
+    }
 
     // Von Hand statt `derive`: `derive(Clone)` verlangte `B: Clone`, obwohl nur der `Rc` geklont wird.
     impl<B> Clone for Open<B> {
         fn clone(&self) -> Self {
-            Self(Rc::clone(&self.0))
+            Self {
+                behavior: Rc::clone(&self.behavior),
+                slot: self.slot,
+            }
         }
     }
 
     // Von Hand statt `derive`: `derive(Debug)` verlangte `B: Debug`.
     impl<B> fmt::Debug for Open<B> {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            f.debug_tuple("Open").finish_non_exhaustive()
+            f.debug_struct("Open")
+                .field("slot", &self.slot)
+                .finish_non_exhaustive()
         }
     }
 }
 
 impl<R: Request> Behaviors<R> for () {
-    fn erase(&self) -> Vec<Rc<ErasedBehavior<R>>> {
+    fn erase(&self, _active: &[Slot]) -> Vec<Rc<ErasedBehavior<R>>> {
         Vec::new()
     }
 }
@@ -82,17 +97,21 @@ where
     P: Behaviors<R>,
     B: PipelineBehavior<R> + 'static,
 {
-    fn erase(&self) -> Vec<Rc<ErasedBehavior<R>>> {
-        let mut behaviors = self.0.erase();
-        behaviors.push(Rc::new(erase_behavior(Rc::clone(&self.1.0))));
+    fn erase(&self, active: &[Slot]) -> Vec<Rc<ErasedBehavior<R>>> {
+        let mut behaviors = self.0.erase(active);
+        if active.contains(&self.1.slot) {
+            behaviors.push(Rc::new(erase_behavior(Rc::clone(&self.1.behavior))));
+        }
         behaviors
     }
 }
 
 impl<R: Request + 'static, P: Behaviors<R>> Behaviors<R> for (P, Closed) {
-    fn erase(&self) -> Vec<Rc<ErasedBehavior<R>>> {
-        let mut behaviors = self.0.erase();
-        behaviors.extend(self.1.0.get::<ErasedBehavior<R>>());
+    fn erase(&self, active: &[Slot]) -> Vec<Rc<ErasedBehavior<R>>> {
+        let mut behaviors = self.0.erase(active);
+        if active.contains(&self.1.slot) {
+            behaviors.extend(self.1.provider.get::<ErasedBehavior<R>>());
+        }
         behaviors
     }
 }

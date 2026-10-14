@@ -309,3 +309,29 @@ async fn behavior_for_one_request_type_between_two_for_all_wraps_only_its_reques
         )
     );
 }
+
+#[tokio::test]
+async fn two_behaviors_registered_three_times_alternately_run_once_in_first_registration_order() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let (audit, stopwatch) = audit_and_stopwatch(&journal);
+    let (second_audit, second_stopwatch) = audit_and_stopwatch(&journal);
+    let (third_audit, third_stopwatch) = audit_and_stopwatch(&journal);
+    let mediator = Mediator::builder()
+        .behavior(audit)
+        .behavior(stopwatch)
+        .behavior(second_audit)
+        .behavior(second_stopwatch)
+        .behavior(third_audit)
+        .behavior(third_stopwatch)
+        .register(Handler::instance(StockLedger {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let stock = mediator.send(LookupStock { sku: 4 }).await;
+
+    assert_eq!(
+        (stock, journal.borrow().clone()),
+        (Ok(12), audited_and_timed("Bestand gelesen für 4"))
+    );
+}

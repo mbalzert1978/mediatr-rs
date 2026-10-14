@@ -12,7 +12,7 @@ use crate::erased::{
     ErasedBehavior, ErasedHandler, ErasedNotificationHandler, erase, erase_behavior,
     erase_notification_handler,
 };
-use crate::pipeline::{Behaviors, Closed, Open};
+use crate::pipeline::{Behaviors, Closed, Open, Slot};
 use crate::request::HandlerResult;
 use crate::{
     Next, Notification, NotificationHandler, PipelineBehavior, PublishStrategy, Request,
@@ -50,6 +50,8 @@ pub struct Handler<H, S = Sequential, P = ()> {
 pub struct MediatorBuilder<S = Sequential, P = (), F = NoHandlers> {
     provider: ProviderBuilder,
     behaviors: P,
+    /// Wie viele Behaviors die Kette hat; der Platz des nächsten.
+    slots: usize,
     types: PhantomData<(S, F)>,
 }
 
@@ -148,6 +150,7 @@ impl<S, P: fmt::Debug, F> fmt::Debug for MediatorBuilder<S, P, F> {
         f.debug_struct("MediatorBuilder")
             .field("provider", &self.provider)
             .field("behaviors", &self.behaviors)
+            .field("slots", &self.slots)
             .field("types", &self.types)
             .finish()
     }
@@ -176,10 +179,17 @@ impl<S, P: Behaviors<R>, R: Request + 'static> Sender<R> for Mediator<S, P> {
             .provider
             .get::<ErasedHandler<R>>()
             .ok_or(SendError::NoHandler)?;
+        // ponytail: liest die behaltenen Plätze bei jedem `send`; einmal beim Bauen merken, wenn das messbar bremst.
+        let active: Vec<Slot> = self
+            .provider
+            .all::<Slot>()
+            .iter()
+            .map(|slot| **slot)
+            .collect();
         let behaviors = self
             .provider
             .get::<P>()
-            .map_or_else(Vec::new, |behaviors| P::erase(&behaviors));
+            .map_or_else(Vec::new, |behaviors| behaviors.erase(&active));
         Next::new(handler, behaviors).run(request).await
     }
 }
@@ -264,6 +274,7 @@ impl<S, P: Clone, F> Clone for MediatorBuilder<S, P, F> {
         Self {
             provider: self.provider.clone(),
             behaviors: self.behaviors.clone(),
+            slots: self.slots,
             types: PhantomData,
         }
     }
@@ -274,6 +285,7 @@ impl<S> Default for MediatorBuilder<S> {
         Self {
             provider: ProviderBuilder::default(),
             behaviors: (),
+            slots: 0,
             types: PhantomData,
         }
     }
@@ -283,9 +295,17 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     /// Registriert `behavior` für alle Request-Typen; es liegt innerhalb der zuvor registrierten Behaviors.
     ///
     /// [`Sender::send`] verlangt, dass `behavior` [`PipelineBehavior`] für den Request-Typ ist.
+    /// Ist ein Behavior vom Typ `B` schon registriert, läuft nur das erste, an seinem Platz.
     #[must_use]
     pub fn behavior<B: 'static>(self, behavior: B) -> MediatorBuilder<S, (P, Open<B>)> {
-        self.with_behavior(Open(Rc::new(behavior)))
+        let slot = Slot(self.slots);
+        self.with_behavior(
+            Open {
+                behavior: Rc::new(behavior),
+                slot,
+            },
+            Registration::instance(slot).unique_by::<B>(),
+        )
     }
 
     /// Registriert `behavior` nur für Requests vom Typ `R`; es liegt innerhalb der zuvor registrierten Behaviors.
@@ -295,18 +315,24 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
         behavior: impl PipelineBehavior<R> + 'static,
     ) -> MediatorBuilder<S, (P, Closed)> {
         let erased: ErasedBehavior<R> = erase_behavior(Rc::new(behavior));
-        self.with_behavior(Closed(
-            Provider::builder()
-                .register(Registration::instance(erased))
-                .build(),
-        ))
+        let slot = Slot(self.slots);
+        self.with_behavior(
+            Closed {
+                provider: Provider::builder()
+                    .register(Registration::instance(erased))
+                    .build(),
+                slot,
+            },
+            Registration::instance(slot),
+        )
     }
 
-    /// Builder, dessen Kette der Behaviors zusätzlich mit `link` endet.
-    fn with_behavior<L>(self, link: L) -> MediatorBuilder<S, (P, L)> {
+    /// Builder, dessen Kette der Behaviors zusätzlich mit `link` endet; `slot` meldet dessen Platz an.
+    fn with_behavior<L>(self, link: L, slot: Registration<Slot>) -> MediatorBuilder<S, (P, L)> {
         MediatorBuilder {
-            provider: self.provider,
+            provider: self.provider.register(slot),
             behaviors: (self.behaviors, link),
+            slots: self.slots.saturating_add(1),
             types: PhantomData,
         }
     }
@@ -359,6 +385,7 @@ impl<S, P, F> MediatorBuilder<S, P, F> {
         MediatorBuilder {
             provider: self.provider.register(registration),
             behaviors: self.behaviors,
+            slots: self.slots,
             types: PhantomData,
         }
     }

@@ -140,11 +140,12 @@ Quelle: MediatR `test/MediatR.Tests/PipelineTests.cs`, `MicrosoftExtensionsDI/Pi
 - [x] Zwei Behaviors, Requests zweier Typen mit je eigenem Handler → jeder Request läuft durch beide Behaviors, das zuerst registrierte außen; `send` liefert jeweils die Antwort seines Handlers · `two_behaviors_wrap_handlers_of_every_request_type_first_registered_outermost`
 - [x] Ein Behavior für alle Request-Typen, eins nur für einen, noch eins für alle, in dieser Reihenfolge registriert → ein Request dieses Typs läuft durch alle drei in Registrierungsreihenfolge, das erste außen; ein Request eines anderen Typs nur durch die zwei allgemeinen; beide bekommen die Antwort ihres Handlers · `behavior_for_one_request_type_between_two_for_all_wraps_only_its_requests_in_registration_order`
 - [ ] Zuerst ein Behavior nur für einen Request-Typ ohne Antwort (Antworttyp `()`), dann eins für alle registriert → beide laufen in Registrierungsreihenfolge um den Handler, das erste außen; `send` liefert `Ok(())`
-- [ ] Zwei Behaviors, jedes dreimal abwechselnd registriert → jedes läuft pro `send` genau einmal, in der Reihenfolge seiner ersten Registrierung
+- [x] Zwei Behaviors, jedes dreimal abwechselnd registriert → jedes läuft pro `send` genau einmal, in der Reihenfolge seiner ersten Registrierung · `two_behaviors_registered_three_times_alternately_run_once_in_first_registration_order`
 - [ ] Dasselbe Behavior zweimal nur für einen Request-Typ registriert → es läuft pro `send` genau einmal
 - [ ] Zwölf Behaviors → sie umschließen den Handler in Registrierungsreihenfolge, das erste außen
 - [ ] Behaviors und Publish-Strategie `Concurrent` zusammen → `send` läuft durch die Behaviors, `publish` lässt die Handler gleichzeitig laufen
 - [x] Ein Behavior nach dem ersten Handler registriert → kompiliert nicht · `behavior_registered_after_first_handler_does_not_compile`
+- [ ] Ein Behavior nach dem ersten Notification-Handler (`subscribe`) registriert → kompiliert nicht
 - [ ] Ein Behavior verlangt mehr vom Request (z. B. `Clone`), ein Request-Typ erfüllt das nicht → `send` für diesen Typ kompiliert nicht
 - [ ] Handler mit `Handler::transient` registriert und von einem Behavior umschlossen → ein `send` baut den Handler genau einmal, das Behavior läuft genau einmal um ihn herum
 - [ ] Behavior ruft den nächsten Schritt nicht auf und liefert selbst eine Antwort → `send` liefert diese Antwort, der Handler läuft nicht
