@@ -1,6 +1,6 @@
 //! Tests für den Abschnitt „Notification — `publish`“ in `TESTLIST.md`.
 
-use std::cell::{OnceCell, RefCell};
+use std::cell::{Cell, OnceCell, RefCell};
 use std::error::Error;
 use std::fmt;
 use std::rc::Rc;
@@ -395,4 +395,30 @@ async fn publish_error_propagates_as_boxed_error() {
         result.unwrap_err().to_string(),
         "Zahlungsdienst nicht erreichbar"
     );
+}
+
+#[tokio::test]
+async fn subscribe_transient_builds_handler_on_every_publish() {
+    let builds = Rc::new(Cell::new(0_u32));
+    let counter = Rc::clone(&builds);
+    let labels = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .subscribe_transient(move |_publisher: Mediator| {
+            counter.set(counter.get().saturating_add(1));
+            ShippingDesk {
+                labels: Rc::clone(&labels),
+            }
+        })
+        .build();
+
+    mediator
+        .publish(OrderPlaced { order_id: 41 })
+        .await
+        .unwrap();
+    mediator
+        .publish(OrderPlaced { order_id: 42 })
+        .await
+        .unwrap();
+
+    assert_eq!(builds.get(), 2);
 }

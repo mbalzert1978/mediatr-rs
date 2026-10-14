@@ -95,7 +95,9 @@ Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `ExceptionTests.cs`, `Micr
 - [x] Handler mit Publisher ist als `singleton` registriert und meldet eine Notification, nachdem der Mediator weggefallen ist → `publish` liefert `Err(SendError::MediatorDropped)`, kein Panic · `singleton_handler_publishing_after_mediator_dropped_gets_mediator_dropped`
 - [x] Handler mit Publisher ist als `singleton` registriert und meldet eine Notification, solange der Mediator lebt → die Handler dieser Notification laufen · `singleton_handler_publishing_while_mediator_alive_runs_handlers`
 - [x] Fehler von `publish` → lässt sich mit `?` als `Box<dyn std::error::Error>` weitergeben · `publish_error_propagates_as_boxed_error`
-- [ ] Notification-Handler mit `transient` registriert → jedes `publish` baut den Handler neu
+- [x] Notification-Handler mit `subscribe_transient` registriert → jedes `publish` baut den Handler neu · `subscribe_transient_builds_handler_on_every_publish`
+- [ ] Notification-Handler mit `subscribe_transient` meldet über den Mediator, den er bekommt, eine andere Notification → deren Handler laufen
+- [ ] Derselbe Handler-Typ einmal mit `subscribe`, einmal mit `subscribe_transient` für dieselbe Notification registriert → `publish` führt ihn einmal aus, und zwar den zuerst registrierten
 
 ## Notification — Publish-Strategie
 
