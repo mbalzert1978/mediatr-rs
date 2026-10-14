@@ -328,19 +328,33 @@ impl RequestHandler<LookupStock> for RemoteWarehouse {
     }
 }
 
-/// Bricht eine Bestandsabfrage ab, die länger als `limit` dauert.
+/// Bricht einen Lager-Request ab, der länger als `limit` dauert.
 pub struct Deadline {
     pub limit: Duration,
 }
 
-impl PipelineBehavior<LookupStock> for Deadline {
-    async fn handle(
-        &self,
-        request: LookupStock,
-        next: Next<LookupStock>,
-    ) -> Result<u32, StockError> {
+impl<R: Request<Error = StockError>> PipelineBehavior<R> for Deadline {
+    async fn handle(&self, request: R, next: Next<R>) -> Result<R::Response, StockError> {
         tokio::time::timeout(self.limit, next.run(request))
             .await
             .unwrap_or(Err(StockError::Timeout))
+    }
+}
+
+/// Bucht Wareneingänge im Außenlager; die Buchung dort dauert eine Stunde.
+pub struct RemoteReceiving {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl RequestHandler<BookReceipt> for RemoteReceiving {
+    async fn handle(&self, request: BookReceipt) -> Result<(), StockError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Außenlager bucht {}", request.sku));
+        tokio::time::sleep(Duration::from_hours(1)).await;
+        self.journal
+            .borrow_mut()
+            .push(format!("Außenlager buchte {}", request.sku));
+        Ok(())
     }
 }

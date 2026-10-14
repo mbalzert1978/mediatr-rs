@@ -153,7 +153,7 @@ Quelle: MediatR `test/MediatR.Tests/PipelineTests.cs`, `MicrosoftExtensionsDI/Pi
 - [x] Handler mit `Handler::transient` registriert und von einem Behavior umschlossen → ein `send` baut den Handler genau einmal, das Behavior läuft genau einmal um ihn herum · `transient_handler_wrapped_by_behavior_is_built_once_per_send_and_wrapped_once`
 - [x] Behavior ruft den nächsten Schritt nicht auf und liefert selbst eine Antwort → `send` liefert diese Antwort, der Handler läuft nicht · `behavior_answering_without_next_returns_its_response_and_handler_does_not_run`
 - [x] Behavior setzt eine Frist, der Handler eines Requests mit Antwort braucht länger → `send` liefert `Err` statt einer Antwort, der Handler wird nicht fertig · `behavior_deadline_shorter_than_handler_returns_err_and_handler_does_not_finish`
-- [ ] Behavior setzt eine Frist, der Handler eines Requests ohne Antwort (Antworttyp `()`) braucht länger → `send` liefert `Err`, der Handler wird nicht fertig
+- [x] Behavior setzt eine Frist, der Handler eines Requests ohne Antwort (Antworttyp `()`) braucht länger → `send` liefert `Err`, der Handler wird nicht fertig · `behavior_deadline_shorter_than_unit_response_handler_returns_err_and_handler_does_not_finish`
 
 ## Pipeline — Vor- und Nachverarbeiter
 
