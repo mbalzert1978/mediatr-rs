@@ -422,3 +422,64 @@ async fn subscribe_transient_builds_handler_on_every_publish() {
 
     assert_eq!(builds.get(), 2);
 }
+
+/// Ereignis: Die Bestellung mit dieser Nummer steht unter Betrugsverdacht.
+struct FraudSuspected {
+    order_id: u32,
+}
+
+impl Notification for FraudSuspected {
+    type Error = SendError;
+}
+
+/// Prüft jede eingegangene Bestellung und meldet gesperrte Nummern über den Mediator, den sie per Konstruktor bekommt.
+struct FraudCheck {
+    publisher: Mediator,
+    blocked: Vec<u32>,
+}
+
+impl NotificationHandler<OrderPlaced> for FraudCheck {
+    async fn handle(&self, event: &OrderPlaced) -> Result<(), SendError> {
+        if !self.blocked.contains(&event.order_id) {
+            return Ok(());
+        }
+        self.publisher
+            .publish(FraudSuspected {
+                order_id: event.order_id,
+            })
+            .await
+    }
+}
+
+/// Legt für jeden Betrugsverdacht einen Fall mit der Bestellnummer an.
+struct FraudDesk {
+    cases: Rc<RefCell<Vec<u32>>>,
+}
+
+impl NotificationHandler<FraudSuspected> for FraudDesk {
+    async fn handle(&self, event: &FraudSuspected) -> Result<(), SendError> {
+        self.cases.borrow_mut().push(event.order_id);
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn subscribe_transient_handler_publishes_through_received_mediator() {
+    let cases = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .subscribe_transient(|publisher| FraudCheck {
+            publisher,
+            blocked: vec![13],
+        })
+        .subscribe(FraudDesk {
+            cases: Rc::clone(&cases),
+        })
+        .build();
+
+    mediator
+        .publish(OrderPlaced { order_id: 13 })
+        .await
+        .unwrap();
+
+    assert_eq!(*cases.borrow(), [13]);
+}
