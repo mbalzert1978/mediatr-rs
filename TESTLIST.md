@@ -113,7 +113,7 @@ Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `ExceptionTests.cs`, `Micr
 Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `NotificationPublisherTests.cs`, `MicrosoftExtensionsDI/NotificationPublisherTests.cs`; `src/MediatR/NotificationPublishers/TaskWhenAllPublisher.cs` (startet alle Handler, meldet den ersten Fehler erst, wenn alle fertig sind). Default bleibt „nacheinander“ wie `ForeachAwaitPublisher`: Laufen Handler verschränkt, löst ein `RefCell`-Borrow über ein `await` eine Panic aus; „alle gleichzeitig“ gibt es deshalb nur bewusst gewählt.
 
 - [x] Mediator mit eigener Publish-Strategie, die Handler in umgekehrter Reihenfolge aufruft, Notification mit zwei Handlern → beide laufen, in der Reihenfolge der eigenen Strategie · `custom_strategy_runs_both_handlers_in_its_own_order`
-- [ ] Mediator mit eigener Publish-Strategie, Request mit registriertem Handler → `send` liefert die Antwort des Handlers
+- [x] Mediator mit eigener Publish-Strategie, Request mit registriertem Handler → `send` liefert die Antwort des Handlers · `custom_strategy_send_returns_handler_response`
 - [ ] Mediator mit eigener Publish-Strategie, Handler mit `Handler::singleton` schickt über den `WeakMediator`, den er bekommt, einen Request → `send` liefert die Antwort von dessen Handler
 - [x] Mediator und `WeakMediator` mit eigener Publish-Strategie, die kein `Clone` hat → lassen sich klonen, und der Klon erreicht dieselben Handler · `custom_strategy_without_clone_mediator_and_weak_mediator_clone_reaches_same_handlers`
 - [ ] Handler mit `Handler::singleton` in einem Mediator mit eigener Publish-Strategie klont den `WeakMediator`, den er bekommt, und meldet über Original und Klon je eine Notification → beide erreichen dieselben Handler

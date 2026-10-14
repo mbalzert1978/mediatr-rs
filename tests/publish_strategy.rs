@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use mediatr_rs::{
     Handler, Mediator, MediatorBuilder, Notification, NotificationHandler, PublishStrategy,
-    Publisher, SendError, WeakMediator,
+    Publisher, Request, RequestHandler, SendError, Sender, WeakMediator,
 };
 
 /// Ereignis: Das Paket mit dieser Sendungsnummer ist angekommen.
@@ -279,4 +279,34 @@ async fn custom_strategy_without_clone_builder_clone_builds_mediators_reaching_s
             "Kurier geplant 8"
         ]
     );
+}
+
+/// Fragt nach, wo das Paket mit dieser Sendungsnummer gerade ist.
+struct TrackParcel {
+    tracking: u32,
+}
+
+impl Request for TrackParcel {
+    type Response = String;
+    type Error = SendError;
+}
+
+/// Kennt den Ort jedes Pakets im Lager.
+struct TrackingDesk;
+
+impl RequestHandler<TrackParcel> for TrackingDesk {
+    async fn handle(&self, request: TrackParcel) -> Result<String, SendError> {
+        Ok(format!("Paket {} liegt im Lager", request.tracking))
+    }
+}
+
+#[tokio::test]
+async fn custom_strategy_send_returns_handler_response() {
+    let mediator = MediatorBuilder::<NewestFirst>::default()
+        .register(Handler::instance(TrackingDesk))
+        .build();
+
+    let place = mediator.send(TrackParcel { tracking: 7 }).await;
+
+    assert_eq!(place, Ok("Paket 7 liegt im Lager".to_owned()));
 }
