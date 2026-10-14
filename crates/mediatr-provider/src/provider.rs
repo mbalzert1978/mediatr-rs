@@ -74,12 +74,16 @@ impl Provider {
         Some(recipe(self))
     }
 
-    /// Liefert alle Dienste vom Typ `T`, in der Reihenfolge ihrer Registrierung.
+    /// Liefert alle Dienste vom Typ `T`, in der Reihenfolge ihrer Registrierung; keinen, wenn eine Bauanleitung von `T` gerade läuft.
     #[must_use]
     pub fn all<T: 'static>(&self) -> Vec<Rc<T>> {
+        let id = TypeId::of::<T>();
+        let Some(_building) = Building::enter(&self.shared.building, id) else {
+            return Vec::new();
+        };
         self.shared
             .services
-            .get(&TypeId::of::<T>())
+            .get(&id)
             .into_iter()
             .flatten()
             .filter_map(|recipe| recipe.downcast_ref::<Recipe<T>>())

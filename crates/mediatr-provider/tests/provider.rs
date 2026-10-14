@@ -387,6 +387,24 @@ fn recipe_asking_twice_for_own_type_gets_none_both_times() {
     assert!(folder.parent.is_none() && folder.template.is_none());
 }
 
+/// Ein Menüeintrag, der beim Bau alle Einträge seines Menüs sammelt.
+struct MenuItem {
+    siblings: Vec<Rc<MenuItem>>,
+}
+
+#[test]
+fn recipe_asking_all_for_own_type_gets_empty_list() {
+    let provider = Provider::builder()
+        .transient(|provider| MenuItem {
+            siblings: provider.all::<MenuItem>(),
+        })
+        .build();
+
+    let items = provider.all::<MenuItem>();
+
+    assert!(matches!(items.as_slice(), [item] if item.siblings.is_empty()));
+}
+
 /// Ein Team mit seiner Leitung, falls es eine gibt.
 struct Team {
     lead: Option<Rc<Employee>>,
