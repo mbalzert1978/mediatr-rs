@@ -497,6 +497,7 @@ struct ParcelInspected {
 #[derive(Debug, PartialEq)]
 enum InspectionError {
     Damaged(u32),
+    Held(u32),
     Undeliverable(SendError),
 }
 
@@ -585,4 +586,25 @@ async fn concurrent_strategy_runs_each_of_three_handlers_once_and_returns_ok() {
             ]
         )
     );
+}
+
+/// Hält jedes geprüfte Paket beim Zoll fest.
+struct CustomsHold;
+
+impl NotificationHandler<ParcelInspected> for CustomsHold {
+    async fn handle(&self, event: &ParcelInspected) -> Result<(), InspectionError> {
+        Err(InspectionError::Held(event.tracking))
+    }
+}
+
+#[tokio::test]
+async fn concurrent_strategy_both_handlers_fail_returns_error_of_first_registered() {
+    let mediator = MediatorBuilder::<Concurrent>::default()
+        .subscribe(Handler::instance(DamageCheck))
+        .subscribe(Handler::instance(CustomsHold))
+        .build();
+
+    let published = mediator.publish(ParcelInspected { tracking: 7 }).await;
+
+    assert_eq!(published, Err(InspectionError::Damaged(7)));
 }
