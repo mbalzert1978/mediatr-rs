@@ -1,4 +1,4 @@
-//! Löscht den Typ eines Handlers, damit Handler verschiedener Typen im Provider liegen.
+//! Löscht den Typ registrierter Handler oder Behaviors, damit verschieden typisierte im Provider zusammen liegen.
 
 use std::future::Future;
 use std::pin::Pin;
@@ -6,13 +6,16 @@ use std::rc::Rc;
 
 use crate::notification::NotificationResult;
 use crate::request::HandlerResult;
-use crate::{Notification, NotificationHandler, Request, RequestHandler};
+use crate::{Next, Notification, NotificationHandler, PipelineBehavior, Request, RequestHandler};
+
+/// Eine Future mit gelöschtem Typ, die auf diesem Thread läuft (nicht `Send`) und höchstens `'a` lang leiht.
+// dyn: Handler, Behaviors und ihre Futures verschiedener Typen liegen hinter einem gemeinsamen Typ;
+// `Sender::send` und `Publisher::publish` kennen nur den Nachrichtentyp, nicht den Handler- oder Behavior-Typ.
+type LocalBoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 
 /// Ein Handler mit gelöschtem Typ: nimmt einen `R` und liefert später dessen Antwort oder Fehler.
-// dyn: `Sender::send` kennt nur `R`, nicht den Handler-Typ. Handler verschiedener Typen
-// und ihre Futures liegen deshalb hinter einem gemeinsamen Typ je `R`.
-pub(crate) type ErasedHandler<R> =
-    Box<dyn Fn(R) -> Pin<Box<dyn Future<Output = HandlerResult<R>>>>>;
+// dyn: wie bei `LocalBoxFuture`, je `R`.
+pub(crate) type ErasedHandler<R> = Box<dyn Fn(R) -> LocalBoxFuture<'static, HandlerResult<R>>>;
 
 /// Verpackt `handler` als [`ErasedHandler`].
 pub(crate) fn erase<R, H>(handler: Rc<H>) -> ErasedHandler<R>
@@ -29,9 +32,9 @@ async fn call<R: Request, H: RequestHandler<R>>(handler: Rc<H>, request: R) -> H
 }
 
 /// Ein Notification-Handler mit gelöschtem Typ: leiht sich ein `N` und meldet später `Ok(())` oder den Fehler.
-// dyn: aus demselben Grund wie bei `ErasedHandler`, je `N` statt je `R`.
+// dyn: wie bei `LocalBoxFuture`, je `N`.
 pub(crate) type ErasedNotificationHandler<N> =
-    Box<dyn for<'a> Fn(&'a N) -> Pin<Box<dyn Future<Output = NotificationResult<N>> + 'a>>>;
+    Box<dyn for<'a> Fn(&'a N) -> LocalBoxFuture<'a, NotificationResult<N>>>;
 
 /// Verpackt `handler` als [`ErasedNotificationHandler`].
 pub(crate) fn erase_notification_handler<N, H>(handler: Rc<H>) -> ErasedNotificationHandler<N>
@@ -48,4 +51,27 @@ async fn notify<N: Notification, H: NotificationHandler<N>>(
     notification: &N,
 ) -> NotificationResult<N> {
     handler.handle(notification).await
+}
+
+/// Ein Behavior mit gelöschtem Typ: nimmt einen `R` und den Rest der Pipeline und liefert später die Antwort oder den Fehler.
+// dyn: wie bei `LocalBoxFuture`, je `R`.
+pub(crate) type ErasedBehavior<R> =
+    Box<dyn Fn(R, Next<R>) -> LocalBoxFuture<'static, HandlerResult<R>>>;
+
+/// Verpackt `behavior` als [`ErasedBehavior`].
+pub(crate) fn erase_behavior<R, B>(behavior: Rc<B>) -> ErasedBehavior<R>
+where
+    R: Request + 'static,
+    B: PipelineBehavior<R> + 'static,
+{
+    Box::new(move |request, next| Box::pin(wrap(Rc::clone(&behavior), request, next)))
+}
+
+/// Ruft `behavior` auf; die Future besitzt das Behavior, damit sie ohne Leihe auskommt.
+async fn wrap<R: Request, B: PipelineBehavior<R>>(
+    behavior: Rc<B>,
+    request: R,
+    next: Next<R>,
+) -> HandlerResult<R> {
+    behavior.handle(request, next).await
 }

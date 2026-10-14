@@ -135,6 +135,7 @@ Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `NotificationPublisherTest
 Quelle: MediatR `test/MediatR.Tests/PipelineTests.cs`, `MicrosoftExtensionsDI/PipelineTests.cs`, `MicrosoftExtensionsDI/PipeLineMultiCallToConstructorTest.cs`, `SendTests.cs` (Timeout-Tests); `docs/mediatr-concepts.md` (Behavior bricht ab). Das zuerst registrierte Behavior liegt außen. Doppelte Behavior-Typen: `TryAddEnumerable` behält das zuerst registrierte.
 
 - [ ] Zwei Behaviors für einen Request-Typ → das zuerst registrierte läuft außen: außen-vorher, innen-vorher, Handler, innen-nachher, außen-nachher; `send` liefert die Antwort des Handlers
+- [x] Behavior klont den nächsten Schritt und ruft ihn nach einem Fehler des Handlers noch einmal auf → der Handler läuft zweimal, `send` liefert die Antwort des zweiten Laufs · `behavior_retries_cloned_next_after_handler_error_and_returns_second_response`
 - [ ] Zwei Behaviors für einen Request ohne Antwort (Antworttyp `()`) → sie umschließen den Handler in derselben Reihenfolge, das zuerst registrierte außen
 - [ ] Zwei Behaviors für alle Request-Typen → sie umschließen den Handler jedes Requests, das zuerst registrierte außen; `send` liefert die Antwort des Handlers
 - [ ] Zwei Behaviors für alle Request-Typen, Request ohne Antwort (Antworttyp `()`) → sie umschließen den Handler in derselben Reihenfolge, das zuerst registrierte außen

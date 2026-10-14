@@ -7,10 +7,14 @@ use std::marker::PhantomData;
 
 use mediatr_provider::{Provider, ProviderBuilder, Registration, WeakProvider};
 
-use crate::erased::{ErasedHandler, ErasedNotificationHandler, erase, erase_notification_handler};
+use crate::erased::{
+    ErasedBehavior, ErasedHandler, ErasedNotificationHandler, erase, erase_behavior,
+    erase_notification_handler,
+};
 use crate::request::HandlerResult;
 use crate::{
-    Notification, NotificationHandler, PublishStrategy, Request, RequestHandler, Sequential,
+    Next, Notification, NotificationHandler, PipelineBehavior, PublishStrategy, Request,
+    RequestHandler, Sequential,
 };
 
 /// Stellt Requests und Notifications den Handlern zu, die für ihren Typ registriert sind.
@@ -29,7 +33,7 @@ pub struct WeakMediator<S = Sequential> {
     strategy: PhantomData<S>,
 }
 
-/// Wie der Mediator einen Handler vom Typ `H` bekommt; [`MediatorBuilder::register`] und [`MediatorBuilder::subscribe`] nehmen ihn.
+/// Wie der Mediator einen Handler vom Typ `H` bekommt; [`MediatorBuilder::register`], [`MediatorBuilder::subscribe`] und [`MediatorBuilder::behavior`] nehmen ihn.
 /// `S` ist die Publish-Strategie des Mediators, für den der Handler bestimmt ist.
 pub struct Handler<H, S = Sequential> {
     registration: Registration<H>,
@@ -156,7 +160,8 @@ impl<S, R: Request + 'static> Sender<R> for Mediator<S> {
             .provider
             .get::<ErasedHandler<R>>()
             .ok_or(SendError::NoHandler)?;
-        handler(request).await
+        let behaviors = self.provider.all::<ErasedBehavior<R>>();
+        Next::new(handler, behaviors).run(request).await
     }
 }
 
@@ -261,10 +266,17 @@ impl<S> MediatorBuilder<S> {
         R: Request + 'static,
         H: RequestHandler<R> + 'static,
     {
-        Self {
-            provider: self.provider.register(handler.registration.map(erase)),
-            ..self
-        }
+        self.with_registration(handler.registration.map(erase))
+    }
+
+    /// Registriert `behavior` für Requests vom Typ `R`; es umschließt deren Handler.
+    #[must_use]
+    pub fn behavior<R, B>(self, behavior: Handler<B, S>) -> Self
+    where
+        R: Request + 'static,
+        B: PipelineBehavior<R> + 'static,
+    {
+        self.with_registration(behavior.registration.map(erase_behavior))
     }
 
     /// Registriert `handler` für Notifications vom Typ `N`; ist für `N` schon ein Handler vom Typ `H` registriert, fällt `handler` weg.
@@ -274,21 +286,26 @@ impl<S> MediatorBuilder<S> {
         N: Notification + 'static,
         H: NotificationHandler<N> + 'static,
     {
-        Self {
-            provider: self.provider.register(
-                handler
-                    .registration
-                    .map(erase_notification_handler)
-                    .unique_by::<H>(),
-            ),
-            ..self
-        }
+        self.with_registration(
+            handler
+                .registration
+                .map(erase_notification_handler)
+                .unique_by::<H>(),
+        )
     }
 
     /// Baut den Mediator mit allen registrierten Handlern.
     #[must_use]
     pub fn build(self) -> Mediator<S> {
         Mediator::new(self.provider.build())
+    }
+
+    /// Builder, dessen Provider zusätzlich `registration` kennt.
+    fn with_registration<T: 'static>(self, registration: Registration<T>) -> Self {
+        Self {
+            provider: self.provider.register(registration),
+            ..self
+        }
     }
 }
 
