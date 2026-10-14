@@ -29,6 +29,7 @@ Quelle: MediatR `Mediator(IServiceProvider)` speichert keine Handler; es holt si
 - [x] Handler mit `Handler::singleton` registriert → nur das erste `send` baut den Handler, jedes weitere nutzt denselben · `singleton_builds_handler_only_on_first_send`
 - [x] Handler mit Sender per Konstruktor ist als `Handler::singleton` registriert, der Mediator wird fallen gelassen → der Handler wird freigegeben (sein `Drop` läuft) · `singleton_handler_with_sender_is_released_with_mediator`
 - [x] Handler mit Sender ist als `Handler::singleton` registriert und schickt einen Request, nachdem der Mediator weggefallen ist → `send` liefert `Err(SendError::MediatorDropped)`, kein Panic · `singleton_handler_sending_after_mediator_dropped_gets_mediator_dropped`
+- [ ] `Handler` für einen Handler-Typ ohne `Debug` mit `{:?}` formatiert → das kompiliert und liefert eine Ausgabe
 
 ## Provider-Crate `mediatr-provider`
 
@@ -78,7 +79,7 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] `register` mit `unique_by` und demselben Schlüsseltyp für zwei verschiedene Typen → `all` nach jedem der beiden Typen liefert genau ihren Dienst · `unique_instance_from_same_source_type_for_two_service_types_all_returns_each_own`
 - [x] Erst `register` ohne, dann mit `unique_by` für denselben Typ → `all` liefert beide, in der Reihenfolge der Registrierung · `instance_then_unique_instance_of_same_type_all_returns_both_in_order`
 - [x] `Registration` mit `map` umgewandelt → `get` liefert den umgewandelten Dienst · `mapped_registration_get_returns_converted_service`
-- [ ] Zweimal `register` für denselben Typ, beide erst mit `unique_by` und demselben Schlüsseltyp, dann mit `map` umgewandelt → `all` liefert nur den zuerst registrierten Dienst
+- [x] Zweimal `register` für denselben Typ, beide erst mit `unique_by` und demselben Schlüsseltyp, dann mit `map` umgewandelt → `all` liefert nur den zuerst registrierten Dienst · `unique_then_mapped_registration_twice_all_returns_first`
 - [ ] `Registration::singleton` mit `map` umgewandelt, zweimal `get` → `f` bekommt beide Male dasselbe Objekt
 - [ ] Zweimal `register` mit `Registration::transient` für denselben Typ, beide mit `unique_by` und demselben Schlüsseltyp → `all` baut nur den zuerst registrierten Dienst
 - [ ] `Registration` mit `{:?}` formatiert → die Ausgabe nennt den Diensttyp

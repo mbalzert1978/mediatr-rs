@@ -184,10 +184,15 @@ impl<T: 'static> Registration<T> {
     }
 
     /// Dienst `f(dienst)` vom Typ `U` statt des Diensts vom Typ `T`; den Dienst vom Typ `T` baut die Bauart wie zuvor, `f` läuft bei jeder Abfrage neu.
+    ///
+    /// Ein Schlüsseltyp aus [`Registration::unique_by`] bleibt.
     #[must_use]
     pub fn map<U: 'static>(self, f: impl Fn(Rc<T>) -> U + 'static) -> Registration<U> {
-        let recipe = self.recipe;
-        Registration::new(move |provider, slot| Rc::new(f(recipe(provider, slot))))
+        let Self { recipe, key } = self;
+        Registration {
+            key,
+            ..Registration::new(move |provider, slot| Rc::new(f(recipe(provider, slot))))
+        }
     }
 
     fn new(recipe: impl Fn(&Provider, Slot) -> Rc<T> + 'static) -> Self {

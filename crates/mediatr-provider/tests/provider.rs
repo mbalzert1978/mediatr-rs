@@ -862,3 +862,31 @@ fn mapped_registration_get_returns_converted_service() {
 
     assert_eq!(title.as_deref(), Some("Rechnung 1"));
 }
+
+#[test]
+fn unique_then_mapped_registration_twice_all_returns_first() {
+    let provider = Provider::builder()
+        .register(
+            Registration::instance(Invoice {
+                heading: "Rechnung 1".to_owned(),
+            })
+            .unique_by::<Invoice>()
+            .map(|invoice: Rc<Invoice>| Document(invoice.heading.clone())),
+        )
+        .register(
+            Registration::instance(Invoice {
+                heading: "Rechnung 2".to_owned(),
+            })
+            .unique_by::<Invoice>()
+            .map(|invoice: Rc<Invoice>| Document(invoice.heading.clone())),
+        )
+        .build();
+
+    let titles: Vec<_> = provider
+        .all::<Document>()
+        .iter()
+        .map(|document| document.0.clone())
+        .collect();
+
+    assert_eq!(titles, ["Rechnung 1"]);
+}
