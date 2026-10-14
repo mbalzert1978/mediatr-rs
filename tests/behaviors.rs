@@ -8,8 +8,8 @@ use mediatr_rs::{Handler, Mediator, Sender};
 mod behaviors_fixtures;
 
 use behaviors_fixtures::{
-    BookReceipt, LookupStock, ReceiptBook, RetryOnce, ShelfLock, SlowStockLedger, StockLedger,
-    audit_and_stopwatch, audited_and_timed, audited_locked_and_timed,
+    AuditTrail, BookReceipt, LookupStock, ReceiptBook, RetryOnce, ShelfLock, SlowStockLedger,
+    StockLedger, audit_and_stopwatch, audited_and_timed, audited_locked_and_timed,
 };
 
 #[tokio::test]
@@ -185,6 +185,40 @@ async fn same_behavior_registered_twice_for_one_request_type_runs_once() {
             ["Regal gesperrt", "Bestand gelesen für 4", "Regal frei"]
                 .map(str::to_owned)
                 .to_vec()
+        )
+    );
+}
+
+#[tokio::test]
+async fn same_behavior_registered_for_all_and_for_one_request_type_runs_twice_for_that_type() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .behavior(AuditTrail {
+            journal: Rc::clone(&journal),
+        })
+        .behavior_for::<LookupStock>(AuditTrail {
+            journal: Rc::clone(&journal),
+        })
+        .register(Handler::instance(StockLedger {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let stock = mediator.send(LookupStock { sku: 4 }).await;
+
+    assert_eq!(
+        (stock, journal.borrow().clone()),
+        (
+            Ok(12),
+            [
+                "Prüfung beginnt",
+                "Prüfung beginnt",
+                "Bestand gelesen für 4",
+                "Prüfung endet",
+                "Prüfung endet"
+            ]
+            .map(str::to_owned)
+            .to_vec()
         )
     );
 }
