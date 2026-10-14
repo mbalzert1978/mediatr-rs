@@ -200,3 +200,39 @@ impl PipelineBehavior<BookReceipt> for LoadingDock {
         booked
     }
 }
+
+/// Prüfstation Nummer `N` am Lager; schreibt vor und nach jeder Bestandsabfrage ihre Nummer ins Protokoll.
+pub struct Checkpoint<const N: usize> {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+/// Prüfstation Nummer `N`, die in `journal` schreibt.
+pub fn checkpoint<const N: usize>(journal: &Rc<RefCell<Vec<String>>>) -> Checkpoint<N> {
+    Checkpoint {
+        journal: Rc::clone(journal),
+    }
+}
+
+impl<const N: usize> PipelineBehavior<LookupStock> for Checkpoint<N> {
+    async fn handle(
+        &self,
+        request: LookupStock,
+        next: Next<LookupStock>,
+    ) -> Result<u32, StockError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Station {N} betreten"));
+        let stock = next.run(request).await;
+        self.journal
+            .borrow_mut()
+            .push(format!("Station {N} verlassen"));
+        stock
+    }
+}
+
+/// Was die Prüfstationen 0 bis `count - 1`, in dieser Reihenfolge registriert, um den Protokolleintrag `handled` herum ins Protokoll schreiben.
+pub fn passed_checkpoints(count: usize, handled: &str) -> Vec<String> {
+    let entered = (0..count).map(|n| format!("Station {n} betreten"));
+    let left = (0..count).rev().map(|n| format!("Station {n} verlassen"));
+    entered.chain([handled.to_owned()]).chain(left).collect()
+}

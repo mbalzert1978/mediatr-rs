@@ -145,7 +145,7 @@ Quelle: MediatR `test/MediatR.Tests/PipelineTests.cs`, `MicrosoftExtensionsDI/Pi
 - [x] Dasselbe Behavior einmal für alle Request-Typen und einmal nur für einen registriert → ein Request dieses Typs läuft durch beide · `same_behavior_registered_for_all_and_for_one_request_type_runs_twice_for_that_type`
 - [x] Dasselbe Behavior zuerst nur für einen Request-Typ, dann für alle registriert → ein Request dieses Typs läuft durch beide · `same_behavior_registered_for_one_request_type_then_for_all_runs_twice_for_that_type`
 - [x] Dasselbe Behavior einmal für alle Request-Typen und einmal nur für einen registriert → ein Request eines anderen Typs läuft nur einmal hindurch · `same_behavior_registered_for_all_and_for_one_request_type_runs_once_for_another_type`
-- [ ] Zwölf Behaviors → sie umschließen den Handler in Registrierungsreihenfolge, das erste außen
+- [x] Zwölf Behaviors → sie umschließen den Handler in Registrierungsreihenfolge, das erste außen · `twelve_behaviors_wrap_handler_first_registered_outermost`
 - [ ] Behaviors und Publish-Strategie `Concurrent` zusammen → `send` läuft durch die Behaviors, `publish` lässt die Handler gleichzeitig laufen
 - [x] Ein Behavior nach dem ersten Handler registriert → kompiliert nicht · `behavior_registered_after_first_handler_does_not_compile`
 - [ ] Ein Behavior nach dem ersten Notification-Handler (`subscribe`) registriert → kompiliert nicht

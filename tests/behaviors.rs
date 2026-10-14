@@ -10,6 +10,7 @@ mod behaviors_fixtures;
 use behaviors_fixtures::{
     AuditTrail, BookReceipt, LoadingDock, LookupStock, ReceiptBook, RetryOnce, ShelfLock,
     SlowStockLedger, StockLedger, audit_and_stopwatch, audited_and_timed, audited_locked_and_timed,
+    checkpoint, passed_checkpoints,
 };
 
 #[tokio::test]
@@ -317,5 +318,34 @@ async fn unit_response_behavior_for_one_request_type_then_one_for_all_wrap_handl
             .map(str::to_owned)
             .to_vec()
         )
+    );
+}
+
+#[tokio::test]
+async fn twelve_behaviors_wrap_handler_first_registered_outermost() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .behavior(checkpoint::<0>(&journal))
+        .behavior(checkpoint::<1>(&journal))
+        .behavior(checkpoint::<2>(&journal))
+        .behavior(checkpoint::<3>(&journal))
+        .behavior(checkpoint::<4>(&journal))
+        .behavior(checkpoint::<5>(&journal))
+        .behavior(checkpoint::<6>(&journal))
+        .behavior(checkpoint::<7>(&journal))
+        .behavior(checkpoint::<8>(&journal))
+        .behavior(checkpoint::<9>(&journal))
+        .behavior(checkpoint::<10>(&journal))
+        .behavior(checkpoint::<11>(&journal))
+        .register(Handler::instance(StockLedger {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let stock = mediator.send(LookupStock { sku: 4 }).await;
+
+    assert_eq!(
+        (stock, journal.borrow().clone()),
+        (Ok(12), passed_checkpoints(12, "Bestand gelesen für 4"))
     );
 }
