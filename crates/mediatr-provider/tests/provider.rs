@@ -1,6 +1,6 @@
 //! Tests für den Abschnitt „Provider-Crate `mediatr-provider`“ in `TESTLIST.md`.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::panic::{self, AssertUnwindSafe};
 use std::rc::Rc;
 
@@ -709,4 +709,31 @@ fn unique_instance_twice_from_same_source_type_get_returns_first() {
         .map(|document| document.0.clone());
 
     assert_eq!(title.as_deref(), Some("Rechnung 1"));
+}
+
+#[test]
+fn unique_instance_twice_from_same_source_type_converts_only_first() {
+    let printed = RefCell::new(Vec::new());
+    let print = |invoice: Invoice| {
+        printed.borrow_mut().push(invoice.heading.clone());
+        Document::from(invoice)
+    };
+
+    drop(
+        Provider::builder()
+            .unique_instance(
+                Invoice {
+                    heading: "Rechnung 1".to_owned(),
+                },
+                print,
+            )
+            .unique_instance(
+                Invoice {
+                    heading: "Rechnung 2".to_owned(),
+                },
+                print,
+            ),
+    );
+
+    assert_eq!(*printed.borrow(), ["Rechnung 1"]);
 }
