@@ -1,11 +1,11 @@
 //! Tests für den Abschnitt „Notification — `publish`“ in `TESTLIST.md`.
 
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
 use std::rc::Rc;
 
 use mediatr_rs::{
     Mediator, Notification, NotificationHandler, Publisher, Request, RequestHandler, SendError,
-    Sender,
+    Sender, WeakMediator,
 };
 
 /// Ereignis: Die Bestellung mit dieser Nummer ist eingegangen.
@@ -330,4 +330,28 @@ async fn handler_publishes_to_fake_publisher() {
     handler.handle(Checkout { order_id: 42 }).await.unwrap();
 
     assert_eq!(*order_ids.borrow(), [42]);
+}
+
+#[tokio::test]
+async fn singleton_handler_publishing_after_mediator_dropped_gets_mediator_dropped() {
+    let handed_out = Rc::new(OnceCell::new());
+    let keep = Rc::clone(&handed_out);
+    let mediator = Mediator::builder()
+        .singleton(move |publisher: WeakMediator| {
+            keep.get_or_init(|| publisher.clone());
+            CheckoutHandler { publisher }
+        })
+        .subscribe(ShippingDesk {
+            labels: Rc::new(RefCell::new(Vec::new())),
+        })
+        .build();
+    mediator.send(Checkout { order_id: 41 }).await.unwrap();
+    let checkout = CheckoutHandler {
+        publisher: handed_out.get().unwrap().clone(),
+    };
+    drop(mediator);
+
+    let result = checkout.handle(Checkout { order_id: 42 }).await;
+
+    assert_eq!(result, Err(SendError::MediatorDropped));
 }

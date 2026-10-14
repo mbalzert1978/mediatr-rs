@@ -18,7 +18,7 @@ pub struct Mediator {
     provider: Provider,
 }
 
-/// Verweis auf einen [`Mediator`], der dessen Handler nicht am Leben hält; ein `singleton`-Handler bekommt ihn als [`Sender`].
+/// Verweis auf einen [`Mediator`], der dessen Handler nicht am Leben hält; ein `singleton`-Handler bekommt ihn als [`Sender`] und [`Publisher`].
 #[derive(Debug, Clone)]
 pub struct WeakMediator {
     provider: WeakProvider,
@@ -68,7 +68,7 @@ pub trait Publisher<N: Notification> {
 pub enum SendError {
     /// Für den Request-Typ ist kein Handler registriert.
     NoHandler,
-    /// Der Mediator, über den ein [`WeakMediator`] sendet, ist weggefallen.
+    /// Der Mediator, über den ein [`WeakMediator`] sendet oder meldet, ist weggefallen.
     MediatorDropped,
 }
 
@@ -108,6 +108,13 @@ impl<R: Request + 'static> Sender<R> for WeakMediator {
     }
 }
 
+impl<N: Notification + 'static> Publisher<N> for WeakMediator {
+    async fn publish(&self, _notification: N) -> Result<(), N::Error> {
+        self.provider.upgrade().ok_or(SendError::MediatorDropped)?;
+        Ok(())
+    }
+}
+
 impl MediatorBuilder {
     /// Registriert `handler` für Requests vom Typ `R`; ein früherer Handler für `R` fällt weg.
     #[must_use]
@@ -121,7 +128,7 @@ impl MediatorBuilder {
         }
     }
 
-    /// Registriert `make` für Requests vom Typ `R`; jedes `send` baut den Handler damit neu und gibt ihm den [`Mediator`] als [`Sender`].
+    /// Registriert `make` für Requests vom Typ `R`; jedes `send` baut den Handler damit neu und gibt ihm den [`Mediator`] als [`Sender`] und [`Publisher`].
     #[must_use]
     pub fn transient<R, H>(self, make: impl Fn(Mediator) -> H + 'static) -> Self
     where
@@ -139,7 +146,7 @@ impl MediatorBuilder {
 
     /// Registriert `make` für Requests vom Typ `R`; das erste `send` baut den Handler damit, jedes weitere nutzt denselben Handler.
     ///
-    /// Der Handler bekommt einen [`WeakMediator`] als [`Sender`], damit er den Mediator nicht selbst am Leben hält.
+    /// Der Handler bekommt einen [`WeakMediator`] als [`Sender`] und [`Publisher`], damit er den Mediator nicht selbst am Leben hält.
     #[must_use]
     pub fn singleton<R, H>(self, make: impl Fn(WeakMediator) -> H + 'static) -> Self
     where
