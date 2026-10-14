@@ -63,6 +63,17 @@ fn all_without_registration_returns_empty_list() {
 }
 
 #[test]
+fn transient_all_runs_recipe_on_every_call() {
+    let (calls, recipe) = counting_recipe();
+    let provider = Provider::builder().transient(recipe).build();
+
+    drop(provider.all::<Config>());
+    drop(provider.all::<Config>());
+
+    assert_eq!(calls.get(), 2);
+}
+
+#[test]
 fn transient_runs_recipe_on_every_get() {
     let (calls, recipe) = counting_recipe();
     let provider = Provider::builder().transient(recipe).build();
