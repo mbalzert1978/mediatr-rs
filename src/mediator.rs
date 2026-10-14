@@ -4,7 +4,7 @@ use std::error::Error;
 use std::fmt;
 use std::future::Future;
 
-use mediatr_provider::{Provider, ProviderBuilder, WeakProvider};
+use mediatr_provider::{Provider, ProviderBuilder, Registration, WeakProvider};
 
 use crate::erased::{ErasedHandler, ErasedNotificationHandler, erase, erase_notification_handler};
 use crate::request::HandlerResult;
@@ -126,7 +126,9 @@ impl MediatorBuilder {
         H: RequestHandler<R> + 'static,
     {
         Self {
-            provider: self.provider.instance(erase(handler)),
+            provider: self
+                .provider
+                .register(Registration::instance(erase(handler))),
         }
     }
 
@@ -138,11 +140,13 @@ impl MediatorBuilder {
         H: RequestHandler<R> + 'static,
     {
         Self {
-            provider: self.provider.transient(move |provider| {
-                erase(make(Mediator {
-                    provider: provider.clone(),
-                }))
-            }),
+            provider: self
+                .provider
+                .register(Registration::transient(move |provider| {
+                    erase(make(Mediator {
+                        provider: provider.clone(),
+                    }))
+                })),
         }
     }
 
@@ -156,11 +160,13 @@ impl MediatorBuilder {
         H: RequestHandler<R> + 'static,
     {
         Self {
-            provider: self.provider.singleton(move |provider| {
-                erase(make(WeakMediator {
-                    provider: provider.downgrade(),
-                }))
-            }),
+            provider: self
+                .provider
+                .register(Registration::singleton(move |provider| {
+                    erase(make(WeakMediator {
+                        provider: provider.downgrade(),
+                    }))
+                })),
         }
     }
 
@@ -172,9 +178,9 @@ impl MediatorBuilder {
         H: NotificationHandler<N> + 'static,
     {
         Self {
-            provider: self
-                .provider
-                .unique_instance(handler, erase_notification_handler),
+            provider: self.provider.register(
+                Registration::instance(erase_notification_handler(handler)).unique_by::<H>(),
+            ),
         }
     }
 
@@ -186,11 +192,13 @@ impl MediatorBuilder {
         H: NotificationHandler<N> + 'static,
     {
         Self {
-            provider: self.provider.transient(move |provider| {
-                erase_notification_handler(make(Mediator {
-                    provider: provider.clone(),
-                }))
-            }),
+            provider: self
+                .provider
+                .register(Registration::transient(move |provider| {
+                    erase_notification_handler(make(Mediator {
+                        provider: provider.clone(),
+                    }))
+                })),
         }
     }
 

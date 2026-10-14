@@ -3,19 +3,23 @@
 use std::any::{Any, TypeId};
 use std::cell::{OnceCell, RefCell};
 use std::collections::{HashMap, HashSet};
+use std::fmt;
 use std::rc::{Rc, Weak};
 
 /// Bauanleitungen verschiedener Typen, je Typ alle in der Reihenfolge ihrer Registrierung; jede ist ein [`Recipe`] ihres Typs.
 // Rc reicht, solange kein Testlisten-Punkt Threads verlangt; dann Arc.
 type Services = HashMap<TypeId, Vec<Rc<dyn Any>>>;
 
-/// Dienste verschiedener Typen, die ein Scope schon gebaut hat, je `scoped`-Registrierung einer, nach ihrer Platznummer.
-type Built = RefCell<HashMap<usize, Rc<dyn Any>>>;
+/// Dienste verschiedener Typen, die ein Scope schon gebaut hat, je `scoped`-Registrierung einer, nach ihrem [`Slot`].
+type Built = RefCell<HashMap<Slot, Rc<dyn Any>>>;
 
-/// Liefert bei jedem Aufruf einen Dienst vom Typ `T`, gebaut mit dem übergebenen Provider oder gemerkt in seinem Scope.
+/// Platz einer Registrierung: ihr Diensttyp und ihre Stelle in dessen Liste.
+type Slot = (TypeId, usize);
+
+/// Liefert bei jedem Aufruf einen Dienst vom Typ `T`, gebaut mit dem übergebenen Provider oder gemerkt in seinem Scope auf dem übergebenen Platz.
 // dyn: `get` kennt nur `T`, nicht den Typ der Bauanleitung. Bauanleitungen verschiedener
-// Typen (aus `instance`, `transient`, `singleton`, `scoped`) liegen deshalb hinter einem gemeinsamen Typ je `T`.
-type Recipe<T> = Box<dyn Fn(&Provider) -> Rc<T>>;
+// Typen (aus `Registration::instance`, `transient`, `singleton`, `scoped`) liegen deshalb hinter einem gemeinsamen Typ je `T`.
+type Recipe<T> = Box<dyn Fn(&Provider, Slot) -> Rc<T>>;
 
 /// Liefert Dienste nach ihrem Typ.
 ///
@@ -51,8 +55,15 @@ pub struct WeakProvider {
 #[derive(Debug, Clone, Default)]
 pub struct ProviderBuilder {
     services: Services,
-    /// Paare aus Diensttyp und Quelltyp, die [`ProviderBuilder::unique_instance`] schon registriert hat.
-    sources: HashSet<(TypeId, TypeId)>,
+    /// Paare aus Diensttyp und Schlüsseltyp, die [`ProviderBuilder::register`] als einmalig schon aufgenommen hat.
+    keys: HashSet<(TypeId, TypeId)>,
+}
+
+/// Wie ein Dienst vom Typ `T` entsteht; [`ProviderBuilder::register`] nimmt ihn auf.
+pub struct Registration<T> {
+    recipe: Recipe<T>,
+    /// Schlüsseltyp aus [`Registration::unique_by`]; `None` heißt: nicht einmalig.
+    key: Option<TypeId>,
 }
 
 impl Provider {
@@ -66,14 +77,16 @@ impl Provider {
     #[must_use]
     pub fn get<T: 'static>(&self) -> Option<Rc<T>> {
         let id = TypeId::of::<T>();
-        let recipe = self
+        let (index, recipe) = self
             .shared
             .services
             .get(&id)?
-            .last()?
-            .downcast_ref::<Recipe<T>>()?;
+            .iter()
+            .enumerate()
+            .next_back()?;
+        let recipe = recipe.downcast_ref::<Recipe<T>>()?;
         let _building = Building::enter(&self.shared.building, id)?;
-        Some(recipe(self))
+        Some(recipe(self, (id, index)))
     }
 
     /// Liefert alle Dienste vom Typ `T`, in der Reihenfolge ihrer Registrierung; keinen, wenn eine Bauanleitung von `T` gerade läuft.
@@ -88,8 +101,9 @@ impl Provider {
             .get(&id)
             .into_iter()
             .flatten()
-            .filter_map(|recipe| recipe.downcast_ref::<Recipe<T>>())
-            .map(|recipe| recipe(self))
+            .enumerate()
+            .filter_map(|(index, recipe)| Some((index, recipe.downcast_ref::<Recipe<T>>()?)))
+            .map(|(index, recipe)| recipe(self, (id, index)))
             .collect()
     }
 
@@ -131,48 +145,75 @@ impl WeakProvider {
     }
 }
 
-impl ProviderBuilder {
-    /// Registriert `service`; jede Abfrage liefert dasselbe Objekt.
+impl<T: 'static> Registration<T> {
+    /// Dienst `service`; jede Abfrage liefert dasselbe Objekt.
     #[must_use]
-    pub fn instance<T: 'static>(self, service: T) -> Self {
+    pub fn instance(service: T) -> Self {
         let service = Rc::new(service);
-        self.recipe(move |_| Rc::clone(&service))
+        Self::new(move |_, _| Rc::clone(&service))
     }
 
-    /// Registriert `into(source)` wie [`instance`](Self::instance); hat `unique_instance` für `T` schon einen Dienst aus einem `S` registriert, registriert dieser Aufruf nichts und ruft `into` nicht auf.
+    /// Dienst aus `recipe`; jede Abfrage baut ihn damit neu.
     #[must_use]
-    pub fn unique_instance<S: 'static, T: 'static>(
-        mut self,
-        source: S,
-        into: impl FnOnce(S) -> T,
-    ) -> Self {
-        if !self.sources.insert((TypeId::of::<T>(), TypeId::of::<S>())) {
-            return self;
-        }
-        self.instance(into(source))
+    pub fn transient(recipe: impl Fn(&Provider) -> T + 'static) -> Self {
+        Self::new(move |provider, _| Rc::new(recipe(provider)))
     }
 
-    /// Registriert `recipe`; jede Abfrage baut den Dienst damit neu.
+    /// Dienst aus `recipe`; die erste Abfrage baut ihn mit dem Provider statt mit dem Scope, jede weitere liefert dasselbe Objekt.
     #[must_use]
-    pub fn transient<T: 'static>(self, recipe: impl Fn(&Provider) -> T + 'static) -> Self {
-        self.recipe(move |provider| Rc::new(recipe(provider)))
-    }
-
-    /// Registriert `recipe`; die erste Abfrage baut den Dienst mit dem Provider statt mit dem Scope, jede weitere liefert dasselbe Objekt.
-    #[must_use]
-    pub fn singleton<T: 'static>(self, recipe: impl Fn(&Provider) -> T + 'static) -> Self {
+    pub fn singleton(recipe: impl Fn(&Provider) -> T + 'static) -> Self {
         let service = OnceCell::new();
-        self.recipe(move |provider| {
+        Self::new(move |provider, _| {
             Rc::clone(service.get_or_init(|| Rc::new(recipe(&provider.root()))))
         })
     }
 
-    /// Registriert `recipe`; die erste Abfrage in einem Scope baut den Dienst, jede weitere im selben Scope liefert dasselbe Objekt.
+    /// Dienst aus `recipe`; die erste Abfrage in einem Scope baut ihn, jede weitere im selben Scope liefert dasselbe Objekt.
     #[must_use]
-    pub fn scoped<T: 'static>(self, recipe: impl Fn(&Provider) -> T + 'static) -> Self {
-        // Die Zahl der Registrierungen davor ist für jede Registrierung eine andere Platznummer.
-        let slot = self.services.values().map(Vec::len).sum();
-        self.recipe(move |provider| scoped_service(provider, slot, &recipe))
+    pub fn scoped(recipe: impl Fn(&Provider) -> T + 'static) -> Self {
+        Self::new(move |provider, slot| scoped_service(provider, slot, &recipe))
+    }
+
+    /// Macht die Registrierung einmalig je Schlüsseltyp `K`: Hat [`ProviderBuilder::register`] für `T` schon eine Registrierung mit `K` aufgenommen, nimmt es diese nicht mehr auf.
+    #[must_use]
+    pub fn unique_by<K: 'static>(self) -> Self {
+        Self {
+            key: Some(TypeId::of::<K>()),
+            ..self
+        }
+    }
+
+    fn new(recipe: impl Fn(&Provider, Slot) -> Rc<T> + 'static) -> Self {
+        Self {
+            recipe: Box::new(recipe),
+            key: None,
+        }
+    }
+}
+
+impl<T> fmt::Debug for Registration<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Registration")
+            .field("key", &self.key)
+            .finish_non_exhaustive()
+    }
+}
+
+impl ProviderBuilder {
+    /// Nimmt `registration` auf; ist sie einmalig und für ihren Typ schon eine mit demselben Schlüsseltyp aufgenommen, nimmt es sie nicht auf.
+    #[must_use]
+    pub fn register<T: 'static>(mut self, registration: Registration<T>) -> Self {
+        let id = TypeId::of::<T>();
+        if let Some(key) = registration.key
+            && !self.keys.insert((id, key))
+        {
+            return self;
+        }
+        self.services
+            .entry(id)
+            .or_default()
+            .push(Rc::new(registration.recipe));
+        self
     }
 
     /// Baut den Provider mit allen registrierten Diensten.
@@ -187,15 +228,6 @@ impl ProviderBuilder {
                 building: RefCell::default(),
             }),
         }
-    }
-
-    fn recipe<T: 'static>(mut self, recipe: impl Fn(&Provider) -> Rc<T> + 'static) -> Self {
-        let recipe: Recipe<T> = Box::new(recipe);
-        self.services
-            .entry(TypeId::of::<T>())
-            .or_default()
-            .push(Rc::new(recipe));
-        self
     }
 }
 
@@ -224,7 +256,7 @@ impl Drop for Building<'_> {
 /// Liefert den Dienst auf Platz `slot` im Scope von `provider`; fehlt er dort, baut `recipe` ihn, und der Scope merkt ihn sich.
 fn scoped_service<T: 'static>(
     provider: &Provider,
-    slot: usize,
+    slot: Slot,
     recipe: impl Fn(&Provider) -> T,
 ) -> Rc<T> {
     let cached = provider

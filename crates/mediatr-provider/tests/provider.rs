@@ -4,7 +4,7 @@ use std::cell::Cell;
 use std::panic::{self, AssertUnwindSafe};
 use std::rc::Rc;
 
-use mediatr_provider::{Provider, WeakProvider};
+use mediatr_provider::{Provider, Registration, WeakProvider};
 
 struct Config;
 
@@ -12,7 +12,9 @@ struct Name(&'static str);
 
 #[test]
 fn instance_returns_same_object_on_every_get() {
-    let provider = Provider::builder().instance(Config).build();
+    let provider = Provider::builder()
+        .register(Registration::instance(Config))
+        .build();
 
     let first = provider.get::<Config>().unwrap();
     let second = provider.get::<Config>().unwrap();
@@ -32,8 +34,8 @@ fn get_without_registration_returns_none() {
 #[test]
 fn instance_twice_returns_last_registered_service() {
     let provider = Provider::builder()
-        .instance(Name("alt"))
-        .instance(Name("neu"))
+        .register(Registration::instance(Name("alt")))
+        .register(Registration::instance(Name("neu")))
         .build();
 
     let name = provider.get::<Name>().unwrap();
@@ -44,8 +46,8 @@ fn instance_twice_returns_last_registered_service() {
 #[test]
 fn all_returns_every_instance_in_registration_order() {
     let provider = Provider::builder()
-        .instance(Name("alt"))
-        .instance(Name("neu"))
+        .register(Registration::instance(Name("alt")))
+        .register(Registration::instance(Name("neu")))
         .build();
 
     let names: Vec<_> = provider.all::<Name>().iter().map(|name| name.0).collect();
@@ -55,7 +57,9 @@ fn all_returns_every_instance_in_registration_order() {
 
 #[test]
 fn all_without_registration_returns_empty_list() {
-    let provider = Provider::builder().instance(Name("alt")).build();
+    let provider = Provider::builder()
+        .register(Registration::instance(Name("alt")))
+        .build();
 
     let configs = provider.all::<Config>();
 
@@ -65,7 +69,9 @@ fn all_without_registration_returns_empty_list() {
 #[test]
 fn transient_all_runs_recipe_on_every_call() {
     let (calls, recipe) = counting_recipe();
-    let provider = Provider::builder().transient(recipe).build();
+    let provider = Provider::builder()
+        .register(Registration::transient(recipe))
+        .build();
 
     drop(provider.all::<Config>());
     drop(provider.all::<Config>());
@@ -75,7 +81,9 @@ fn transient_all_runs_recipe_on_every_call() {
 
 #[test]
 fn singleton_all_returns_same_object_as_get() {
-    let provider = Provider::builder().singleton(|_| Config).build();
+    let provider = Provider::builder()
+        .register(Registration::singleton(|_| Config))
+        .build();
 
     let single = provider.get::<Config>().unwrap();
     let all = provider.all::<Config>();
@@ -85,7 +93,9 @@ fn singleton_all_returns_same_object_as_get() {
 
 #[test]
 fn scoped_all_returns_same_object_as_get_within_scope() {
-    let provider = Provider::builder().scoped(|_| Config).build();
+    let provider = Provider::builder()
+        .register(Registration::scoped(|_| Config))
+        .build();
     let first = provider.scope();
     let second = provider.scope();
 
@@ -100,7 +110,9 @@ fn scoped_all_returns_same_object_as_get_within_scope() {
 #[test]
 fn transient_runs_recipe_on_every_get() {
     let (calls, recipe) = counting_recipe();
-    let provider = Provider::builder().transient(recipe).build();
+    let provider = Provider::builder()
+        .register(Registration::transient(recipe))
+        .build();
 
     provider.get::<Config>().unwrap();
     provider.get::<Config>().unwrap();
@@ -111,7 +123,9 @@ fn transient_runs_recipe_on_every_get() {
 #[test]
 fn singleton_runs_recipe_once_on_first_get() {
     let (calls, recipe) = counting_recipe();
-    let provider = Provider::builder().singleton(recipe).build();
+    let provider = Provider::builder()
+        .register(Registration::singleton(recipe))
+        .build();
     assert_eq!(calls.get(), 0);
 
     provider.get::<Config>().unwrap();
@@ -123,7 +137,9 @@ fn singleton_runs_recipe_once_on_first_get() {
 #[test]
 fn scoped_runs_recipe_once_per_scope() {
     let (calls, recipe) = counting_recipe();
-    let provider = Provider::builder().scoped(recipe).build();
+    let provider = Provider::builder()
+        .register(Registration::scoped(recipe))
+        .build();
     let first = provider.scope();
     let second = provider.scope();
 
@@ -136,7 +152,9 @@ fn scoped_runs_recipe_once_per_scope() {
 
 #[test]
 fn singleton_returns_same_object_in_new_scope() {
-    let provider = Provider::builder().singleton(|_| Config).build();
+    let provider = Provider::builder()
+        .register(Registration::singleton(|_| Config))
+        .build();
 
     let first = provider.get::<Config>().unwrap();
     let second = provider.scope().get::<Config>().unwrap();
@@ -149,8 +167,10 @@ struct Greeting(String);
 #[test]
 fn recipe_gets_other_service_from_provider() {
     let provider = Provider::builder()
-        .instance(Name("Welt"))
-        .transient(|provider| Greeting(format!("Hallo {}", provider.get::<Name>().unwrap().0)))
+        .register(Registration::instance(Name("Welt")))
+        .register(Registration::transient(|provider| {
+            Greeting(format!("Hallo {}", provider.get::<Name>().unwrap().0))
+        }))
         .build();
 
     let greeting = provider.get::<Greeting>().unwrap();
@@ -170,13 +190,13 @@ struct AuditLog {
 fn singleton_built_from_scope_gets_scoped_service_of_provider() {
     let opened = Cell::new(0_u32);
     let provider = Provider::builder()
-        .scoped(move |_| {
+        .register(Registration::scoped(move |_| {
             opened.set(opened.get().saturating_add(1));
             Session(opened.get())
-        })
-        .singleton(|provider| AuditLog {
+        }))
+        .register(Registration::singleton(|provider| AuditLog {
             session: provider.get::<Session>().unwrap(),
-        })
+        }))
         .build();
 
     let log = provider.scope().get::<AuditLog>().unwrap();
@@ -188,8 +208,8 @@ fn singleton_built_from_scope_gets_scoped_service_of_provider() {
 #[test]
 fn two_scoped_registrations_of_same_type_build_one_object_each() {
     let scope = Provider::builder()
-        .scoped(|_| Name("haupt"))
-        .scoped(|_| Name("ersatz"))
+        .register(Registration::scoped(|_| Name("haupt")))
+        .register(Registration::scoped(|_| Name("ersatz")))
         .build()
         .scope();
 
@@ -201,7 +221,10 @@ fn two_scoped_registrations_of_same_type_build_one_object_each() {
 #[test]
 fn cloned_scope_returns_same_scoped_service() {
     let (calls, recipe) = counting_recipe();
-    let scope = Provider::builder().scoped(recipe).build().scope();
+    let scope = Provider::builder()
+        .register(Registration::scoped(recipe))
+        .build()
+        .scope();
     let clone = scope.clone();
 
     scope.get::<Config>().unwrap();
@@ -212,7 +235,9 @@ fn cloned_scope_returns_same_scoped_service() {
 
 #[test]
 fn upgraded_weak_provider_returns_same_singleton() {
-    let provider = Provider::builder().singleton(|_| Config).build();
+    let provider = Provider::builder()
+        .register(Registration::singleton(|_| Config))
+        .build();
     let weak = provider.downgrade();
 
     let upgraded = weak.upgrade().unwrap();
@@ -242,12 +267,12 @@ fn both_instances_of_same_type_are_released_with_provider() {
     let office = Rc::new(Cell::new(true));
     let lobby = Rc::new(Cell::new(true));
     let provider = Provider::builder()
-        .instance(Printer {
+        .register(Registration::instance(Printer {
             _alive: Alive(Rc::clone(&office)),
-        })
-        .instance(Printer {
+        }))
+        .register(Registration::instance(Printer {
             _alive: Alive(Rc::clone(&lobby)),
-        })
+        }))
         .build();
 
     drop(provider);
@@ -266,10 +291,10 @@ fn singleton_holding_weak_provider_is_released_with_provider() {
     let running = Rc::new(Cell::new(true));
     let flag = Rc::clone(&running);
     let provider = Provider::builder()
-        .singleton(move |provider| Scheduler {
+        .register(Registration::singleton(move |provider| Scheduler {
             _provider: provider.downgrade(),
             _alive: Alive(Rc::clone(&flag)),
-        })
+        }))
         .build();
     provider.get::<Scheduler>().unwrap();
 
@@ -290,7 +315,10 @@ fn upgrade_after_provider_dropped_returns_none() {
 
 #[test]
 fn upgraded_weak_scope_returns_same_scoped_service() {
-    let scope = Provider::builder().scoped(|_| Config).build().scope();
+    let scope = Provider::builder()
+        .register(Registration::scoped(|_| Config))
+        .build()
+        .scope();
     let weak = scope.downgrade();
 
     let upgraded = weak.upgrade().unwrap();
@@ -323,10 +351,10 @@ fn scoped_holding_weak_scope_is_released_with_scope() {
     let open = Rc::new(Cell::new(true));
     let flag = Rc::clone(&open);
     let provider = Provider::builder()
-        .scoped(move |scope| UnitOfWork {
+        .register(Registration::scoped(move |scope| UnitOfWork {
             _scope: scope.downgrade(),
             _alive: Alive(Rc::clone(&flag)),
-        })
+        }))
         .build();
     let scope = provider.scope();
     scope.get::<UnitOfWork>().unwrap();
@@ -348,14 +376,14 @@ fn scoped_service_and_its_singleton_with_weak_provider_are_released_with_provide
     let open = Rc::new(Cell::new(true));
     let (running_flag, open_flag) = (Rc::clone(&running), Rc::clone(&open));
     let provider = Provider::builder()
-        .singleton(move |provider| Scheduler {
+        .register(Registration::singleton(move |provider| Scheduler {
             _provider: provider.downgrade(),
             _alive: Alive(Rc::clone(&running_flag)),
-        })
-        .scoped(move |provider| Report {
+        }))
+        .register(Registration::scoped(move |provider| Report {
             _scheduler: provider.get::<Scheduler>().unwrap(),
             _alive: Alive(Rc::clone(&open_flag)),
-        })
+        }))
         .build();
     provider.get::<Report>().unwrap();
 
@@ -378,7 +406,9 @@ fn settings_recipe(provider: &Provider) -> Settings {
 
 #[test]
 fn recipe_asking_for_own_type_gets_none() {
-    let provider = Provider::builder().transient(settings_recipe).build();
+    let provider = Provider::builder()
+        .register(Registration::transient(settings_recipe))
+        .build();
 
     let settings = provider.get::<Settings>().unwrap();
 
@@ -388,8 +418,8 @@ fn recipe_asking_for_own_type_gets_none() {
 #[test]
 fn first_of_two_recipes_asking_for_own_type_through_all_gets_none() {
     let provider = Provider::builder()
-        .transient(settings_recipe)
-        .transient(|_| Settings { parent: None })
+        .register(Registration::transient(settings_recipe))
+        .register(Registration::transient(|_| Settings { parent: None }))
         .build();
 
     let settings = provider.all::<Settings>();
@@ -399,7 +429,9 @@ fn first_of_two_recipes_asking_for_own_type_through_all_gets_none() {
 
 #[test]
 fn singleton_recipe_asking_for_own_type_gets_none() {
-    let provider = Provider::builder().singleton(settings_recipe).build();
+    let provider = Provider::builder()
+        .register(Registration::singleton(settings_recipe))
+        .build();
 
     let settings = provider.get::<Settings>().unwrap();
 
@@ -408,7 +440,9 @@ fn singleton_recipe_asking_for_own_type_gets_none() {
 
 #[test]
 fn scoped_recipe_asking_for_own_type_gets_none() {
-    let provider = Provider::builder().scoped(settings_recipe).build();
+    let provider = Provider::builder()
+        .register(Registration::scoped(settings_recipe))
+        .build();
 
     let settings = provider.get::<Settings>().unwrap();
 
@@ -424,10 +458,10 @@ struct Folder {
 #[test]
 fn recipe_asking_twice_for_own_type_gets_none_both_times() {
     let provider = Provider::builder()
-        .transient(|provider| Folder {
+        .register(Registration::transient(|provider| Folder {
             parent: provider.get::<Folder>(),
             template: provider.get::<Folder>(),
-        })
+        }))
         .build();
 
     let folder = provider.get::<Folder>().unwrap();
@@ -443,9 +477,9 @@ struct MenuItem {
 #[test]
 fn recipe_asking_all_for_own_type_gets_empty_list() {
     let provider = Provider::builder()
-        .transient(|provider| MenuItem {
+        .register(Registration::transient(|provider| MenuItem {
             siblings: provider.all::<MenuItem>(),
-        })
+        }))
         .build();
 
     let items = provider.all::<MenuItem>();
@@ -456,9 +490,9 @@ fn recipe_asking_all_for_own_type_gets_empty_list() {
 #[test]
 fn recipe_asking_all_for_own_type_through_get_gets_empty_list() {
     let provider = Provider::builder()
-        .transient(|provider| MenuItem {
+        .register(Registration::transient(|provider| MenuItem {
             siblings: provider.all::<MenuItem>(),
-        })
+        }))
         .build();
 
     let item = provider.get::<MenuItem>().unwrap();
@@ -479,12 +513,12 @@ struct Student {
 #[test]
 fn mutually_dependent_recipes_get_empty_list_from_inner_all() {
     let provider = Provider::builder()
-        .transient(|provider| Course {
+        .register(Registration::transient(|provider| Course {
             students: provider.all::<Student>(),
-        })
-        .transient(|provider| Student {
+        }))
+        .register(Registration::transient(|provider| Student {
             courses: provider.all::<Course>(),
-        })
+        }))
         .build();
 
     let courses = provider.all::<Course>();
@@ -508,12 +542,12 @@ struct Employee {
 #[test]
 fn mutually_dependent_recipes_get_none_for_inner_query() {
     let provider = Provider::builder()
-        .transient(|provider| Team {
+        .register(Registration::transient(|provider| Team {
             lead: provider.get::<Employee>(),
-        })
-        .transient(|provider| Employee {
+        }))
+        .register(Registration::transient(|provider| Employee {
             team: provider.get::<Team>(),
-        })
+        }))
         .build();
 
     let team = provider.get::<Team>().unwrap();
@@ -527,7 +561,9 @@ struct Connection;
 #[test]
 fn recipe_runs_again_after_caught_panic() {
     let (server_up, recipe) = connection_recipe();
-    let provider = Provider::builder().transient(recipe).build();
+    let provider = Provider::builder()
+        .register(Registration::transient(recipe))
+        .build();
     let failed = panic::catch_unwind(AssertUnwindSafe(|| provider.get::<Connection>()));
     assert!(failed.is_err());
     server_up.set(true);
@@ -540,7 +576,9 @@ fn recipe_runs_again_after_caught_panic() {
 #[test]
 fn singleton_recipe_runs_again_after_caught_panic() {
     let (server_up, recipe) = connection_recipe();
-    let provider = Provider::builder().singleton(recipe).build();
+    let provider = Provider::builder()
+        .register(Registration::singleton(recipe))
+        .build();
     let failed = panic::catch_unwind(AssertUnwindSafe(|| provider.get::<Connection>()));
     assert!(failed.is_err());
     server_up.set(true);
@@ -553,7 +591,10 @@ fn singleton_recipe_runs_again_after_caught_panic() {
 #[test]
 fn scoped_recipe_runs_again_after_caught_panic() {
     let (server_up, recipe) = connection_recipe();
-    let scope = Provider::builder().scoped(recipe).build().scope();
+    let scope = Provider::builder()
+        .register(Registration::scoped(recipe))
+        .build()
+        .scope();
     let failed = panic::catch_unwind(AssertUnwindSafe(|| scope.get::<Connection>()));
     assert!(failed.is_err());
     server_up.set(true);
@@ -572,10 +613,10 @@ struct Repository {
 fn recipe_runs_again_after_caught_panic_in_dependency() {
     let (server_up, recipe) = connection_recipe();
     let provider = Provider::builder()
-        .transient(recipe)
-        .transient(|provider| Repository {
+        .register(Registration::transient(recipe))
+        .register(Registration::transient(|provider| Repository {
             connection: provider.get::<Connection>(),
-        })
+        }))
         .build();
     let failed = panic::catch_unwind(AssertUnwindSafe(|| provider.get::<Repository>()));
     assert!(failed.is_err());
@@ -626,17 +667,17 @@ impl From<Invoice> for Document {
 #[test]
 fn unique_instance_twice_from_same_source_type_all_returns_first() {
     let provider = Provider::builder()
-        .unique_instance(
-            Invoice {
+        .register(
+            Registration::instance(Document::from(Invoice {
                 heading: "Rechnung 1".to_owned(),
-            },
-            Document::from,
+            }))
+            .unique_by::<Invoice>(),
         )
-        .unique_instance(
-            Invoice {
+        .register(
+            Registration::instance(Document::from(Invoice {
                 heading: "Rechnung 2".to_owned(),
-            },
-            Document::from,
+            }))
+            .unique_by::<Invoice>(),
         )
         .build();
 
@@ -664,17 +705,17 @@ impl From<DeliveryNote> for Document {
 #[test]
 fn unique_instance_from_different_source_types_all_returns_both_in_order() {
     let provider = Provider::builder()
-        .unique_instance(
-            Invoice {
+        .register(
+            Registration::instance(Document::from(Invoice {
                 heading: "Rechnung 1".to_owned(),
-            },
-            Document::from,
+            }))
+            .unique_by::<Invoice>(),
         )
-        .unique_instance(
-            DeliveryNote {
+        .register(
+            Registration::instance(Document::from(DeliveryNote {
                 heading: "Lieferschein 1".to_owned(),
-            },
-            Document::from,
+            }))
+            .unique_by::<DeliveryNote>(),
         )
         .build();
 
@@ -690,17 +731,17 @@ fn unique_instance_from_different_source_types_all_returns_both_in_order() {
 #[test]
 fn unique_instance_twice_from_same_source_type_get_returns_first() {
     let provider = Provider::builder()
-        .unique_instance(
-            Invoice {
+        .register(
+            Registration::instance(Document::from(Invoice {
                 heading: "Rechnung 1".to_owned(),
-            },
-            Document::from,
+            }))
+            .unique_by::<Invoice>(),
         )
-        .unique_instance(
-            Invoice {
+        .register(
+            Registration::instance(Document::from(Invoice {
                 heading: "Rechnung 2".to_owned(),
-            },
-            Document::from,
+            }))
+            .unique_by::<Invoice>(),
         )
         .build();
 
@@ -724,17 +765,17 @@ impl From<Invoice> for LedgerEntry {
 #[test]
 fn unique_instance_from_same_source_type_for_two_service_types_registers_both() {
     let provider = Provider::builder()
-        .unique_instance(
-            Invoice {
+        .register(
+            Registration::instance(Document::from(Invoice {
                 heading: "Rechnung 1".to_owned(),
-            },
-            Document::from,
+            }))
+            .unique_by::<Invoice>(),
         )
-        .unique_instance(
-            Invoice {
+        .register(
+            Registration::instance(LedgerEntry::from(Invoice {
                 heading: "Rechnung 2".to_owned(),
-            },
-            LedgerEntry::from,
+            }))
+            .unique_by::<Invoice>(),
         )
         .build();
 
@@ -752,12 +793,12 @@ fn unique_instance_from_same_source_type_for_two_service_types_registers_both() 
 #[test]
 fn instance_then_unique_instance_of_same_type_all_returns_both_in_order() {
     let provider = Provider::builder()
-        .instance(Document("Aushang".to_owned()))
-        .unique_instance(
-            Invoice {
+        .register(Registration::instance(Document("Aushang".to_owned())))
+        .register(
+            Registration::instance(Document::from(Invoice {
                 heading: "Rechnung 1".to_owned(),
-            },
-            Document::from,
+            }))
+            .unique_by::<Invoice>(),
         )
         .build();
 
@@ -773,17 +814,17 @@ fn instance_then_unique_instance_of_same_type_all_returns_both_in_order() {
 #[test]
 fn unique_instance_from_same_source_type_for_two_service_types_all_returns_each_own() {
     let provider = Provider::builder()
-        .unique_instance(
-            Invoice {
+        .register(
+            Registration::instance(Document::from(Invoice {
                 heading: "Rechnung 1".to_owned(),
-            },
-            Document::from,
+            }))
+            .unique_by::<Invoice>(),
         )
-        .unique_instance(
-            Invoice {
+        .register(
+            Registration::instance(LedgerEntry::from(Invoice {
                 heading: "Rechnung 2".to_owned(),
-            },
-            LedgerEntry::from,
+            }))
+            .unique_by::<Invoice>(),
         )
         .build();
 
