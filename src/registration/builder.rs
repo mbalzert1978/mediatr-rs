@@ -11,15 +11,15 @@ use crate::wrappers::{
     BehaviorWrapper, wrap_behavior, wrap_notification_handler, wrap_request_handler,
 };
 use crate::{
-    Handler, Mediator, Notification, NotificationHandler, PipelineBehavior, Request,
-    RequestHandler, RequestPostProcessor, RequestPreProcessor, Sequential,
+    ForeachAwaitPublisher, Handler, Mediator, Notification, NotificationHandler, PipelineBehavior,
+    Request, RequestHandler, RequestPostProcessor, RequestPreProcessor,
 };
 
 /// Sammelt Behaviors und Handler und baut daraus einen [`Mediator`] mit der Publish-Strategie `S` und der Kette `P` der Behaviors.
 ///
 /// `F` sagt, ob schon ein Handler registriert ist; Behaviors nimmt der Builder nur davor,
 /// weil jeder Handler die Kette der Behaviors schon in seinem Typ trägt.
-pub struct MediatorBuilder<S = Sequential, P = (), F = NoHandlers> {
+pub struct MediatorBuilder<S = ForeachAwaitPublisher, P = (), F = NoHandlers> {
     provider: ProviderBuilder,
     behaviors: P,
     /// Wie viele Behaviors die Kette hat; der Platz des nächsten.

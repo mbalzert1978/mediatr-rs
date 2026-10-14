@@ -9,23 +9,23 @@ use crate::pipeline::{Behaviors, Slot};
 use crate::request::HandlerResult;
 use crate::wrappers::{NotificationHandlerWrapper, RequestHandlerWrapper};
 use crate::{
-    MediatorBuilder, Next, Notification, PublishStrategy, Publisher, Request, SendError, Sender,
-    Sequential,
+    ForeachAwaitPublisher, MediatorBuilder, Next, Notification, NotificationPublisher, Publisher,
+    Request, SendError, Sender,
 };
 
 /// Stellt Requests und Notifications den Handlern zu, die für ihren Typ registriert sind.
 ///
 /// Entsteht über [`Mediator::builder`]. Verschickt wird über [`Sender`] und [`Publisher`].
-/// `S` ist die [`PublishStrategy`], nach der `publish` die Handler laufen lässt.
+/// `S` ist die [`NotificationPublisher`], nach der `publish` die Handler laufen lässt.
 /// `P` ist die Kette der Behaviors, die Requests umschließen; siehe [`MediatorBuilder::behavior`].
-pub struct Mediator<S = Sequential, P = ()> {
+pub struct Mediator<S = ForeachAwaitPublisher, P = ()> {
     provider: Provider,
     types: PhantomData<(S, P)>,
 }
 
 /// Verweis auf einen [`Mediator`], der dessen Handler nicht am Leben hält; ein [`Handler::singleton`](crate::Handler::singleton) bekommt ihn als [`Sender`] und [`Publisher`].
 /// `S` und `P` sind Publish-Strategie und Behaviors dieses Mediators.
-pub struct WeakMediator<S = Sequential, P = ()> {
+pub struct WeakMediator<S = ForeachAwaitPublisher, P = ()> {
     pub(crate) provider: WeakProvider,
     pub(crate) types: PhantomData<(S, P)>,
 }
@@ -106,7 +106,7 @@ impl<S, P: Behaviors<R>, R: Request + 'static> Sender<R> for Mediator<S, P> {
     }
 }
 
-impl<S: PublishStrategy, P, N: Notification + 'static> Publisher<N> for Mediator<S, P> {
+impl<S: NotificationPublisher, P, N: Notification + 'static> Publisher<N> for Mediator<S, P> {
     async fn publish(&self, notification: N) -> Result<(), N::Error> {
         let handlers = self.provider.all::<NotificationHandlerWrapper<N>>();
         S::publish(
@@ -127,7 +127,7 @@ impl<S, P: Behaviors<R>, R: Request + 'static> Sender<R> for WeakMediator<S, P> 
     }
 }
 
-impl<S: PublishStrategy, P, N: Notification + 'static> Publisher<N> for WeakMediator<S, P> {
+impl<S: NotificationPublisher, P, N: Notification + 'static> Publisher<N> for WeakMediator<S, P> {
     async fn publish(&self, notification: N) -> Result<(), N::Error> {
         let mediator: Mediator<S, P> =
             Mediator::new(self.provider.upgrade().ok_or(SendError::MediatorDropped)?);

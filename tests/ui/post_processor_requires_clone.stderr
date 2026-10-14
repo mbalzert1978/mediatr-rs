@@ -13,7 +13,7 @@ help: the trait `mediatr_rs::Sender<R>` is implemented for `Mediator<S, P>`
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    = note: required for `mediatr_rs::pipeline::sealed::PostProcess<ReplyArchive>` to implement `PipelineBehavior<QuotePrice>`
    = note: required for `((), mediatr_rs::pipeline::sealed::Open<mediatr_rs::pipeline::sealed::PostProcess<ReplyArchive>>)` to implement `mediatr_rs::pipeline::sealed::Behaviors<QuotePrice>`
-   = note: required for `Mediator<Sequential, ((), mediatr_rs::pipeline::sealed::Open<mediatr_rs::pipeline::sealed::PostProcess<ReplyArchive>>)>` to implement `mediatr_rs::Sender<QuotePrice>`
+   = note: required for `Mediator<ForeachAwaitPublisher, ((), mediatr_rs::pipeline::sealed::Open<mediatr_rs::pipeline::sealed::PostProcess<ReplyArchive>>)>` to implement `mediatr_rs::Sender<QuotePrice>`
 help: consider annotating `QuotePrice` with `#[derive(Clone)]`
    |
  8 + #[derive(Clone)]

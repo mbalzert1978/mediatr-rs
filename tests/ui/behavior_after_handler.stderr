@@ -1,11 +1,11 @@
-error[E0599]: no method named `behavior` found for struct `MediatorBuilder<Sequential, (), WithHandlers>` in the current scope
+error[E0599]: no method named `behavior` found for struct `MediatorBuilder<ForeachAwaitPublisher, (), WithHandlers>` in the current scope
   --> tests/ui/behavior_after_handler.rs:36:10
    |
 34 |       let _mediator = Mediator::builder()
    |  _____________________-
 35 | |         .register(Handler::instance(StockLedger))
 36 | |         .behavior(AuditTrail)
-   | |         -^^^^^^^^ method not found in `MediatorBuilder<Sequential, (), WithHandlers>`
+   | |         -^^^^^^^^ method not found in `MediatorBuilder<ForeachAwaitPublisher, (), WithHandlers>`
    | |_________|
    |
    |

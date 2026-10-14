@@ -3,7 +3,7 @@ use std::future::Future;
 use std::rc::Rc;
 
 use mediatr_rs::{
-    Mediator, Notification, NotificationHandler, PublishStrategy, Publisher, Request,
+    Mediator, Notification, NotificationHandler, NotificationPublisher, Publisher, Request,
     RequestHandler, SendError, Sender, WeakMediator,
 };
 
@@ -47,7 +47,7 @@ impl NotificationHandler<ParcelArrived> for Recipient {
 /// Ruft die Handler nacheinander auf, den zuletzt registrierten zuerst.
 pub struct NewestFirst;
 
-impl PublishStrategy for NewestFirst {
+impl NotificationPublisher for NewestFirst {
     async fn publish<E, F>(calls: Vec<F>) -> Result<(), E>
     where
         F: Future<Output = Result<(), E>>,

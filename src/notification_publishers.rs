@@ -1,12 +1,12 @@
 //! Strategien, nach denen `publish` die Handler einer Notification laufen lässt.
 
-mod concurrent;
-mod sequential;
+mod foreach_await_publisher;
+mod when_all_publisher;
 
 use std::future::Future;
 
-pub use concurrent::Concurrent;
-pub use sequential::Sequential;
+pub use foreach_await_publisher::ForeachAwaitPublisher;
+pub use when_all_publisher::WhenAllPublisher;
 
 /// Wie [`Publisher::publish`](crate::Publisher::publish) die Handler einer Notification laufen lässt; ein [`Mediator`](crate::Mediator) bekommt sie als Typ-Parameter.
 ///
@@ -14,7 +14,7 @@ pub use sequential::Sequential;
 ///
 /// `publish` wartet jeden Aufruf aus `calls` ab; erst nachdem ein Aufruf einen Fehler geliefert hat, darf es die übrigen auslassen.
 /// Es liefert `Ok(())`, wenn jeder Aufruf `Ok(())` liefert, sonst den Fehler eines Aufrufs, und löst keine Panic aus.
-pub trait PublishStrategy {
+pub trait NotificationPublisher {
     /// Lässt `calls` laufen; `calls` enthält je einen Aufruf pro Handler, in der Reihenfolge ihrer Registrierung.
     ///
     /// # Errors

@@ -4,7 +4,7 @@ use std::future::{Future, poll_fn};
 use std::pin::Pin;
 use std::task::{Context, Poll, ready};
 
-use crate::PublishStrategy;
+use crate::NotificationPublisher;
 
 /// Startet alle Handler gleichzeitig auf demselben Thread: Wartet einer, läuft der nächste weiter.
 /// Jeder Handler läuft zu Ende, auch nach einem Fehler; danach liefert `publish` den Fehler des zuerst registrierten Handlers, der gescheitert ist.
@@ -14,9 +14,9 @@ use crate::PublishStrategy;
 /// Hält ein Handler eine `RefCell`-Leihe über ein `await`, kann ein anderer Handler dieselbe `RefCell` leihen wollen;
 /// das löst eine Panic aus. Clippy meldet solche Stellen mit `await_holding_refcell_ref`; diesen Lint nicht abschalten.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
-pub struct Concurrent;
+pub struct WhenAllPublisher;
 
-impl PublishStrategy for Concurrent {
+impl NotificationPublisher for WhenAllPublisher {
     async fn publish<E, F>(calls: Vec<F>) -> Result<(), E>
     where
         F: Future<Output = Result<(), E>>,
@@ -44,7 +44,7 @@ fn poll_all<F: Future>(calls: &mut [Call<F>], cx: &mut Context<'_>) -> Poll<()> 
     }
 }
 
-/// Ein Aufruf aus `calls` für [`Concurrent`], der noch läuft oder schon sein Ergebnis hat.
+/// Ein Aufruf aus `calls` für [`WhenAllPublisher`], der noch läuft oder schon sein Ergebnis hat.
 enum Call<F: Future> {
     // Box::pin, weil `F` nicht `Unpin` sein muss.
     Running(Pin<Box<F>>),

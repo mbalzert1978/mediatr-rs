@@ -4,7 +4,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::Duration;
 
-use mediatr_rs::{Concurrent, Handler, Mediator, MediatorBuilder, Publisher, Sender};
+use mediatr_rs::{Handler, Mediator, MediatorBuilder, Publisher, Sender, WhenAllPublisher};
 
 mod behaviors_fixtures;
 
@@ -356,7 +356,7 @@ async fn twelve_behaviors_wrap_handler_first_registered_outermost() {
 async fn behaviors_with_concurrent_strategy_wrap_send_and_publish_starts_handlers_together() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let (audit, stopwatch) = audit_and_stopwatch(&journal);
-    let mediator = MediatorBuilder::<Concurrent>::default()
+    let mediator = MediatorBuilder::<WhenAllPublisher>::default()
         .behavior(audit)
         .behavior(stopwatch)
         .register(Handler::instance(StockLedger {

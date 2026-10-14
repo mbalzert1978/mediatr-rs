@@ -1,11 +1,11 @@
-error[E0599]: no method named `post_processor` found for struct `MediatorBuilder<Sequential, (), WithHandlers>` in the current scope
+error[E0599]: no method named `post_processor` found for struct `MediatorBuilder<ForeachAwaitPublisher, (), WithHandlers>` in the current scope
   --> tests/ui/post_processor_after_handler.rs:37:10
    |
 35 |       let _mediator = Mediator::builder()
    |  _____________________-
 36 | |         .register(Handler::instance(ShippingTable))
 37 | |         .post_processor(OutboxStamp)
-   | |         -^^^^^^^^^^^^^^ method not found in `MediatorBuilder<Sequential, (), WithHandlers>`
+   | |         -^^^^^^^^^^^^^^ method not found in `MediatorBuilder<ForeachAwaitPublisher, (), WithHandlers>`
    | |_________|
    |
    |

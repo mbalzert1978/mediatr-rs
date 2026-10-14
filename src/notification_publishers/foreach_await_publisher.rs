@@ -2,13 +2,13 @@
 
 use std::future::Future;
 
-use crate::PublishStrategy;
+use crate::NotificationPublisher;
 
 /// Lässt die Handler nacheinander laufen, in der Reihenfolge ihrer Registrierung; der erste Fehler stoppt, die Handler danach laufen nicht mehr.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
-pub struct Sequential;
+pub struct ForeachAwaitPublisher;
 
-impl PublishStrategy for Sequential {
+impl NotificationPublisher for ForeachAwaitPublisher {
     async fn publish<E, F>(calls: Vec<F>) -> Result<(), E>
     where
         F: Future<Output = Result<(), E>>,

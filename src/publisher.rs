@@ -14,8 +14,8 @@ pub trait Publisher<N: Notification> {
     ///
     /// # Errors
     ///
-    /// Den Fehler eines Handlers, wie die [`PublishStrategy`](crate::PublishStrategy) des Mediators ihn liefert;
-    /// bei [`Sequential`](crate::Sequential) ist es der erste, und die Handler danach laufen nicht mehr.
+    /// Den Fehler eines Handlers, wie die [`NotificationPublisher`](crate::NotificationPublisher) des Mediators ihn liefert;
+    /// bei [`ForeachAwaitPublisher`](crate::ForeachAwaitPublisher) ist es der erste, und die Handler danach laufen nicht mehr.
     /// Oder einen [`SendError`](crate::SendError) als `N::Error`, wenn `publish` die Notification nicht zustellen kann.
     fn publish(&self, notification: N) -> impl Future<Output = Result<(), N::Error>>;
 }
