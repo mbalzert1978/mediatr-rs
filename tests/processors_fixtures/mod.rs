@@ -1,7 +1,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use mediatr_rs::{Request, RequestHandler, RequestPostProcessor, RequestPreProcessor, SendError};
+use mediatr_rs::{
+    Next, PipelineBehavior, Request, RequestHandler, RequestPostProcessor, RequestPreProcessor,
+    SendError,
+};
 
 /// Fragt den Preis des Artikels mit dieser Nummer in Cent ab.
 #[derive(Clone)]
@@ -95,4 +98,143 @@ pub fn checked_and_exported(count: usize, handled: &str) -> Vec<String> {
     let checks = (1..=count).map(|n| format!("Prüfung {n}"));
     let exports = (1..=count).map(|n| format!("Export {n}"));
     checks.chain([handled.to_owned()]).chain(exports).collect()
+}
+
+/// Fragt die Versandkosten des Artikels mit dieser Nummer in Cent ab.
+#[derive(Clone)]
+pub struct QuoteShipping {
+    pub sku: u32,
+}
+
+impl Request for QuoteShipping {
+    type Response = u32;
+    type Error = SendError;
+}
+
+/// Berechnet Versandkosten und schreibt jede Berechnung ins Protokoll.
+pub struct ShippingTable {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl RequestHandler<QuoteShipping> for ShippingTable {
+    async fn handle(&self, request: QuoteShipping) -> Result<u32, SendError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Versand berechnet für {}", request.sku));
+        Ok(490)
+    }
+}
+
+/// Stempelt jede eingehende Anfrage im Protokoll.
+pub struct InboxStamp {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+/// Eingangsstempel, der in `journal` schreibt.
+pub fn inbox_stamp(journal: &Rc<RefCell<Vec<String>>>) -> InboxStamp {
+    InboxStamp {
+        journal: Rc::clone(journal),
+    }
+}
+
+impl<R: Request> RequestPreProcessor<R> for InboxStamp {
+    async fn process(&self, _request: &R) {
+        self.journal
+            .borrow_mut()
+            .push("Eingang gestempelt".to_owned());
+    }
+}
+
+/// Stempelt jede beantwortete Anfrage im Protokoll.
+pub struct OutboxStamp {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+/// Ausgangsstempel, der in `journal` schreibt.
+pub fn outbox_stamp(journal: &Rc<RefCell<Vec<String>>>) -> OutboxStamp {
+    OutboxStamp {
+        journal: Rc::clone(journal),
+    }
+}
+
+impl<R: Request> RequestPostProcessor<R> for OutboxStamp {
+    async fn process(&self, _request: &R, _response: &R::Response) {
+        self.journal
+            .borrow_mut()
+            .push("Ausgang gestempelt".to_owned());
+    }
+}
+
+/// Misst jede Anfrage und schreibt Start und Ende ins Protokoll.
+pub struct Timer {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+/// Zeitmessung, die in `journal` schreibt.
+pub fn timer(journal: &Rc<RefCell<Vec<String>>>) -> Timer {
+    Timer {
+        journal: Rc::clone(journal),
+    }
+}
+
+impl<R: Request> PipelineBehavior<R> for Timer {
+    async fn handle(&self, request: R, next: Next<R>) -> Result<R::Response, R::Error> {
+        self.journal.borrow_mut().push("Zeit startet".to_owned());
+        let response = next.run(request).await;
+        self.journal.borrow_mut().push("Zeit stoppt".to_owned());
+        response
+    }
+}
+
+/// Sperrt den Preis, solange er berechnet wird.
+pub struct PriceLock {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+/// Preissperre, die in `journal` schreibt.
+pub fn price_lock(journal: &Rc<RefCell<Vec<String>>>) -> PriceLock {
+    PriceLock {
+        journal: Rc::clone(journal),
+    }
+}
+
+impl PipelineBehavior<QuotePrice> for PriceLock {
+    async fn handle(&self, request: QuotePrice, next: Next<QuotePrice>) -> Result<u32, SendError> {
+        self.journal.borrow_mut().push("Preis gesperrt".to_owned());
+        let price = next.run(request).await;
+        self.journal
+            .borrow_mut()
+            .push("Preis freigegeben".to_owned());
+        price
+    }
+}
+
+/// Was ein Preis für Artikel 7 durch alle Stufen ins Protokoll schreibt.
+pub fn price_through_all_stages() -> Vec<String> {
+    [
+        "Prüfung 1",
+        "Eingang gestempelt",
+        "Zeit startet",
+        "Preis gesperrt",
+        "Preis berechnet für 7",
+        "Preis freigegeben",
+        "Zeit stoppt",
+        "Ausgang gestempelt",
+        "Export 1",
+    ]
+    .map(str::to_owned)
+    .to_vec()
+}
+
+/// Was Versandkosten für Artikel 7 nur durch die allgemeinen Stufen ins Protokoll schreiben.
+pub fn shipping_through_general_stages() -> Vec<String> {
+    [
+        "Eingang gestempelt",
+        "Zeit startet",
+        "Versand berechnet für 7",
+        "Zeit stoppt",
+        "Ausgang gestempelt",
+    ]
+    .map(str::to_owned)
+    .to_vec()
 }

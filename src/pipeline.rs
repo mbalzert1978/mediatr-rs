@@ -70,10 +70,12 @@ mod sealed {
     /// Wo ein Behavior in der Pipeline liegt.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub enum Stage {
-        /// Um den Handler, das zuerst registrierte außen.
-        Around,
-        /// Direkt um den Handler, innerhalb aller anderen; läuft nach ihm in Registrierungsreihenfolge.
+        /// Außerhalb aller anderen; läuft vor ihnen in Registrierungsreihenfolge.
+        Before,
+        /// Innerhalb von `Before`, außerhalb von `Around`; läuft nach dem Rest in Registrierungsreihenfolge.
         After,
+        /// Direkt um den Handler, das zuerst registrierte außen.
+        Around,
     }
 
     /// Der Platz eines Behaviors in der Kette; `send` lässt nur die Plätze laufen, die der Provider des Mediators behalten hat.
@@ -204,18 +206,21 @@ impl<R: Request> Next<R> {
     /// Pipeline aus `behaviors`, in der Reihenfolge ihrer Registrierung, und `handler`; jedes liegt, wo seine [`Stage`] sagt.
     pub(crate) fn new(
         handler: Rc<ErasedHandler<R>>,
-        behaviors: Vec<(Stage, Rc<ErasedBehavior<R>>)>,
+        behaviors: &[(Stage, Rc<ErasedBehavior<R>>)],
     ) -> Self {
-        let (after, around): (Vec<_>, Vec<_>) = behaviors
-            .into_iter()
-            .partition(|(stage, _)| *stage == Stage::After);
+        let at = |wanted: Stage| {
+            behaviors
+                .iter()
+                .filter(move |(stage, _)| *stage == wanted)
+                .map(|(_, behavior)| Rc::clone(behavior))
+        };
         Self {
-            handler,
-            behaviors: after
-                .into_iter()
-                .chain(around.into_iter().rev())
-                .map(|(_, behavior)| behavior)
+            behaviors: at(Stage::Around)
+                .rev()
+                .chain(at(Stage::After))
+                .chain(at(Stage::Before).rev())
                 .collect(),
+            handler,
         }
     }
 

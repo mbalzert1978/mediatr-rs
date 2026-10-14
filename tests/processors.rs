@@ -8,8 +8,9 @@ use mediatr_rs::{Handler, Mediator, Sender};
 mod processors_fixtures;
 
 use processors_fixtures::{
-    InquiryLog, PriceList, QuoteArchive, QuotePrice, checked_and_exported, price_check,
-    price_export,
+    InquiryLog, PriceList, QuoteArchive, QuotePrice, QuoteShipping, ShippingTable,
+    checked_and_exported, inbox_stamp, outbox_stamp, price_check, price_export, price_lock,
+    price_through_all_stages, shipping_through_general_stages, timer,
 };
 
 #[tokio::test]
@@ -87,5 +88,36 @@ async fn pre_and_post_processors_for_one_and_all_request_types_run_in_registrati
     assert_eq!(
         (price, journal.borrow().clone()),
         (Ok(1999), checked_and_exported(4, "Preis berechnet für 7"))
+    );
+}
+
+#[tokio::test]
+async fn processors_run_outside_behaviors_and_other_request_only_through_general_ones() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .behavior(timer(&journal))
+        .post_processor(outbox_stamp(&journal))
+        .pre_processor_for::<QuotePrice>(price_check::<1>(&journal))
+        .behavior_for::<QuotePrice>(price_lock(&journal))
+        .pre_processor(inbox_stamp(&journal))
+        .post_processor_for::<QuotePrice>(price_export::<1>(&journal))
+        .register(Handler::instance(PriceList {
+            journal: Rc::clone(&journal),
+        }))
+        .register(Handler::instance(ShippingTable {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let _price = mediator.send(QuotePrice { sku: 7 }).await;
+    let price_journal = journal.take();
+    let _shipping = mediator.send(QuoteShipping { sku: 7 }).await;
+
+    assert_eq!(
+        (price_journal, journal.take()),
+        (
+            price_through_all_stages(),
+            shipping_through_general_stages()
+        )
     );
 }

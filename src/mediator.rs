@@ -190,7 +190,7 @@ impl<S, P: Behaviors<R>, R: Request + 'static> Sender<R> for Mediator<S, P> {
             .provider
             .get::<P>()
             .map_or_else(Vec::new, |behaviors| behaviors.erase(&active));
-        Next::new(handler, behaviors).run(request).await
+        Next::new(handler, &behaviors).run(request).await
     }
 }
 
@@ -310,7 +310,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
         self.closed::<R>(behavior, Stage::Around)
     }
 
-    /// Registriert `pre_processor` für alle Request-Typen; er läuft vor dem Handler.
+    /// Registriert `pre_processor` für alle Request-Typen; er läuft vor allen Behaviors.
     ///
     /// [`Sender::send`] verlangt, dass `pre_processor` [`RequestPreProcessor`](crate::RequestPreProcessor) für den Request-Typ ist.
     #[must_use]
@@ -318,10 +318,10 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
         self,
         pre_processor: B,
     ) -> MediatorBuilder<S, (P, Open<PreProcess<B>>)> {
-        self.behavior(PreProcess(pre_processor))
+        self.open(PreProcess(pre_processor), Stage::Before)
     }
 
-    /// Registriert `post_processor` für alle Request-Typen; er läuft nach dem Handler.
+    /// Registriert `post_processor` für alle Request-Typen; er läuft nach allen Behaviors.
     ///
     /// [`Sender::send`] verlangt, dass `post_processor` [`RequestPostProcessor`](crate::RequestPostProcessor) für den Request-Typ ist
     /// und der Request [`Clone`] ist, denn der Handler verbraucht ihn.
@@ -333,16 +333,16 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
         self.open(PostProcess(post_processor), Stage::After)
     }
 
-    /// Registriert `pre_processor` nur für Requests vom Typ `R`; er läuft vor dem Handler.
+    /// Registriert `pre_processor` nur für Requests vom Typ `R`; er läuft vor allen Behaviors.
     #[must_use]
     pub fn pre_processor_for<R: Request + 'static>(
         self,
         pre_processor: impl RequestPreProcessor<R> + 'static,
     ) -> MediatorBuilder<S, (P, Closed)> {
-        self.behavior_for::<R>(PreProcess(pre_processor))
+        self.closed::<R>(PreProcess(pre_processor), Stage::Before)
     }
 
-    /// Registriert `post_processor` nur für Requests vom Typ `R`; er läuft nach dem Handler.
+    /// Registriert `post_processor` nur für Requests vom Typ `R`; er läuft nach allen Behaviors.
     #[must_use]
     pub fn post_processor_for<R: Request + Clone + 'static>(
         self,
