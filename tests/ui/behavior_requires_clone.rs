@@ -37,7 +37,7 @@ impl<R: Request + Clone> PipelineBehavior<R> for RetryWithCopy {
 
 fn main() {
     let mediator = Mediator::builder()
-        .behavior(RetryWithCopy)
+        .open_behavior(RetryWithCopy)
         .register(Handler::instance(StockLedger))
         .build();
     let _stock = mediator.send(LookupStock { sku: 4 });

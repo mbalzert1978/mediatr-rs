@@ -19,7 +19,7 @@ use behaviors_fixtures::{
 async fn behavior_retries_cloned_next_after_handler_error_and_returns_second_response() {
     let calls = Rc::new(Cell::new(0));
     let mediator = Mediator::builder()
-        .behavior(RetryOnce)
+        .open_behavior(RetryOnce)
         .register(Handler::instance(SlowStockLedger {
             calls: Rc::clone(&calls),
         }))
@@ -35,8 +35,8 @@ async fn two_behaviors_wrap_handler_first_registered_outermost() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let (audit, stopwatch) = audit_and_stopwatch(&journal);
     let mediator = Mediator::builder()
-        .behavior(audit)
-        .behavior(stopwatch)
+        .open_behavior(audit)
+        .open_behavior(stopwatch)
         .register(Handler::instance(StockLedger {
             journal: Rc::clone(&journal),
         }))
@@ -55,8 +55,8 @@ async fn two_behaviors_wrap_unit_response_handler_first_registered_outermost() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let (audit, stopwatch) = audit_and_stopwatch(&journal);
     let mediator = Mediator::builder()
-        .behavior(audit)
-        .behavior(stopwatch)
+        .open_behavior(audit)
+        .open_behavior(stopwatch)
         .register(Handler::instance(ReceiptBook {
             journal: Rc::clone(&journal),
         }))
@@ -75,8 +75,8 @@ async fn two_behaviors_wrap_handlers_of_every_request_type_first_registered_oute
     let journal = Rc::new(RefCell::new(Vec::new()));
     let (audit, stopwatch) = audit_and_stopwatch(&journal);
     let mediator = Mediator::builder()
-        .behavior(audit)
-        .behavior(stopwatch)
+        .open_behavior(audit)
+        .open_behavior(stopwatch)
         .register(Handler::instance(StockLedger {
             journal: Rc::clone(&journal),
         }))
@@ -108,11 +108,11 @@ async fn behavior_for_one_request_type_between_two_for_all_wraps_only_its_reques
     let journal = Rc::new(RefCell::new(Vec::new()));
     let (audit, stopwatch) = audit_and_stopwatch(&journal);
     let mediator = Mediator::builder()
-        .behavior(audit)
-        .behavior_for::<LookupStock>(ShelfLock {
+        .open_behavior(audit)
+        .behavior::<LookupStock>(ShelfLock {
             journal: Rc::clone(&journal),
         })
-        .behavior(stopwatch)
+        .open_behavior(stopwatch)
         .register(Handler::instance(StockLedger {
             journal: Rc::clone(&journal),
         }))
@@ -145,12 +145,12 @@ async fn two_behaviors_registered_three_times_alternately_run_once_in_first_regi
     let (second_audit, second_stopwatch) = audit_and_stopwatch(&journal);
     let (third_audit, third_stopwatch) = audit_and_stopwatch(&journal);
     let mediator = Mediator::builder()
-        .behavior(audit)
-        .behavior(stopwatch)
-        .behavior(second_audit)
-        .behavior(second_stopwatch)
-        .behavior(third_audit)
-        .behavior(third_stopwatch)
+        .open_behavior(audit)
+        .open_behavior(stopwatch)
+        .open_behavior(second_audit)
+        .open_behavior(second_stopwatch)
+        .open_behavior(third_audit)
+        .open_behavior(third_stopwatch)
         .register(Handler::instance(StockLedger {
             journal: Rc::clone(&journal),
         }))
@@ -168,10 +168,10 @@ async fn two_behaviors_registered_three_times_alternately_run_once_in_first_regi
 async fn same_behavior_registered_twice_for_one_request_type_runs_once() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .behavior_for::<LookupStock>(ShelfLock {
+        .behavior::<LookupStock>(ShelfLock {
             journal: Rc::clone(&journal),
         })
-        .behavior_for::<LookupStock>(ShelfLock {
+        .behavior::<LookupStock>(ShelfLock {
             journal: Rc::clone(&journal),
         })
         .register(Handler::instance(StockLedger {
@@ -196,10 +196,10 @@ async fn same_behavior_registered_twice_for_one_request_type_runs_once() {
 async fn same_behavior_registered_for_all_and_for_one_request_type_runs_twice_for_that_type() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .behavior(AuditTrail {
+        .open_behavior(AuditTrail {
             journal: Rc::clone(&journal),
         })
-        .behavior_for::<LookupStock>(AuditTrail {
+        .behavior::<LookupStock>(AuditTrail {
             journal: Rc::clone(&journal),
         })
         .register(Handler::instance(StockLedger {
@@ -230,10 +230,10 @@ async fn same_behavior_registered_for_all_and_for_one_request_type_runs_twice_fo
 async fn same_behavior_registered_for_one_request_type_then_for_all_runs_twice_for_that_type() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .behavior_for::<LookupStock>(AuditTrail {
+        .behavior::<LookupStock>(AuditTrail {
             journal: Rc::clone(&journal),
         })
-        .behavior(AuditTrail {
+        .open_behavior(AuditTrail {
             journal: Rc::clone(&journal),
         })
         .register(Handler::instance(StockLedger {
@@ -264,10 +264,10 @@ async fn same_behavior_registered_for_one_request_type_then_for_all_runs_twice_f
 async fn same_behavior_registered_for_all_and_for_one_request_type_runs_once_for_another_type() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .behavior(AuditTrail {
+        .open_behavior(AuditTrail {
             journal: Rc::clone(&journal),
         })
-        .behavior_for::<LookupStock>(AuditTrail {
+        .behavior::<LookupStock>(AuditTrail {
             journal: Rc::clone(&journal),
         })
         .register(Handler::instance(ReceiptBook {
@@ -293,10 +293,10 @@ async fn unit_response_behavior_for_one_request_type_then_one_for_all_wrap_handl
  {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .behavior_for::<BookReceipt>(LoadingDock {
+        .behavior::<BookReceipt>(LoadingDock {
             journal: Rc::clone(&journal),
         })
-        .behavior(AuditTrail {
+        .open_behavior(AuditTrail {
             journal: Rc::clone(&journal),
         })
         .register(Handler::instance(ReceiptBook {
@@ -327,18 +327,18 @@ async fn unit_response_behavior_for_one_request_type_then_one_for_all_wrap_handl
 async fn twelve_behaviors_wrap_handler_first_registered_outermost() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .behavior(checkpoint::<0>(&journal))
-        .behavior(checkpoint::<1>(&journal))
-        .behavior(checkpoint::<2>(&journal))
-        .behavior(checkpoint::<3>(&journal))
-        .behavior(checkpoint::<4>(&journal))
-        .behavior(checkpoint::<5>(&journal))
-        .behavior(checkpoint::<6>(&journal))
-        .behavior(checkpoint::<7>(&journal))
-        .behavior(checkpoint::<8>(&journal))
-        .behavior(checkpoint::<9>(&journal))
-        .behavior(checkpoint::<10>(&journal))
-        .behavior(checkpoint::<11>(&journal))
+        .open_behavior(checkpoint::<0>(&journal))
+        .open_behavior(checkpoint::<1>(&journal))
+        .open_behavior(checkpoint::<2>(&journal))
+        .open_behavior(checkpoint::<3>(&journal))
+        .open_behavior(checkpoint::<4>(&journal))
+        .open_behavior(checkpoint::<5>(&journal))
+        .open_behavior(checkpoint::<6>(&journal))
+        .open_behavior(checkpoint::<7>(&journal))
+        .open_behavior(checkpoint::<8>(&journal))
+        .open_behavior(checkpoint::<9>(&journal))
+        .open_behavior(checkpoint::<10>(&journal))
+        .open_behavior(checkpoint::<11>(&journal))
         .register(Handler::instance(StockLedger {
             journal: Rc::clone(&journal),
         }))
@@ -357,8 +357,8 @@ async fn behaviors_with_concurrent_strategy_wrap_send_and_publish_starts_handler
     let journal = Rc::new(RefCell::new(Vec::new()));
     let (audit, stopwatch) = audit_and_stopwatch(&journal);
     let mediator = MediatorBuilder::<WhenAllPublisher>::default()
-        .behavior(audit)
-        .behavior(stopwatch)
+        .open_behavior(audit)
+        .open_behavior(stopwatch)
         .register(Handler::instance(StockLedger {
             journal: Rc::clone(&journal),
         }))
@@ -394,7 +394,7 @@ async fn transient_handler_wrapped_by_behavior_is_built_once_per_send_and_wrappe
     let ledger_journal = Rc::clone(&journal);
     let ledger_builds = Rc::clone(&builds);
     let mediator = Mediator::builder()
-        .behavior(AuditTrail {
+        .open_behavior(AuditTrail {
             journal: Rc::clone(&journal),
         })
         .register(Handler::transient(move |_sender| {
@@ -423,7 +423,7 @@ async fn transient_handler_wrapped_by_behavior_is_built_once_per_send_and_wrappe
 async fn behavior_answering_without_next_returns_its_response_and_handler_does_not_run() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .behavior_for::<LookupStock>(StockCache { cached: 7 })
+        .behavior::<LookupStock>(StockCache { cached: 7 })
         .register(Handler::instance(StockLedger {
             journal: Rc::clone(&journal),
         }))
@@ -438,7 +438,7 @@ async fn behavior_answering_without_next_returns_its_response_and_handler_does_n
 async fn behavior_deadline_shorter_than_handler_returns_err_and_handler_does_not_finish() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .behavior_for::<LookupStock>(Deadline {
+        .behavior::<LookupStock>(Deadline {
             limit: Duration::from_secs(5),
         })
         .register(Handler::instance(RemoteWarehouse {
@@ -462,7 +462,7 @@ async fn behavior_deadline_shorter_than_unit_response_handler_returns_err_and_ha
  {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .behavior_for::<BookReceipt>(Deadline {
+        .behavior::<BookReceipt>(Deadline {
             limit: Duration::from_secs(5),
         })
         .register(Handler::instance(RemoteReceiving {

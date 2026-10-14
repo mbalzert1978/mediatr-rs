@@ -34,7 +34,7 @@ impl<R: Request> RequestPostProcessor<R> for ReplyArchive {
 
 fn main() {
     let mediator = Mediator::builder()
-        .post_processor(ReplyArchive)
+        .open_request_post_processor(ReplyArchive)
         .register(Handler::instance(PriceList))
         .build();
     let _price = mediator.send(QuotePrice { sku: 7 });

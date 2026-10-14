@@ -34,6 +34,6 @@ impl<R: Request> RequestPostProcessor<R> for OutboxStamp {
 fn main() {
     let _mediator = Mediator::builder()
         .register(Handler::instance(ShippingTable))
-        .post_processor(OutboxStamp)
+        .open_request_post_processor(OutboxStamp)
         .build();
 }

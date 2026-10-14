@@ -33,6 +33,6 @@ impl<R: Request> PipelineBehavior<R> for AuditTrail {
 fn main() {
     let _mediator = Mediator::builder()
         .register(Handler::instance(StockLedger))
-        .behavior(AuditTrail)
+        .open_behavior(AuditTrail)
         .build();
 }

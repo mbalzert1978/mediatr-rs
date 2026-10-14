@@ -18,7 +18,7 @@ use processors_fixtures::{
 async fn pre_processor_runs_before_handler_with_request_and_send_returns_handler_response() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .pre_processor(InquiryLog {
+        .open_request_pre_processor(InquiryLog {
             journal: Rc::clone(&journal),
         })
         .register(Handler::instance(PriceList {
@@ -45,7 +45,7 @@ async fn post_processor_runs_after_handler_with_request_and_response_and_send_re
  {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .post_processor(QuoteArchive {
+        .open_request_post_processor(QuoteArchive {
             journal: Rc::clone(&journal),
         })
         .register(Handler::instance(PriceList {
@@ -71,14 +71,14 @@ async fn post_processor_runs_after_handler_with_request_and_response_and_send_re
 async fn pre_and_post_processors_for_one_and_all_request_types_run_in_registration_order() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .pre_processor(price_check::<1>(&journal))
-        .pre_processor_for::<QuotePrice>(price_check::<2>(&journal))
-        .pre_processor(price_check::<3>(&journal))
-        .pre_processor_for::<QuotePrice>(price_check::<4>(&journal))
-        .post_processor_for::<QuotePrice>(price_export::<1>(&journal))
-        .post_processor(price_export::<2>(&journal))
-        .post_processor_for::<QuotePrice>(price_export::<3>(&journal))
-        .post_processor(price_export::<4>(&journal))
+        .open_request_pre_processor(price_check::<1>(&journal))
+        .request_pre_processor::<QuotePrice>(price_check::<2>(&journal))
+        .open_request_pre_processor(price_check::<3>(&journal))
+        .request_pre_processor::<QuotePrice>(price_check::<4>(&journal))
+        .request_post_processor::<QuotePrice>(price_export::<1>(&journal))
+        .open_request_post_processor(price_export::<2>(&journal))
+        .request_post_processor::<QuotePrice>(price_export::<3>(&journal))
+        .open_request_post_processor(price_export::<4>(&journal))
         .register(Handler::instance(PriceList {
             journal: Rc::clone(&journal),
         }))
@@ -96,12 +96,12 @@ async fn pre_and_post_processors_for_one_and_all_request_types_run_in_registrati
 async fn processors_run_outside_behaviors_and_other_request_only_through_general_ones() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .behavior(timer(&journal))
-        .post_processor(outbox_stamp(&journal))
-        .pre_processor_for::<QuotePrice>(price_check::<1>(&journal))
-        .behavior_for::<QuotePrice>(price_lock(&journal))
-        .pre_processor(inbox_stamp(&journal))
-        .post_processor_for::<QuotePrice>(price_export::<1>(&journal))
+        .open_behavior(timer(&journal))
+        .open_request_post_processor(outbox_stamp(&journal))
+        .request_pre_processor::<QuotePrice>(price_check::<1>(&journal))
+        .behavior::<QuotePrice>(price_lock(&journal))
+        .open_request_pre_processor(inbox_stamp(&journal))
+        .request_post_processor::<QuotePrice>(price_export::<1>(&journal))
         .register(Handler::instance(PriceList {
             journal: Rc::clone(&journal),
         }))
@@ -127,7 +127,7 @@ async fn processors_run_outside_behaviors_and_other_request_only_through_general
 async fn failing_handler_skips_post_processor_and_send_returns_handler_error() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .post_processor(QuoteArchive {
+        .open_request_post_processor(QuoteArchive {
             journal: Rc::clone(&journal),
         })
         .register(Handler::instance(RetiredItems {
@@ -150,10 +150,10 @@ async fn failing_handler_skips_post_processor_and_send_returns_handler_error() {
 async fn same_pre_processor_type_registered_twice_runs_once_per_send() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .pre_processor(InquiryLog {
+        .open_request_pre_processor(InquiryLog {
             journal: Rc::clone(&journal),
         })
-        .pre_processor(InquiryLog {
+        .open_request_pre_processor(InquiryLog {
             journal: Rc::clone(&journal),
         })
         .register(Handler::instance(PriceList {
@@ -176,7 +176,7 @@ async fn same_pre_processor_type_registered_twice_runs_once_per_send() {
 async fn failing_pre_processor_skips_handler_and_send_returns_its_error() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .pre_processor(RetiredFilter {
+        .open_request_pre_processor(RetiredFilter {
             retired: 7,
             journal: Rc::clone(&journal),
         })
@@ -200,7 +200,7 @@ async fn failing_pre_processor_skips_handler_and_send_returns_its_error() {
 async fn failing_post_processor_replaces_handler_response_with_its_error() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
-        .post_processor(PriceCeiling {
+        .open_request_post_processor(PriceCeiling {
             max: 1000,
             journal: Rc::clone(&journal),
         })

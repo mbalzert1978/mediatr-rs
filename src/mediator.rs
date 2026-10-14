@@ -17,7 +17,7 @@ use crate::{
 ///
 /// Entsteht über [`Mediator::builder`]. Verschickt wird über [`Sender`] und [`Publisher`].
 /// `S` ist die [`NotificationPublisher`], nach der `publish` die Handler laufen lässt.
-/// `P` ist die Kette der Behaviors, die Requests umschließen; siehe [`MediatorBuilder::behavior`].
+/// `P` ist die Kette der Behaviors, die Requests umschließen; siehe [`MediatorBuilder::open_behavior`].
 pub struct Mediator<S = ForeachAwaitPublisher, P = ()> {
     provider: Provider,
     types: PhantomData<(S, P)>,

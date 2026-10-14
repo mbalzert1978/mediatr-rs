@@ -36,6 +36,6 @@ impl<R: Request> PipelineBehavior<R> for AuditTrail {
 fn main() {
     let _mediator = Mediator::builder()
         .subscribe(Handler::instance(ShelfLabeling))
-        .behavior(AuditTrail)
+        .open_behavior(AuditTrail)
         .build();
 }

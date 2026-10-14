@@ -78,13 +78,16 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     /// [`Sender::send`](crate::Sender::send) verlangt, dass `behavior` [`PipelineBehavior`] für den Request-Typ ist.
     /// Ist ein Behavior vom Typ `B` schon registriert, läuft nur das erste, an seinem Platz.
     #[must_use]
-    pub fn behavior<B: 'static>(self, behavior: B) -> MediatorBuilder<S, (P, OpenBehavior<B>)> {
+    pub fn open_behavior<B: 'static>(
+        self,
+        behavior: B,
+    ) -> MediatorBuilder<S, (P, OpenBehavior<B>)> {
         self.open(behavior, Stage::Around)
     }
 
     /// Registriert `behavior` nur für Requests vom Typ `R`; es liegt innerhalb der zuvor registrierten Behaviors.
     #[must_use]
-    pub fn behavior_for<R: Request + 'static>(
+    pub fn behavior<R: Request + 'static>(
         self,
         behavior: impl PipelineBehavior<R> + 'static,
     ) -> MediatorBuilder<S, (P, Closed)> {
@@ -95,7 +98,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     ///
     /// [`Sender::send`](crate::Sender::send) verlangt, dass `pre_processor` [`RequestPreProcessor`](crate::RequestPreProcessor) für den Request-Typ ist.
     #[must_use]
-    pub fn pre_processor<B: 'static>(
+    pub fn open_request_pre_processor<B: 'static>(
         self,
         pre_processor: B,
     ) -> MediatorBuilder<S, (P, OpenBehavior<RequestPreProcessorBehavior<B>>)> {
@@ -107,7 +110,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     /// [`Sender::send`](crate::Sender::send) verlangt, dass `post_processor` [`RequestPostProcessor`](crate::RequestPostProcessor) für den Request-Typ ist
     /// und der Request [`Clone`] ist, denn der Handler verbraucht ihn.
     #[must_use]
-    pub fn post_processor<B: 'static>(
+    pub fn open_request_post_processor<B: 'static>(
         self,
         post_processor: B,
     ) -> MediatorBuilder<S, (P, OpenBehavior<RequestPostProcessorBehavior<B>>)> {
@@ -116,7 +119,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
 
     /// Registriert `pre_processor` nur für Requests vom Typ `R`; er läuft vor allen Behaviors.
     #[must_use]
-    pub fn pre_processor_for<R: Request + 'static>(
+    pub fn request_pre_processor<R: Request + 'static>(
         self,
         pre_processor: impl RequestPreProcessor<R> + 'static,
     ) -> MediatorBuilder<S, (P, Closed)> {
@@ -125,7 +128,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
 
     /// Registriert `post_processor` nur für Requests vom Typ `R`; er läuft nach allen Behaviors.
     #[must_use]
-    pub fn post_processor_for<R: Request + Clone + 'static>(
+    pub fn request_post_processor<R: Request + Clone + 'static>(
         self,
         post_processor: impl RequestPostProcessor<R> + 'static,
     ) -> MediatorBuilder<S, (P, Closed)> {
@@ -235,7 +238,7 @@ impl<S, P, F> MediatorBuilder<S, P, F> {
 }
 
 /// Meldet `slot` an; der Provider behält nur die erste Meldung je Paar aus Request-Typ `R` und Behavior-Typ `B`.
-// Eigene Funktion, weil `behavior_for` den Behavior-Typ nicht beim Namen kennt; `_behavior` liefert ihn.
+// Eigene Funktion, weil `behavior` den Behavior-Typ nicht beim Namen kennt; `_behavior` liefert ihn.
 fn unique_for<R: 'static, B: 'static>(slot: Slot, _behavior: &B) -> Registration<Slot> {
     Registration::instance(slot).unique_by::<(R, B)>()
 }

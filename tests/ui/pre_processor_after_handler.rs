@@ -33,6 +33,6 @@ impl<R: Request> RequestPreProcessor<R> for InboxStamp {
 fn main() {
     let _mediator = Mediator::builder()
         .register(Handler::instance(PriceList))
-        .pre_processor(InboxStamp)
+        .open_request_pre_processor(InboxStamp)
         .build();
 }
