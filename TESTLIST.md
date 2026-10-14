@@ -29,7 +29,7 @@ Quelle: MediatR `Mediator(IServiceProvider)` speichert keine Handler; es holt si
 - [x] Handler mit `Handler::singleton` registriert → nur das erste `send` baut den Handler, jedes weitere nutzt denselben · `singleton_builds_handler_only_on_first_send`
 - [x] Handler mit Sender per Konstruktor ist als `Handler::singleton` registriert, der Mediator wird fallen gelassen → der Handler wird freigegeben (sein `Drop` läuft) · `singleton_handler_with_sender_is_released_with_mediator`
 - [x] Handler mit Sender ist als `Handler::singleton` registriert und schickt einen Request, nachdem der Mediator weggefallen ist → `send` liefert `Err(SendError::MediatorDropped)`, kein Panic · `singleton_handler_sending_after_mediator_dropped_gets_mediator_dropped`
-- [ ] `Handler` für einen Handler-Typ ohne `Debug` mit `{:?}` formatiert → das kompiliert und liefert eine Ausgabe
+- [x] `Handler` für einen Handler-Typ ohne `Debug` mit `{:?}` formatiert → die Ausgabe nennt den Handler-Typ · `handler_debug_names_handler_type_without_debug`
 
 ## Provider-Crate `mediatr-provider`
 

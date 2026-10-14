@@ -323,3 +323,14 @@ async fn handler_processes_response_of_fake_sender() {
         }
     );
 }
+
+#[test]
+fn handler_debug_names_handler_type_without_debug() {
+    let handler = Handler::instance(CustomerDirectory {
+        customers: vec![ada()],
+    });
+
+    let output = format!("{handler:?}");
+
+    assert!(output.contains("CustomerDirectory"), "{output}");
+}

@@ -25,7 +25,6 @@ pub struct WeakMediator {
 }
 
 /// Wie der Mediator einen Handler vom Typ `H` bekommt; [`MediatorBuilder::register`] und [`MediatorBuilder::subscribe`] nehmen ihn.
-#[derive(Debug)]
 pub struct Handler<H> {
     registration: Registration<H>,
 }
@@ -156,6 +155,14 @@ impl<H: 'static> Handler<H> {
                 })
             }),
         }
+    }
+}
+
+impl<H> fmt::Debug for Handler<H> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Handler")
+            .field("registration", &self.registration)
+            .finish()
     }
 }
 
