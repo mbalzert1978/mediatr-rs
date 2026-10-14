@@ -5,9 +5,9 @@ use std::marker::PhantomData;
 
 use mediatr_provider::{Provider, WeakProvider};
 
-use crate::erased::{ErasedHandler, ErasedNotificationHandler};
 use crate::pipeline::{Behaviors, Slot};
 use crate::request::HandlerResult;
+use crate::wrappers::{ErasedHandler, ErasedNotificationHandler};
 use crate::{
     MediatorBuilder, Next, Notification, PublishStrategy, Publisher, Request, SendError, Sender,
     Sequential,

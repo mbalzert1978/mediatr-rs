@@ -1,6 +1,5 @@
 //! Rust-Port von [MediatR](https://github.com/LuckyPennySoftware/MediatR) für In-Process-Messaging.
 
-mod erased;
 mod error;
 mod mediator;
 mod notification;
@@ -10,6 +9,7 @@ mod publisher;
 mod registration;
 mod request;
 mod sender;
+mod wrappers;
 
 pub use error::SendError;
 pub use mediator::{Mediator, WeakMediator};

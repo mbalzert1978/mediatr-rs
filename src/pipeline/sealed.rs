@@ -7,7 +7,7 @@ use mediatr_provider::Provider;
 
 use crate::PipelineBehavior;
 use crate::Request;
-use crate::erased::{ErasedBehavior, erase_behavior};
+use crate::wrappers::{ErasedBehavior, erase_behavior};
 
 /// Die Kette der Behaviors eines Mediators: `()` oder ein Paar aus der Kette davor und einem weiteren Behavior.
 ///

@@ -6,8 +6,8 @@ use std::rc::Rc;
 
 use mediatr_provider::{Provider, ProviderBuilder, Registration};
 
-use crate::erased::{ErasedBehavior, erase, erase_behavior, erase_notification_handler};
 use crate::pipeline::{Closed, Open, PostProcess, PreProcess, Slot, Stage};
+use crate::wrappers::{ErasedBehavior, erase, erase_behavior, erase_notification_handler};
 use crate::{
     Handler, Mediator, Notification, NotificationHandler, PipelineBehavior, Request,
     RequestHandler, RequestPostProcessor, RequestPreProcessor, Sequential,

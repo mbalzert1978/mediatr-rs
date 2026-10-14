@@ -4,9 +4,9 @@ use std::fmt;
 use std::rc::Rc;
 
 use crate::Request;
-use crate::erased::{ErasedBehavior, ErasedHandler};
 use crate::pipeline::Stage;
 use crate::request::HandlerResult;
+use crate::wrappers::{ErasedBehavior, ErasedHandler};
 
 /// Der Rest der Pipeline hinter einem Behavior; [`Next::run`] schickt einen Request hinein.
 pub struct Next<R: Request> {
