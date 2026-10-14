@@ -2,7 +2,7 @@
 
 use std::future::Future;
 
-use crate::pipeline::PostProcess;
+use crate::pipeline::RequestPostProcessorBehavior;
 use crate::request::HandlerResult;
 use crate::{Next, PipelineBehavior, Request};
 
@@ -24,7 +24,9 @@ pub trait RequestPostProcessor<R: Request> {
     ) -> impl Future<Output = Result<(), R::Error>>;
 }
 
-impl<R: Request + Clone, B: RequestPostProcessor<R>> PipelineBehavior<R> for PostProcess<B> {
+impl<R: Request + Clone, B: RequestPostProcessor<R>> PipelineBehavior<R>
+    for RequestPostProcessorBehavior<B>
+{
     async fn handle(&self, request: R, next: Next<R>) -> HandlerResult<R> {
         let copy = request.clone();
         let response = next.run(request).await?;

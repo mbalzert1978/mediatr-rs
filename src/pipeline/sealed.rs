@@ -46,10 +46,10 @@ pub struct Open<B> {
 }
 
 /// Ein Vorverarbeiter als Behavior: `B` sieht den Request, dann geht dieser weiter.
-pub struct PreProcess<B>(pub(crate) B);
+pub struct RequestPreProcessorBehavior<B>(pub(crate) B);
 
 /// Ein Nachverarbeiter als Behavior: `B` sieht eine Kopie des Requests mit der Antwort des Handlers.
-pub struct PostProcess<B>(pub(crate) B);
+pub struct RequestPostProcessorBehavior<B>(pub(crate) B);
 
 /// Ein Behavior nur für einen Request-Typ, als Glied der Kette.
 /// Ein eigener [`Provider`] hält es als [`BehaviorWrapper`] dieses Typs, damit `wrap` es nur für diesen Typ findet.
@@ -82,16 +82,18 @@ impl<B> fmt::Debug for Open<B> {
 }
 
 // Von Hand statt `derive`: `derive(Debug)` verlangte `B: Debug`.
-impl<B> fmt::Debug for PreProcess<B> {
+impl<B> fmt::Debug for RequestPreProcessorBehavior<B> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("PreProcess").finish_non_exhaustive()
+        f.debug_struct("RequestPreProcessorBehavior")
+            .finish_non_exhaustive()
     }
 }
 
 // Von Hand statt `derive`: `derive(Debug)` verlangte `B: Debug`.
-impl<B> fmt::Debug for PostProcess<B> {
+impl<B> fmt::Debug for RequestPostProcessorBehavior<B> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("PostProcess").finish_non_exhaustive()
+        f.debug_struct("RequestPostProcessorBehavior")
+            .finish_non_exhaustive()
     }
 }
 

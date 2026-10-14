@@ -6,7 +6,9 @@ use std::rc::Rc;
 
 use mediatr_provider::{Provider, ProviderBuilder, Registration};
 
-use crate::pipeline::{Closed, Open, PostProcess, PreProcess, Slot, Stage};
+use crate::pipeline::{
+    Closed, Open, RequestPostProcessorBehavior, RequestPreProcessorBehavior, Slot, Stage,
+};
 use crate::wrappers::{
     BehaviorWrapper, wrap_behavior, wrap_notification_handler, wrap_request_handler,
 };
@@ -96,8 +98,8 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     pub fn pre_processor<B: 'static>(
         self,
         pre_processor: B,
-    ) -> MediatorBuilder<S, (P, Open<PreProcess<B>>)> {
-        self.open(PreProcess(pre_processor), Stage::Before)
+    ) -> MediatorBuilder<S, (P, Open<RequestPreProcessorBehavior<B>>)> {
+        self.open(RequestPreProcessorBehavior(pre_processor), Stage::Before)
     }
 
     /// Registriert `post_processor` für alle Request-Typen; er läuft nach allen Behaviors.
@@ -108,8 +110,8 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     pub fn post_processor<B: 'static>(
         self,
         post_processor: B,
-    ) -> MediatorBuilder<S, (P, Open<PostProcess<B>>)> {
-        self.open(PostProcess(post_processor), Stage::After)
+    ) -> MediatorBuilder<S, (P, Open<RequestPostProcessorBehavior<B>>)> {
+        self.open(RequestPostProcessorBehavior(post_processor), Stage::After)
     }
 
     /// Registriert `pre_processor` nur für Requests vom Typ `R`; er läuft vor allen Behaviors.
@@ -118,7 +120,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
         self,
         pre_processor: impl RequestPreProcessor<R> + 'static,
     ) -> MediatorBuilder<S, (P, Closed)> {
-        self.closed::<R>(PreProcess(pre_processor), Stage::Before)
+        self.closed::<R>(RequestPreProcessorBehavior(pre_processor), Stage::Before)
     }
 
     /// Registriert `post_processor` nur für Requests vom Typ `R`; er läuft nach allen Behaviors.
@@ -127,7 +129,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
         self,
         post_processor: impl RequestPostProcessor<R> + 'static,
     ) -> MediatorBuilder<S, (P, Closed)> {
-        self.closed::<R>(PostProcess(post_processor), Stage::After)
+        self.closed::<R>(RequestPostProcessorBehavior(post_processor), Stage::After)
     }
 
     /// Builder, dessen Kette zusätzlich mit `behavior` für alle Request-Typen auf der Stufe `stage` endet.

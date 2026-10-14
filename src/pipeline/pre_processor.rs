@@ -2,7 +2,7 @@
 
 use std::future::Future;
 
-use crate::pipeline::PreProcess;
+use crate::pipeline::RequestPreProcessorBehavior;
 use crate::request::HandlerResult;
 use crate::{Next, PipelineBehavior, Request};
 
@@ -20,7 +20,7 @@ pub trait RequestPreProcessor<R: Request> {
     fn process(&self, request: &R) -> impl Future<Output = Result<(), R::Error>>;
 }
 
-impl<R: Request, B: RequestPreProcessor<R>> PipelineBehavior<R> for PreProcess<B> {
+impl<R: Request, B: RequestPreProcessor<R>> PipelineBehavior<R> for RequestPreProcessorBehavior<B> {
     async fn handle(&self, request: R, next: Next<R>) -> HandlerResult<R> {
         self.0.process(&request).await?;
         next.run(request).await
