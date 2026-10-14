@@ -1,0 +1,12 @@
+error[E0599]: no method named `behavior` found for struct `MediatorBuilder<Sequential, (), WithHandlers>` in the current scope
+  --> tests/ui/behavior_after_subscribe.rs:39:10
+   |
+37 |       let _mediator = Mediator::builder()
+   |  _____________________-
+38 | |         .subscribe(Handler::instance(ShelfLabeling))
+39 | |         .behavior(AuditTrail)
+   | |         -^^^^^^^^ method not found in `MediatorBuilder<Sequential, (), WithHandlers>`
+   | |_________|
+   |
+   |
+   = note: the method was found for `MediatorBuilder<S, P>`

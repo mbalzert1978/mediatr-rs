@@ -5,3 +5,8 @@
 fn behavior_registered_after_first_handler_does_not_compile() {
     trybuild::TestCases::new().compile_fail("tests/ui/behavior_after_handler.rs");
 }
+
+#[test]
+fn behavior_registered_after_first_notification_handler_does_not_compile() {
+    trybuild::TestCases::new().compile_fail("tests/ui/behavior_after_subscribe.rs");
+}
