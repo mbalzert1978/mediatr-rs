@@ -1,6 +1,6 @@
 //! Tests für den Abschnitt „Notification — Publish-Strategie“ in `TESTLIST.md`.
 
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
 use std::future::Future;
 use std::rc::Rc;
 
@@ -395,4 +395,31 @@ async fn custom_strategy_singleton_handler_publishes_through_weak_mediator_and_i
             vec!["Kurier geplant 7".to_owned(), "Kurier geplant 8".to_owned()]
         )
     );
+}
+
+#[tokio::test]
+async fn custom_strategy_singleton_handler_publishing_after_mediator_dropped_gets_mediator_dropped()
+{
+    let handed_out = Rc::new(OnceCell::new());
+    let keep = Rc::clone(&handed_out);
+    let mediator = MediatorBuilder::<NewestFirst>::default()
+        .subscribe(Handler::singleton(
+            move |publisher: WeakMediator<NewestFirst>| {
+                keep.get_or_init(|| publisher.clone());
+                DispatchCenter { publisher }
+            },
+        ))
+        .build();
+    mediator
+        .publish(ParcelArrived { tracking: 6 })
+        .await
+        .unwrap();
+    let center = DispatchCenter {
+        publisher: handed_out.get().unwrap().clone(),
+    };
+    drop(mediator);
+
+    let result = center.handle(&ParcelArrived { tracking: 7 }).await;
+
+    assert_eq!(result, Err(SendError::MediatorDropped));
 }
