@@ -63,7 +63,7 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] Zwei Dienste desselben Typs mit `instance` registriert → `all` liefert beide, in der Reihenfolge der Registrierung · `all_returns_every_instance_in_registration_order`
 - [x] Dienst nicht registriert → `all` liefert eine leere Liste · `all_without_registration_returns_empty_list`
 - [x] Dienst mit `transient` registriert → `all` baut ihn bei jeder Abfrage neu · `transient_all_runs_recipe_on_every_call`
-- [ ] Dienst mit `singleton` registriert → `all` liefert dasselbe Objekt wie `get`
+- [x] Dienst mit `singleton` registriert → `all` liefert dasselbe Objekt wie `get` · `singleton_all_returns_same_object_as_get`
 - [ ] Dienst mit `scoped` registriert → `all` liefert im selben Scope dasselbe Objekt wie `get`; ein neuer Scope baut neu
 - [ ] Bauanleitung fragt mit `all` nach ihrem eigenen Typ → die Abfrage liefert eine leere Liste, kein Panic und keine Endlosschleife
 - [ ] Zwei Dienste desselben Typs mit `scoped` registriert → `all` liefert im selben Scope zwei verschiedene Objekte, je eins pro Bauanleitung

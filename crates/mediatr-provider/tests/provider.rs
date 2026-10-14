@@ -74,6 +74,16 @@ fn transient_all_runs_recipe_on_every_call() {
 }
 
 #[test]
+fn singleton_all_returns_same_object_as_get() {
+    let provider = Provider::builder().singleton(|_| Config).build();
+
+    let single = provider.get::<Config>().unwrap();
+    let all = provider.all::<Config>();
+
+    assert!(matches!(all.as_slice(), [config] if Rc::ptr_eq(config, &single)));
+}
+
+#[test]
 fn transient_runs_recipe_on_every_get() {
     let (calls, recipe) = counting_recipe();
     let provider = Provider::builder().transient(recipe).build();
