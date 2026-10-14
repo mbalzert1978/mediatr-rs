@@ -385,3 +385,35 @@ async fn behaviors_with_concurrent_strategy_wrap_send_and_publish_starts_handler
         )
     );
 }
+
+#[tokio::test]
+async fn transient_handler_wrapped_by_behavior_is_built_once_per_send_and_wrapped_once() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let builds = Rc::new(Cell::new(0_u32));
+    let ledger_journal = Rc::clone(&journal);
+    let ledger_builds = Rc::clone(&builds);
+    let mediator = Mediator::builder()
+        .behavior(AuditTrail {
+            journal: Rc::clone(&journal),
+        })
+        .register(Handler::transient(move |_sender| {
+            ledger_builds.set(ledger_builds.get().saturating_add(1));
+            StockLedger {
+                journal: Rc::clone(&ledger_journal),
+            }
+        }))
+        .build();
+
+    let stock = mediator.send(LookupStock { sku: 4 }).await;
+
+    assert_eq!(
+        (stock, builds.get(), journal.borrow().clone()),
+        (
+            Ok(12),
+            1,
+            ["Prüfung beginnt", "Bestand gelesen für 4", "Prüfung endet"]
+                .map(str::to_owned)
+                .to_vec()
+        )
+    );
+}
