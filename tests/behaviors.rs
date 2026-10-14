@@ -3,14 +3,15 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use mediatr_rs::{Handler, Mediator, Sender};
+use mediatr_rs::{Concurrent, Handler, Mediator, MediatorBuilder, Publisher, Sender};
 
 mod behaviors_fixtures;
 
 use behaviors_fixtures::{
-    AuditTrail, BookReceipt, LoadingDock, LookupStock, ReceiptBook, RetryOnce, ShelfLock,
-    SlowStockLedger, StockLedger, audit_and_stopwatch, audited_and_timed, audited_locked_and_timed,
-    checkpoint, passed_checkpoints,
+    AuditTrail, BookReceipt, LoadingDock, LookupStock, ReceiptBook, ReorderCheck, RetryOnce,
+    ShelfLabeling, ShelfLock, SlowStockLedger, StockCounted, StockLedger, audit_and_stopwatch,
+    audited_and_timed, audited_locked_and_timed, checkpoint, labeled_and_reordered_together,
+    passed_checkpoints,
 };
 
 #[tokio::test]
@@ -347,5 +348,40 @@ async fn twelve_behaviors_wrap_handler_first_registered_outermost() {
     assert_eq!(
         (stock, journal.borrow().clone()),
         (Ok(12), passed_checkpoints(12, "Bestand gelesen für 4"))
+    );
+}
+
+#[tokio::test]
+async fn behaviors_with_concurrent_strategy_wrap_send_and_publish_starts_handlers_together() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let (audit, stopwatch) = audit_and_stopwatch(&journal);
+    let mediator = MediatorBuilder::<Concurrent>::default()
+        .behavior(audit)
+        .behavior(stopwatch)
+        .register(Handler::instance(StockLedger {
+            journal: Rc::clone(&journal),
+        }))
+        .subscribe(Handler::instance(ShelfLabeling {
+            journal: Rc::clone(&journal),
+        }))
+        .subscribe(Handler::instance(ReorderCheck {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let stock = mediator.send(LookupStock { sku: 4 }).await;
+    let counted = mediator.publish(StockCounted { sku: 4 }).await;
+
+    assert_eq!(
+        (stock, counted, journal.borrow().clone()),
+        (
+            Ok(12),
+            Ok(()),
+            [
+                audited_and_timed("Bestand gelesen für 4"),
+                labeled_and_reordered_together(4),
+            ]
+            .concat()
+        )
     );
 }

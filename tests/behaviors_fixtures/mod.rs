@@ -1,7 +1,9 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use mediatr_rs::{Next, PipelineBehavior, Request, RequestHandler, SendError};
+use mediatr_rs::{
+    Next, Notification, NotificationHandler, PipelineBehavior, Request, RequestHandler, SendError,
+};
 
 /// Fragt den Lagerbestand des Artikels mit dieser Nummer ab.
 pub struct LookupStock {
@@ -235,4 +237,59 @@ pub fn passed_checkpoints(count: usize, handled: &str) -> Vec<String> {
     let entered = (0..count).map(|n| format!("Station {n} betreten"));
     let left = (0..count).rev().map(|n| format!("Station {n} verlassen"));
     entered.chain([handled.to_owned()]).chain(left).collect()
+}
+
+/// Ereignis: Der Bestand des Artikels mit dieser Nummer wurde gezählt.
+pub struct StockCounted {
+    pub sku: u32,
+}
+
+impl Notification for StockCounted {
+    type Error = SendError;
+}
+
+/// Druckt nach jeder Zählung ein neues Regaletikett; zwischen Beginn und Ende wartet es auf den Drucker.
+pub struct ShelfLabeling {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl NotificationHandler<StockCounted> for ShelfLabeling {
+    async fn handle(&self, event: &StockCounted) -> Result<(), SendError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Etikett beginnt {}", event.sku));
+        tokio::task::yield_now().await;
+        self.journal
+            .borrow_mut()
+            .push(format!("Etikett fertig {}", event.sku));
+        Ok(())
+    }
+}
+
+/// Prüft nach jeder Zählung, ob nachbestellt werden muss; zwischen Beginn und Ende wartet es auf den Lieferanten.
+pub struct ReorderCheck {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl NotificationHandler<StockCounted> for ReorderCheck {
+    async fn handle(&self, event: &StockCounted) -> Result<(), SendError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Nachbestellung beginnt {}", event.sku));
+        tokio::task::yield_now().await;
+        self.journal
+            .borrow_mut()
+            .push(format!("Nachbestellung fertig {}", event.sku));
+        Ok(())
+    }
+}
+
+/// Was [`ShelfLabeling`] und [`ReorderCheck`], gleichzeitig gestartet, zur Zählung des Artikels `sku` ins Protokoll schreiben.
+pub fn labeled_and_reordered_together(sku: u32) -> Vec<String> {
+    vec![
+        format!("Etikett beginnt {sku}"),
+        format!("Nachbestellung beginnt {sku}"),
+        format!("Etikett fertig {sku}"),
+        format!("Nachbestellung fertig {sku}"),
+    ]
 }
