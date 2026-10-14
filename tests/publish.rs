@@ -277,11 +277,11 @@ impl Request for Checkout {
 }
 
 /// Schließt Bestellungen ab und meldet sie über den Publisher, den er per Konstruktor bekommt.
-struct CheckoutHandler {
-    publisher: Mediator,
+struct CheckoutHandler<P> {
+    publisher: P,
 }
 
-impl RequestHandler<Checkout> for CheckoutHandler {
+impl<P: Publisher<OrderPlaced>> RequestHandler<Checkout> for CheckoutHandler<P> {
     async fn handle(&self, checkout: Checkout) -> Result<(), SendError> {
         self.publisher
             .publish(OrderPlaced {
@@ -304,4 +304,30 @@ async fn request_handler_publishes_through_injected_publisher() {
     mediator.send(Checkout { order_id: 42 }).await.unwrap();
 
     assert_eq!(*labels.borrow(), [42]);
+}
+
+/// Attrappe statt des Mediators: merkt sich die Nummer jeder gemeldeten Bestellung.
+struct RecordedOrders {
+    order_ids: Rc<RefCell<Vec<u32>>>,
+}
+
+impl Publisher<OrderPlaced> for RecordedOrders {
+    async fn publish(&self, event: OrderPlaced) -> Result<(), SendError> {
+        self.order_ids.borrow_mut().push(event.order_id);
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn handler_publishes_to_fake_publisher() {
+    let order_ids = Rc::new(RefCell::new(Vec::new()));
+    let handler = CheckoutHandler {
+        publisher: RecordedOrders {
+            order_ids: Rc::clone(&order_ids),
+        },
+    };
+
+    handler.handle(Checkout { order_id: 42 }).await.unwrap();
+
+    assert_eq!(*order_ids.borrow(), [42]);
 }
