@@ -16,7 +16,7 @@ Quelle: MediatR `test/MediatR.Tests/SendTests.cs`, `SendVoidInterfaceTests.cs`, 
 - [x] Fehler von `send`, nachdem der Mediator weggefallen ist → lässt sich mit `?` als `Box<dyn std::error::Error>` weitergeben, sein Text nennt den weggefallenen Mediator · `mediator_dropped_error_propagates_as_boxed_error`
 - [x] Async-Closure als Handler → `register` nimmt sie an, `send` liefert ihre Antwort · `register_accepts_async_closure`
 - [x] Request mit eigenem Fehlertyp ohne registrierten Handler → `send` liefert den aus `SendError::NoHandler` gewandelten Fehler · `send_without_handler_converts_missing_handler_into_request_error`
-- [ ] Zweimal `register` für denselben Request-Typ → `send` ruft den zuerst registrierten Handler nicht auf
+- [x] Zweimal `register` für denselben Request-Typ → `send` ruft den zuerst registrierten Handler nicht auf · `register_twice_does_not_call_first_handler`
 
 ## Mediator — Fassade und DI
 

@@ -207,3 +207,21 @@ async fn mediator_dropped_error_propagates_as_boxed_error() {
         "der Mediator ist weggefallen"
     );
 }
+
+#[tokio::test]
+async fn register_twice_does_not_call_first_handler() {
+    let first_called = Rc::new(Cell::new(false));
+    let second_called = Rc::new(Cell::new(false));
+    let mediator = Mediator::builder()
+        .register(VoidPingHandler {
+            called: Rc::clone(&first_called),
+        })
+        .register(VoidPingHandler {
+            called: Rc::clone(&second_called),
+        })
+        .build();
+
+    mediator.send(VoidPing).await.unwrap();
+
+    assert_eq!((first_called.get(), second_called.get()), (false, true));
+}
