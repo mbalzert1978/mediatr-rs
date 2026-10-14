@@ -179,17 +179,40 @@ async fn publish_returns_first_handler_error_and_skips_second_handler() {
     );
 }
 
+/// Zwei Versandstellen, die ihre Etiketten getrennt sammeln: Daran sieht ein Test, welche von zwei Registrierungen desselben Handler-Typs gelaufen ist.
+#[derive(Clone, Default)]
+struct TwoDesks {
+    front: Rc<RefCell<Vec<u32>>>,
+    back: Rc<RefCell<Vec<u32>>>,
+}
+
+impl TwoDesks {
+    /// Die vordere Versandstelle.
+    fn front(&self) -> ShippingDesk {
+        ShippingDesk {
+            labels: Rc::clone(&self.front),
+        }
+    }
+
+    /// Die hintere Versandstelle.
+    fn back(&self) -> ShippingDesk {
+        ShippingDesk {
+            labels: Rc::clone(&self.back),
+        }
+    }
+
+    /// Die Etiketten der vorderen und der hinteren Versandstelle.
+    fn labels(&self) -> (Vec<u32>, Vec<u32>) {
+        (self.front.borrow().clone(), self.back.borrow().clone())
+    }
+}
+
 #[tokio::test]
 async fn publish_runs_handler_type_registered_twice_once_with_first_registration() {
-    let front_labels = Rc::new(RefCell::new(Vec::new()));
-    let back_labels = Rc::new(RefCell::new(Vec::new()));
+    let desks = TwoDesks::default();
     let mediator = Mediator::builder()
-        .subscribe(ShippingDesk {
-            labels: Rc::clone(&front_labels),
-        })
-        .subscribe(ShippingDesk {
-            labels: Rc::clone(&back_labels),
-        })
+        .subscribe(desks.front())
+        .subscribe(desks.back())
         .build();
 
     mediator
@@ -197,13 +220,7 @@ async fn publish_runs_handler_type_registered_twice_once_with_first_registration
         .await
         .unwrap();
 
-    assert_eq!(
-        (
-            front_labels.borrow().as_slice(),
-            back_labels.borrow().as_slice()
-        ),
-        ([42].as_slice(), [].as_slice())
-    );
+    assert_eq!(desks.labels(), (vec![42], vec![]));
 }
 
 #[tokio::test]
@@ -487,16 +504,11 @@ async fn subscribe_transient_handler_publishes_through_received_mediator() {
 #[tokio::test]
 async fn publish_runs_handler_type_subscribed_and_subscribed_transient_once_with_first_registration()
  {
-    let front_labels = Rc::new(RefCell::new(Vec::new()));
-    let back_labels = Rc::new(RefCell::new(Vec::new()));
-    let back = Rc::clone(&back_labels);
+    let desks = TwoDesks::default();
+    let back = desks.clone();
     let mediator = Mediator::builder()
-        .subscribe(ShippingDesk {
-            labels: Rc::clone(&front_labels),
-        })
-        .subscribe_transient(move |_publisher: Mediator| ShippingDesk {
-            labels: Rc::clone(&back),
-        })
+        .subscribe(desks.front())
+        .subscribe_transient(move |_publisher: Mediator| back.back())
         .build();
 
     mediator
@@ -504,11 +516,22 @@ async fn publish_runs_handler_type_subscribed_and_subscribed_transient_once_with
         .await
         .unwrap();
 
-    assert_eq!(
-        (
-            front_labels.borrow().as_slice(),
-            back_labels.borrow().as_slice()
-        ),
-        ([42].as_slice(), [].as_slice())
-    );
+    assert_eq!(desks.labels(), (vec![42], vec![]));
+}
+
+#[tokio::test]
+async fn publish_runs_handler_type_subscribed_transient_twice_once_with_first_registration() {
+    let desks = TwoDesks::default();
+    let (first, second) = (desks.clone(), desks.clone());
+    let mediator = Mediator::builder()
+        .subscribe_transient(move |_publisher: Mediator| first.front())
+        .subscribe_transient(move |_publisher: Mediator| second.back())
+        .build();
+
+    mediator
+        .publish(OrderPlaced { order_id: 42 })
+        .await
+        .unwrap();
+
+    assert_eq!(desks.labels(), (vec![42], vec![]));
 }
