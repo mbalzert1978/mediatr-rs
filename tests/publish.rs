@@ -102,3 +102,63 @@ async fn publish_runs_both_handlers_in_registration_order() {
         ["Ware reserviert für 42", "Rechnung für 42"]
     );
 }
+
+/// Ereignis: Die Bestellung mit dieser Nummer ist storniert.
+struct OrderCancelled {
+    order_id: u32,
+}
+
+#[derive(Debug, PartialEq)]
+enum CancellationError {
+    Undeliverable(SendError),
+    PaymentProviderDown,
+}
+
+impl From<SendError> for CancellationError {
+    fn from(error: SendError) -> Self {
+        Self::Undeliverable(error)
+    }
+}
+
+impl Notification for OrderCancelled {
+    type Error = CancellationError;
+}
+
+/// Zahlt den Betrag einer stornierten Bestellung zurück; der Zahlungsdienst ist gerade nicht erreichbar.
+struct Refund;
+
+impl NotificationHandler<OrderCancelled> for Refund {
+    async fn handle(&self, _event: &OrderCancelled) -> Result<(), CancellationError> {
+        Err(CancellationError::PaymentProviderDown)
+    }
+}
+
+/// Schickt dem Kunden für jede stornierte Bestellung eine Mail mit ihrer Nummer.
+struct CancellationMail {
+    sent: Rc<RefCell<Vec<u32>>>,
+}
+
+impl NotificationHandler<OrderCancelled> for CancellationMail {
+    async fn handle(&self, event: &OrderCancelled) -> Result<(), CancellationError> {
+        self.sent.borrow_mut().push(event.order_id);
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn publish_returns_first_handler_error_and_skips_second_handler() {
+    let sent = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .subscribe(Refund)
+        .subscribe(CancellationMail {
+            sent: Rc::clone(&sent),
+        })
+        .build();
+
+    let result = mediator.publish(OrderCancelled { order_id: 7 }).await;
+
+    assert_eq!(
+        (result, sent.borrow().as_slice()),
+        (Err(CancellationError::PaymentProviderDown), [].as_slice())
+    );
+}

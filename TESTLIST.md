@@ -81,7 +81,7 @@ Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `ExceptionTests.cs`, `Micr
 - [x] Notification ohne registrierten Handler → `publish` liefert `Ok(())`, kein Panic · `publish_without_handler_returns_ok`
 - [ ] Zwei Notification-Typen mit je eigenem Handler → jede Notification erreicht nur ihre Handler
 - [ ] Erster Handler wartet (`await`), bevor er fertig ist → der zweite Handler startet erst danach
-- [ ] Erster von zwei Handlern liefert einen Fehler → `publish` gibt genau diesen Fehler zurück, der zweite Handler läuft nicht
+- [x] Erster von zwei Handlern liefert einen Fehler → `publish` gibt genau diesen Fehler zurück, der zweite Handler läuft nicht · `publish_returns_first_handler_error_and_skips_second_handler`
 - [ ] Derselbe Handler-Typ zweimal für dieselbe Notification registriert → `publish` führt ihn einmal aus, und zwar den zuerst registrierten
 - [ ] Request-Handler bekommt einen Publisher per Konstruktor und meldet darüber ein Ereignis → die Handler dieser Notification laufen
 - [ ] Handler, der einen Publisher per Konstruktor bekommt, wird ohne Mediator getestet und bekommt eine Attrappe → die Attrappe sieht die gemeldete Notification

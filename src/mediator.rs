@@ -57,7 +57,8 @@ pub trait Publisher<N: Notification> {
     ///
     /// # Errors
     ///
-    /// Einen [`SendError`] als `N::Error`, wenn `publish` die Notification nicht zustellen kann.
+    /// Den ersten Fehler eines Handlers; die Handler danach laufen nicht mehr.
+    /// Oder einen [`SendError`] als `N::Error`, wenn `publish` die Notification nicht zustellen kann.
     fn publish(&self, notification: N) -> impl Future<Output = Result<(), N::Error>>;
 }
 
