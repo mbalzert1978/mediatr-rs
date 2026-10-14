@@ -269,7 +269,7 @@ impl<S> MediatorBuilder<S> {
         self.with_registration(handler.registration.map(erase))
     }
 
-    /// Registriert `behavior` für Requests vom Typ `R`; es umschließt deren Handler.
+    /// Registriert `behavior` für Requests vom Typ `R`; es umschließt deren Handler, ein früher registriertes liegt weiter außen.
     #[must_use]
     pub fn behavior<R, B>(self, behavior: Handler<B, S>) -> Self
     where

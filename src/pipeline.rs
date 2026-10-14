@@ -25,16 +25,17 @@ pub trait PipelineBehavior<R: Request> {
 /// Der Rest der Pipeline hinter einem Behavior; [`Next::run`] schickt einen Request hinein.
 pub struct Next<R: Request> {
     handler: Rc<ErasedHandler<R>>,
-    /// Die noch ausstehenden Behaviors; `run` nimmt das letzte zuerst.
+    /// Die noch ausstehenden Behaviors, das innerste zuerst; `run` nimmt das letzte, also äußerste.
     behaviors: Vec<Rc<ErasedBehavior<R>>>,
 }
 
 impl<R: Request> Next<R> {
-    /// Pipeline aus `behaviors` und `handler`.
+    /// Pipeline aus `behaviors`, in der Reihenfolge ihrer Registrierung, und `handler`; das erste Behavior liegt außen.
     pub(crate) fn new(
         handler: Rc<ErasedHandler<R>>,
-        behaviors: Vec<Rc<ErasedBehavior<R>>>,
+        mut behaviors: Vec<Rc<ErasedBehavior<R>>>,
     ) -> Self {
+        behaviors.reverse();
         Self { handler, behaviors }
     }
 
