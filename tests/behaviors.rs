@@ -103,8 +103,7 @@ async fn two_behaviors_wrap_handlers_of_every_request_type_first_registered_oute
 }
 
 #[tokio::test]
-async fn behavior_for_one_request_type_between_two_for_all_wraps_only_its_requests_in_registration_order()
- {
+async fn behavior_between_two_open_behaviors_wraps_only_its_requests_in_registration_order() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let (audit, stopwatch) = audit_and_stopwatch(&journal);
     let mediator = Mediator::builder()
@@ -289,8 +288,7 @@ async fn same_behavior_registered_for_all_and_for_one_request_type_runs_once_for
 }
 
 #[tokio::test]
-async fn unit_response_behavior_for_one_request_type_then_one_for_all_wrap_handler_first_registered_outermost()
- {
+async fn unit_response_behavior_then_open_behavior_wrap_handler_first_registered_outermost() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = Mediator::builder()
         .behavior::<BookReceipt>(LoadingDock {
@@ -353,7 +351,7 @@ async fn twelve_behaviors_wrap_handler_first_registered_outermost() {
 }
 
 #[tokio::test]
-async fn behaviors_with_concurrent_strategy_wrap_send_and_publish_starts_handlers_together() {
+async fn behaviors_with_when_all_publisher_wrap_send_and_publish_starts_handlers_together() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let (audit, stopwatch) = audit_and_stopwatch(&journal);
     let mediator = MediatorBuilder::<WhenAllPublisher>::default()

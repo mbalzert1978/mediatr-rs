@@ -1,4 +1,4 @@
-//! Strategien, nach denen `publish` die Handler einer Notification laufen lässt.
+//! Die Publisher, nach denen `publish` die Handler einer Notification laufen lässt.
 
 mod foreach_await_publisher;
 mod when_all_publisher;
@@ -8,7 +8,7 @@ use std::future::Future;
 pub use foreach_await_publisher::ForeachAwaitPublisher;
 pub use when_all_publisher::WhenAllPublisher;
 
-/// Wie [`Publisher::publish`](crate::Publisher::publish) die Handler einer Notification laufen lässt; ein [`Mediator`](crate::Mediator) bekommt sie als Typ-Parameter.
+/// Wie [`Publisher::publish`](crate::Publisher::publish) die Handler einer Notification laufen lässt; ein [`Mediator`](crate::Mediator) bekommt ihn als Typ-Parameter.
 ///
 /// # Vertrag
 ///

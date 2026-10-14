@@ -1,4 +1,4 @@
-//! Die Strategie, die Handler nacheinander laufen lässt.
+//! Der Publisher, der Handler nacheinander laufen lässt.
 
 use std::future::Future;
 

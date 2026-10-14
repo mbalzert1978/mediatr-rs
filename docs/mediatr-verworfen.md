@@ -60,7 +60,7 @@ In Rust ist das `()`; Gleichheit, Hash, Ordnung und Ausgabe kommen aus std.
 
 Rust hat keine Vererbung. Eine Nachricht hat genau ihre eigenen Handler.
 
-- `PublishTests.cs`: `Should_override_with_sequential_firing` (überschreibt `PublishCore` in einer Unterklasse; die eigene Strategie steht als Punkt in „Notification — Publish-Strategie“).
+- `PublishTests.cs`: `Should_override_with_sequential_firing` (überschreibt `PublishCore` in einer Unterklasse; der eigene Publisher steht als Punkt in „Notification — Notification-Publisher“).
 - `NotificationHandlerTests.cs`: `Should_call_abstract_handle_method`.
 - `MicrosoftExtensionsDI/Issue1118Tests.cs`: `Publishing_DerivedEvent_Should_Call_BaseEventHandler_ExactlyOnce`.
 

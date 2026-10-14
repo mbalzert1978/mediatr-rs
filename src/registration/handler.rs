@@ -8,7 +8,7 @@ use mediatr_provider::Registration;
 use crate::{ForeachAwaitPublisher, Mediator, WeakMediator};
 
 /// Wie der Mediator einen Handler vom Typ `H` bekommt; [`MediatorBuilder::register`](crate::MediatorBuilder::register) und [`MediatorBuilder::subscribe`](crate::MediatorBuilder::subscribe) nehmen ihn.
-/// `S` und `P` sind Publish-Strategie und Behaviors des Mediators, für den der Handler bestimmt ist.
+/// `S` und `P` sind Notification-Publisher und Behaviors des Mediators, für den der Handler bestimmt ist.
 pub struct Handler<H, S = ForeachAwaitPublisher, P = ()> {
     pub(super) registration: Registration<H>,
     types: PhantomData<(S, P)>,

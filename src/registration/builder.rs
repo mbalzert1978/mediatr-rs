@@ -17,7 +17,7 @@ use crate::{
     Request, RequestHandler, RequestPostProcessor, RequestPreProcessor,
 };
 
-/// Sammelt Behaviors und Handler und baut daraus einen [`Mediator`] mit der Publish-Strategie `S` und der Kette `P` der Behaviors.
+/// Sammelt Behaviors und Handler und baut daraus einen [`Mediator`] mit dem Notification-Publisher `S` und der Kette `P` der Behaviors.
 ///
 /// `F` sagt, ob schon ein Handler registriert ist; Behaviors nimmt der Builder nur davor,
 /// weil jeder Handler die Kette der Behaviors schon in seinem Typ trägt.
@@ -37,7 +37,7 @@ pub struct NoHandlers;
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct WithHandlers;
 
-// Von Hand statt `derive`: `derive(Debug)` verlangte `S: Debug`; `PhantomData` nennt die Strategie auch ohne.
+// Von Hand statt `derive`: `derive(Debug)` verlangte `S: Debug`; `PhantomData` nennt den Publisher auch ohne.
 impl<S, P: fmt::Debug, F> fmt::Debug for MediatorBuilder<S, P, F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MediatorBuilder")
@@ -238,7 +238,7 @@ impl<S, P, F> MediatorBuilder<S, P, F> {
 }
 
 /// Meldet `slot` an; der Provider behält nur die erste Meldung je Paar aus Request-Typ `R` und Behavior-Typ `B`.
-// Eigene Funktion, weil `behavior` den Behavior-Typ nicht beim Namen kennt; `_behavior` liefert ihn.
+// Eigene Funktion, weil `closed` den Behavior-Typ nicht beim Namen kennt; `_behavior` liefert ihn.
 fn unique_for<R: 'static, B: 'static>(slot: Slot, _behavior: &B) -> Registration<Slot> {
     Registration::instance(slot).unique_by::<(R, B)>()
 }

@@ -16,7 +16,7 @@ use crate::{
 /// Stellt Requests und Notifications den Handlern zu, die für ihren Typ registriert sind.
 ///
 /// Entsteht über [`Mediator::builder`]. Verschickt wird über [`Sender`] und [`Publisher`].
-/// `S` ist die [`NotificationPublisher`], nach der `publish` die Handler laufen lässt.
+/// `S` ist der [`NotificationPublisher`], nach dem `publish` die Handler laufen lässt.
 /// `P` ist die Kette der Behaviors, die Requests umschließen; siehe [`MediatorBuilder::open_behavior`].
 pub struct Mediator<S = ForeachAwaitPublisher, P = ()> {
     provider: Provider,
@@ -24,7 +24,7 @@ pub struct Mediator<S = ForeachAwaitPublisher, P = ()> {
 }
 
 /// Verweis auf einen [`Mediator`], der dessen Handler nicht am Leben hält; ein [`Handler::singleton`](crate::Handler::singleton) bekommt ihn als [`Sender`] und [`Publisher`].
-/// `S` und `P` sind Publish-Strategie und Behaviors dieses Mediators.
+/// `S` und `P` sind Notification-Publisher und Behaviors dieses Mediators.
 pub struct WeakMediator<S = ForeachAwaitPublisher, P = ()> {
     pub(crate) provider: WeakProvider,
     pub(crate) types: PhantomData<(S, P)>,

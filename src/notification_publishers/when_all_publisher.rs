@@ -1,4 +1,4 @@
-//! Die Strategie, die alle Handler gleichzeitig auf einem Thread laufen lässt.
+//! Der Publisher, der alle Handler gleichzeitig auf einem Thread laufen lässt.
 
 use std::future::{Future, poll_fn};
 use std::pin::Pin;

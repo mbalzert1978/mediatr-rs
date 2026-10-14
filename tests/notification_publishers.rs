@@ -1,4 +1,4 @@
-//! Tests für den Abschnitt „Notification — Publish-Strategie“ in `TESTLIST.md`.
+//! Tests für den Abschnitt „Notification — Notification-Publisher“ in `TESTLIST.md`.
 
 use std::cell::{OnceCell, RefCell};
 use std::rc::Rc;
@@ -8,9 +8,9 @@ use mediatr_rs::{
     WhenAllPublisher,
 };
 
-mod publish_strategy_fixtures;
+mod notification_publishers_fixtures;
 
-use publish_strategy_fixtures::{
+use notification_publishers_fixtures::{
     ArrivalClerk, CourierPlanner, CustomsHold, DamageCheck, DeliveryDue, DispatchCenter,
     Dispatcher, DoorNotice, InspectionError, NewestFirst, ParcelArrived, ParcelInspected,
     Recipient, Scanning, ShiftCenter, Stockroom, ThoroughDamageCheck, TrackParcel, TrackingDesk,
@@ -18,7 +18,7 @@ use publish_strategy_fixtures::{
 };
 
 #[tokio::test]
-async fn custom_strategy_runs_both_handlers_in_its_own_order() {
+async fn custom_publisher_runs_both_handlers_in_its_own_order() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = MediatorBuilder::<NewestFirst>::default()
         .subscribe(Handler::instance(Stockroom {
@@ -41,7 +41,7 @@ async fn custom_strategy_runs_both_handlers_in_its_own_order() {
 }
 
 #[tokio::test]
-async fn custom_strategy_transient_handler_publishes_through_received_mediator_in_its_order() {
+async fn custom_publisher_transient_handler_publishes_through_received_mediator_in_its_order() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = MediatorBuilder::<NewestFirst>::default()
         .subscribe(Handler::transient(|publisher| Dispatcher { publisher }))
@@ -62,7 +62,8 @@ async fn custom_strategy_transient_handler_publishes_through_received_mediator_i
 }
 
 #[tokio::test]
-async fn custom_strategy_singleton_handler_publishes_through_received_weak_mediator_in_its_order() {
+async fn custom_publisher_singleton_handler_publishes_through_received_weak_mediator_in_its_order()
+{
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = MediatorBuilder::<NewestFirst>::default()
         .subscribe(Handler::singleton(|publisher| DispatchCenter { publisher }))
@@ -83,7 +84,7 @@ async fn custom_strategy_singleton_handler_publishes_through_received_weak_media
 }
 
 #[tokio::test]
-async fn custom_strategy_without_clone_mediator_and_weak_mediator_clone_reaches_same_handlers() {
+async fn custom_publisher_without_clone_mediator_and_weak_mediator_clone_reaches_same_handlers() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = MediatorBuilder::<NewestFirst>::default()
         .subscribe(Handler::singleton(
@@ -109,7 +110,7 @@ async fn custom_strategy_without_clone_mediator_and_weak_mediator_clone_reaches_
 }
 
 #[tokio::test]
-async fn custom_strategy_without_debug_mediator_weak_mediator_and_builder_debug_names_strategy() {
+async fn custom_publisher_without_debug_mediator_weak_mediator_and_builder_debug_names_publisher() {
     let weak_output = Rc::new(RefCell::new(String::new()));
     let seen = Rc::clone(&weak_output);
     let builder = MediatorBuilder::<NewestFirst>::default().subscribe(Handler::singleton(
@@ -138,7 +139,7 @@ async fn custom_strategy_without_debug_mediator_weak_mediator_and_builder_debug_
 }
 
 #[tokio::test]
-async fn custom_strategy_without_clone_builder_clone_builds_mediators_reaching_same_handlers() {
+async fn custom_publisher_without_clone_builder_clone_builds_mediators_reaching_same_handlers() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let builder = MediatorBuilder::<NewestFirst>::default()
         .subscribe(Handler::instance(CourierPlanner {
@@ -171,7 +172,7 @@ async fn custom_strategy_without_clone_builder_clone_builds_mediators_reaching_s
 }
 
 #[tokio::test]
-async fn custom_strategy_send_returns_handler_response() {
+async fn custom_publisher_send_returns_handler_response() {
     let mediator = MediatorBuilder::<NewestFirst>::default()
         .register(Handler::instance(TrackingDesk))
         .build();
@@ -182,7 +183,7 @@ async fn custom_strategy_send_returns_handler_response() {
 }
 
 #[tokio::test]
-async fn custom_strategy_singleton_handler_sends_through_received_weak_mediator() {
+async fn custom_publisher_singleton_handler_sends_through_received_weak_mediator() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let clerk_journal = Rc::clone(&journal);
     let mediator = MediatorBuilder::<NewestFirst>::default()
@@ -202,7 +203,7 @@ async fn custom_strategy_singleton_handler_sends_through_received_weak_mediator(
 }
 
 #[tokio::test]
-async fn custom_strategy_singleton_handler_publishes_through_weak_mediator_and_its_clone() {
+async fn custom_publisher_singleton_handler_publishes_through_weak_mediator_and_its_clone() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = MediatorBuilder::<NewestFirst>::default()
         .subscribe(Handler::singleton(
@@ -228,8 +229,8 @@ async fn custom_strategy_singleton_handler_publishes_through_weak_mediator_and_i
 }
 
 #[tokio::test]
-async fn custom_strategy_singleton_handler_publishing_after_mediator_dropped_gets_mediator_dropped()
-{
+async fn custom_publisher_singleton_handler_publishing_after_mediator_dropped_gets_mediator_dropped()
+ {
     let handed_out = Rc::new(OnceCell::new());
     let keep = Rc::clone(&handed_out);
     let mediator = MediatorBuilder::<NewestFirst>::default()
@@ -255,7 +256,7 @@ async fn custom_strategy_singleton_handler_publishing_after_mediator_dropped_get
 }
 
 #[tokio::test]
-async fn concurrent_strategy_starts_second_waiting_handler_before_first_finished() {
+async fn when_all_publisher_starts_second_waiting_handler_before_first_finished() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = MediatorBuilder::<WhenAllPublisher>::default()
         .subscribe(Handler::instance(Unloading {
@@ -283,7 +284,7 @@ async fn concurrent_strategy_starts_second_waiting_handler_before_first_finished
 }
 
 #[tokio::test]
-async fn concurrent_strategy_runs_second_handler_after_first_fails_and_returns_first_error() {
+async fn when_all_publisher_runs_second_handler_after_first_fails_and_returns_first_error() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = MediatorBuilder::<WhenAllPublisher>::default()
         .subscribe(Handler::instance(DamageCheck))
@@ -304,7 +305,7 @@ async fn concurrent_strategy_runs_second_handler_after_first_fails_and_returns_f
 }
 
 #[tokio::test]
-async fn concurrent_strategy_runs_each_of_three_handlers_once_and_returns_ok() {
+async fn when_all_publisher_runs_each_of_three_handlers_once_and_returns_ok() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = MediatorBuilder::<WhenAllPublisher>::default()
         .subscribe(Handler::instance(Stockroom {
@@ -337,7 +338,7 @@ async fn concurrent_strategy_runs_each_of_three_handlers_once_and_returns_ok() {
 }
 
 #[tokio::test]
-async fn concurrent_strategy_both_handlers_fail_returns_error_of_first_registered() {
+async fn when_all_publisher_both_handlers_fail_returns_error_of_first_registered() {
     let mediator = MediatorBuilder::<WhenAllPublisher>::default()
         .subscribe(Handler::instance(DamageCheck))
         .subscribe(Handler::instance(CustomsHold))
@@ -349,7 +350,7 @@ async fn concurrent_strategy_both_handlers_fail_returns_error_of_first_registere
 }
 
 #[tokio::test]
-async fn concurrent_strategy_only_second_handler_fails_runs_first_and_returns_second_error() {
+async fn when_all_publisher_only_second_handler_fails_runs_first_and_returns_second_error() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = MediatorBuilder::<WhenAllPublisher>::default()
         .subscribe(Handler::instance(Weighing {
@@ -370,7 +371,7 @@ async fn concurrent_strategy_only_second_handler_fails_runs_first_and_returns_se
 }
 
 #[tokio::test]
-async fn concurrent_strategy_both_fail_first_after_await_returns_error_of_first_registered() {
+async fn when_all_publisher_both_fail_first_after_await_returns_error_of_first_registered() {
     let mediator = MediatorBuilder::<WhenAllPublisher>::default()
         .subscribe(Handler::instance(ThoroughDamageCheck))
         .subscribe(Handler::instance(CustomsHold))
@@ -382,7 +383,7 @@ async fn concurrent_strategy_both_fail_first_after_await_returns_error_of_first_
 }
 
 #[tokio::test]
-async fn concurrent_strategy_equally_waiting_handlers_finish_in_registration_order() {
+async fn when_all_publisher_equally_waiting_handlers_finish_in_registration_order() {
     let journal = Rc::new(RefCell::new(Vec::new()));
     let mediator = MediatorBuilder::<WhenAllPublisher>::default()
         .subscribe(Handler::instance(Unloading {
