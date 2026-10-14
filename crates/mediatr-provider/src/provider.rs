@@ -18,7 +18,7 @@ type Slot = (TypeId, usize);
 
 /// Liefert bei jedem Aufruf einen Dienst vom Typ `T`, gebaut mit dem übergebenen Provider oder gemerkt in seinem Scope auf dem übergebenen Platz.
 // dyn: `get` kennt nur `T`, nicht den Typ der Bauanleitung. Bauanleitungen verschiedener
-// Typen (aus `Registration::instance`, `transient`, `singleton`, `scoped`) liegen deshalb hinter einem gemeinsamen Typ je `T`.
+// Typen (aus `Registration::instance`, `transient`, `singleton`, `scoped`, `map`) liegen deshalb hinter einem gemeinsamen Typ je `T`.
 type Recipe<T> = Box<dyn Fn(&Provider, Slot) -> Rc<T>>;
 
 /// Liefert Dienste nach ihrem Typ.
@@ -181,6 +181,13 @@ impl<T: 'static> Registration<T> {
             key: Some(TypeId::of::<K>()),
             ..self
         }
+    }
+
+    /// Dienst `f(dienst)` vom Typ `U` statt des Diensts vom Typ `T`; den Dienst vom Typ `T` baut die Bauart wie zuvor, `f` läuft bei jeder Abfrage neu.
+    #[must_use]
+    pub fn map<U: 'static>(self, f: impl Fn(Rc<T>) -> U + 'static) -> Registration<U> {
+        let recipe = self.recipe;
+        Registration::new(move |provider, slot| Rc::new(f(recipe(provider, slot))))
     }
 
     fn new(recipe: impl Fn(&Provider, Slot) -> Rc<T> + 'static) -> Self {

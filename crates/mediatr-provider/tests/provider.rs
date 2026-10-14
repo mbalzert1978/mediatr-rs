@@ -844,3 +844,21 @@ fn unique_instance_from_same_source_type_for_two_service_types_all_returns_each_
         (vec!["Rechnung 1".to_owned()], vec!["Rechnung 2".to_owned()])
     );
 }
+
+#[test]
+fn mapped_registration_get_returns_converted_service() {
+    let provider = Provider::builder()
+        .register(
+            Registration::instance(Invoice {
+                heading: "Rechnung 1".to_owned(),
+            })
+            .map(|invoice: Rc<Invoice>| Document(invoice.heading.clone())),
+        )
+        .build();
+
+    let title = provider
+        .get::<Document>()
+        .map(|document| document.0.clone());
+
+    assert_eq!(title.as_deref(), Some("Rechnung 1"));
+}
