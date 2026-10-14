@@ -431,6 +431,35 @@ fn recipe_asking_all_for_own_type_through_get_gets_empty_list() {
     assert!(item.siblings.is_empty());
 }
 
+/// Ein Kurs mit allen Studierenden, die beim Bau bekannt sind.
+struct Course {
+    students: Vec<Rc<Student>>,
+}
+
+/// Eine Studentin mit allen Kursen, die beim Bau bekannt sind.
+struct Student {
+    courses: Vec<Rc<Course>>,
+}
+
+#[test]
+fn mutually_dependent_recipes_get_empty_list_from_inner_all() {
+    let provider = Provider::builder()
+        .transient(|provider| Course {
+            students: provider.all::<Student>(),
+        })
+        .transient(|provider| Student {
+            courses: provider.all::<Course>(),
+        })
+        .build();
+
+    let courses = provider.all::<Course>();
+
+    assert!(matches!(
+        courses.as_slice(),
+        [course] if matches!(course.students.as_slice(), [student] if student.courses.is_empty())
+    ));
+}
+
 /// Ein Team mit seiner Leitung, falls es eine gibt.
 struct Team {
     lead: Option<Rc<Employee>>,
