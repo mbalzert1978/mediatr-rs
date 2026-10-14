@@ -74,7 +74,7 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] Zweimal `unique_instance` für denselben Typ, beide aus demselben Quelltyp umgewandelt → `all` liefert nur den zuerst registrierten Dienst · `unique_instance_twice_from_same_source_type_all_returns_first`
 - [x] Zweimal `unique_instance` für denselben Typ, beide aus demselben Quelltyp umgewandelt → `get` liefert den zuerst registrierten Dienst · `unique_instance_twice_from_same_source_type_get_returns_first`
 - [x] Zweimal `unique_instance` für denselben Typ, aus verschiedenen Quelltypen umgewandelt → `all` liefert beide, in der Reihenfolge der Registrierung · `unique_instance_from_different_source_types_all_returns_both_in_order`
-- [ ] `unique_instance` aus demselben Quelltyp für zwei verschiedene Typen → jede Abfrage nach einem der beiden Typen liefert ihren Dienst
+- [x] `unique_instance` aus demselben Quelltyp für zwei verschiedene Typen → jede Abfrage nach einem der beiden Typen liefert ihren Dienst · `unique_instance_from_same_source_type_for_two_service_types_registers_both`
 - [ ] Erst `instance`, dann `unique_instance` für denselben Typ → `all` liefert beide, in der Reihenfolge der Registrierung
 - [x] Zweimal `unique_instance` für denselben Typ, beide aus demselben Quelltyp → die Umwandlung läuft nur für den ersten · `unique_instance_twice_from_same_source_type_converts_only_first`
 

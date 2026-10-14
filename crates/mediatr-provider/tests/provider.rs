@@ -737,3 +737,41 @@ fn unique_instance_twice_from_same_source_type_converts_only_first() {
 
     assert_eq!(*printed.borrow(), ["Rechnung 1"]);
 }
+
+/// Ein Eintrag im Kassenbuch mit seinem Text.
+struct LedgerEntry(String);
+
+/// Bucht eine Rechnung mit ihrer Überschrift als Text ins Kassenbuch.
+impl From<Invoice> for LedgerEntry {
+    fn from(invoice: Invoice) -> Self {
+        Self(invoice.heading)
+    }
+}
+
+#[test]
+fn unique_instance_from_same_source_type_for_two_service_types_registers_both() {
+    let provider = Provider::builder()
+        .unique_instance(
+            Invoice {
+                heading: "Rechnung 1".to_owned(),
+            },
+            Document::from,
+        )
+        .unique_instance(
+            Invoice {
+                heading: "Rechnung 2".to_owned(),
+            },
+            LedgerEntry::from,
+        )
+        .build();
+
+    let document = provider
+        .get::<Document>()
+        .map(|document| document.0.clone());
+    let entry = provider.get::<LedgerEntry>().map(|entry| entry.0.clone());
+
+    assert_eq!(
+        (document.as_deref(), entry.as_deref()),
+        (Some("Rechnung 1"), Some("Rechnung 2"))
+    );
+}
