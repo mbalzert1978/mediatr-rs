@@ -293,3 +293,18 @@ pub fn labeled_and_reordered_together(sku: u32) -> Vec<String> {
         format!("Nachbestellung fertig {sku}"),
     ]
 }
+
+/// Kennt den Bestand aus dem Zwischenspeicher und fragt das Lager gar nicht erst.
+pub struct StockCache {
+    pub cached: u32,
+}
+
+impl PipelineBehavior<LookupStock> for StockCache {
+    async fn handle(
+        &self,
+        _request: LookupStock,
+        _next: Next<LookupStock>,
+    ) -> Result<u32, StockError> {
+        Ok(self.cached)
+    }
+}

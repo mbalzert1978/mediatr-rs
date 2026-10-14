@@ -9,9 +9,9 @@ mod behaviors_fixtures;
 
 use behaviors_fixtures::{
     AuditTrail, BookReceipt, LoadingDock, LookupStock, ReceiptBook, ReorderCheck, RetryOnce,
-    ShelfLabeling, ShelfLock, SlowStockLedger, StockCounted, StockLedger, audit_and_stopwatch,
-    audited_and_timed, audited_locked_and_timed, checkpoint, labeled_and_reordered_together,
-    passed_checkpoints,
+    ShelfLabeling, ShelfLock, SlowStockLedger, StockCache, StockCounted, StockLedger,
+    audit_and_stopwatch, audited_and_timed, audited_locked_and_timed, checkpoint,
+    labeled_and_reordered_together, passed_checkpoints,
 };
 
 #[tokio::test]
@@ -416,4 +416,19 @@ async fn transient_handler_wrapped_by_behavior_is_built_once_per_send_and_wrappe
                 .to_vec()
         )
     );
+}
+
+#[tokio::test]
+async fn behavior_answering_without_next_returns_its_response_and_handler_does_not_run() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .behavior_for::<LookupStock>(StockCache { cached: 7 })
+        .register(Handler::instance(StockLedger {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let stock = mediator.send(LookupStock { sku: 4 }).await;
+
+    assert_eq!((stock, journal.borrow().len()), (Ok(7), 0));
 }
