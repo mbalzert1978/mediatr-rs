@@ -25,7 +25,9 @@ impl RequestHandler<QuotePrice> for PriceList {
 struct InboxStamp;
 
 impl<R: Request> RequestPreProcessor<R> for InboxStamp {
-    async fn process(&self, _request: &R) {}
+    async fn process(&self, _request: &R) -> Result<(), R::Error> {
+        Ok(())
+    }
 }
 
 fn main() {

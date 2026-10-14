@@ -26,10 +26,14 @@ pub trait PipelineBehavior<R: Request> {
 ///
 /// # Vertrag
 ///
-/// `process` endet für jeden Request und löst keine Panic aus.
+/// `process` endet für jeden Request mit `Ok` oder einem Fehler und löst keine Panic aus.
 pub trait RequestPreProcessor<R: Request> {
     /// Sieht `request`, bevor der Handler ihn bekommt.
-    fn process(&self, request: &R) -> impl Future<Output = ()>;
+    ///
+    /// # Errors
+    ///
+    /// `R::Error`, wenn `request` nicht weiter darf; dann läuft der Handler nicht, und `send` liefert diesen Fehler.
+    fn process(&self, request: &R) -> impl Future<Output = Result<(), R::Error>>;
 }
 
 /// Läuft nach dem Handler von Requests vom Typ `R` und sieht Request samt Antwort.
@@ -142,7 +146,7 @@ mod sealed {
 
 impl<R: Request, B: RequestPreProcessor<R>> PipelineBehavior<R> for PreProcess<B> {
     async fn handle(&self, request: R, next: Next<R>) -> HandlerResult<R> {
-        self.0.process(&request).await;
+        self.0.process(&request).await?;
         next.run(request).await
     }
 }

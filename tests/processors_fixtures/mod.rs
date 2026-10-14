@@ -50,10 +50,11 @@ pub struct InquiryLog {
 }
 
 impl RequestPreProcessor<QuotePrice> for InquiryLog {
-    async fn process(&self, request: &QuotePrice) {
+    async fn process(&self, request: &QuotePrice) -> Result<(), PriceError> {
         self.journal
             .borrow_mut()
             .push(format!("Anfrage für {} eingegangen", request.sku));
+        Ok(())
     }
 }
 
@@ -83,8 +84,9 @@ pub fn price_check<const N: usize>(journal: &Rc<RefCell<Vec<String>>>) -> PriceC
 }
 
 impl<const N: usize> RequestPreProcessor<QuotePrice> for PriceCheck<N> {
-    async fn process(&self, _request: &QuotePrice) {
+    async fn process(&self, _request: &QuotePrice) -> Result<(), PriceError> {
         self.journal.borrow_mut().push(format!("Prüfung {N}"));
+        Ok(())
     }
 }
 
@@ -151,10 +153,11 @@ pub fn inbox_stamp(journal: &Rc<RefCell<Vec<String>>>) -> InboxStamp {
 }
 
 impl<R: Request> RequestPreProcessor<R> for InboxStamp {
-    async fn process(&self, _request: &R) {
+    async fn process(&self, _request: &R) -> Result<(), R::Error> {
         self.journal
             .borrow_mut()
             .push("Eingang gestempelt".to_owned());
+        Ok(())
     }
 }
 
@@ -262,6 +265,24 @@ impl RequestHandler<QuotePrice> for RetiredItems {
         self.journal
             .borrow_mut()
             .push(format!("Artikel {} ausgelaufen", request.sku));
+        Err(PriceError::Discontinued)
+    }
+}
+
+/// Lässt keine Preisanfrage für den ausgelaufenen Artikel `retired` durch und schreibt jede Ablehnung ins Protokoll.
+pub struct RetiredFilter {
+    pub retired: u32,
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl RequestPreProcessor<QuotePrice> for RetiredFilter {
+    async fn process(&self, request: &QuotePrice) -> Result<(), PriceError> {
+        if request.sku != self.retired {
+            return Ok(());
+        }
+        self.journal
+            .borrow_mut()
+            .push(format!("Anfrage für {} abgelehnt", request.sku));
         Err(PriceError::Discontinued)
     }
 }

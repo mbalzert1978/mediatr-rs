@@ -168,6 +168,8 @@ Quelle: MediatR `test/MediatR.Tests/Pipeline/RequestPreProcessorTests.cs`, `Pipe
 - [x] Derselbe Vorverarbeiter-Typ zweimal registriert → er läuft pro `send` einmal · `same_pre_processor_type_registered_twice_runs_once_per_send`
 - [x] Vorverarbeiter nach dem ersten Handler registriert → kompiliert nicht · `pre_processor_registered_after_first_handler_does_not_compile`
 - [x] Nachverarbeiter nach dem ersten Handler registriert → kompiliert nicht · `post_processor_registered_after_first_handler_does_not_compile`
+- [x] Vorverarbeiter scheitert → der Handler läuft nicht; `send` liefert genau den Fehler des Vorverarbeiters · `failing_pre_processor_skips_handler_and_send_returns_its_error`
+- [ ] Nachverarbeiter scheitert → `send` liefert genau den Fehler des Nachverarbeiters statt der Antwort des Handlers
 
 ## Pipeline — Fehler-Handler und Fehler-Aktionen
 
