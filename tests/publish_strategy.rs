@@ -608,3 +608,24 @@ async fn concurrent_strategy_both_handlers_fail_returns_error_of_first_registere
 
     assert_eq!(published, Err(InspectionError::Damaged(7)));
 }
+
+#[tokio::test]
+async fn concurrent_strategy_only_second_handler_fails_runs_first_and_returns_second_error() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = MediatorBuilder::<Concurrent>::default()
+        .subscribe(Handler::instance(Weighing {
+            journal: Rc::clone(&journal),
+        }))
+        .subscribe(Handler::instance(DamageCheck))
+        .build();
+
+    let published = mediator.publish(ParcelInspected { tracking: 7 }).await;
+
+    assert_eq!(
+        (published, journal.borrow().clone()),
+        (
+            Err(InspectionError::Damaged(7)),
+            vec!["gewogen 7".to_owned()]
+        )
+    );
+}
