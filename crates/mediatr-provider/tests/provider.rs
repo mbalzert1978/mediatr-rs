@@ -363,6 +363,18 @@ fn recipe_asking_for_own_type_gets_none() {
 }
 
 #[test]
+fn first_of_two_recipes_asking_for_own_type_through_all_gets_none() {
+    let provider = Provider::builder()
+        .transient(settings_recipe)
+        .transient(|_| Settings { parent: None })
+        .build();
+
+    let settings = provider.all::<Settings>();
+
+    assert!(matches!(settings.as_slice(), [first, _] if first.parent.is_none()));
+}
+
+#[test]
 fn singleton_recipe_asking_for_own_type_gets_none() {
     let provider = Provider::builder().singleton(settings_recipe).build();
 
