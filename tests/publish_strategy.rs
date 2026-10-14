@@ -1,65 +1,21 @@
 //! Tests für den Abschnitt „Notification — Publish-Strategie“ in `TESTLIST.md`.
 
 use std::cell::{OnceCell, RefCell};
-use std::future::Future;
 use std::rc::Rc;
 
 use mediatr_rs::{
-    Concurrent, Handler, Mediator, MediatorBuilder, Notification, NotificationHandler,
-    PublishStrategy, Publisher, Request, RequestHandler, SendError, Sender, WeakMediator,
+    Concurrent, Handler, MediatorBuilder, NotificationHandler, Publisher, SendError, Sender,
+    WeakMediator,
 };
 
-/// Ereignis: Das Paket mit dieser Sendungsnummer ist angekommen.
-struct ParcelArrived {
-    tracking: u32,
-}
+mod publish_strategy_fixtures;
 
-impl Notification for ParcelArrived {
-    type Error = SendError;
-}
-
-/// Lagert jedes angekommene Paket ein und schreibt das ins Protokoll.
-struct Stockroom {
-    journal: Rc<RefCell<Vec<String>>>,
-}
-
-impl NotificationHandler<ParcelArrived> for Stockroom {
-    async fn handle(&self, event: &ParcelArrived) -> Result<(), SendError> {
-        self.journal
-            .borrow_mut()
-            .push(format!("eingelagert {}", event.tracking));
-        Ok(())
-    }
-}
-
-/// Benachrichtigt den Empfänger jedes angekommenen Pakets und schreibt das ins Protokoll.
-struct Recipient {
-    journal: Rc<RefCell<Vec<String>>>,
-}
-
-impl NotificationHandler<ParcelArrived> for Recipient {
-    async fn handle(&self, event: &ParcelArrived) -> Result<(), SendError> {
-        self.journal
-            .borrow_mut()
-            .push(format!("Empfänger benachrichtigt {}", event.tracking));
-        Ok(())
-    }
-}
-
-/// Ruft die Handler nacheinander auf, den zuletzt registrierten zuerst.
-struct NewestFirst;
-
-impl PublishStrategy for NewestFirst {
-    async fn publish<E, F>(calls: Vec<F>) -> Result<(), E>
-    where
-        F: Future<Output = Result<(), E>>,
-    {
-        for call in calls.into_iter().rev() {
-            call.await?;
-        }
-        Ok(())
-    }
-}
+use publish_strategy_fixtures::{
+    ArrivalClerk, CourierPlanner, CustomsHold, DamageCheck, DeliveryDue, DispatchCenter,
+    Dispatcher, DoorNotice, InspectionError, NewestFirst, ParcelArrived, ParcelInspected,
+    Recipient, Scanning, ShiftCenter, Stockroom, ThoroughDamageCheck, TrackParcel, TrackingDesk,
+    Unloading, Weighing,
+};
 
 #[tokio::test]
 async fn custom_strategy_runs_both_handlers_in_its_own_order() {
@@ -84,58 +40,6 @@ async fn custom_strategy_runs_both_handlers_in_its_own_order() {
     );
 }
 
-/// Ereignis: Das Paket mit dieser Sendungsnummer soll zugestellt werden.
-struct DeliveryDue {
-    tracking: u32,
-}
-
-impl Notification for DeliveryDue {
-    type Error = SendError;
-}
-
-/// Meldet für jedes angekommene Paket über seinen Publisher, dass es zugestellt werden soll.
-struct Dispatcher {
-    publisher: Mediator<NewestFirst>,
-}
-
-impl NotificationHandler<ParcelArrived> for Dispatcher {
-    async fn handle(&self, event: &ParcelArrived) -> Result<(), SendError> {
-        self.publisher
-            .publish(DeliveryDue {
-                tracking: event.tracking,
-            })
-            .await
-    }
-}
-
-/// Plant für jedes fällige Paket einen Kurier und schreibt das ins Protokoll.
-struct CourierPlanner {
-    journal: Rc<RefCell<Vec<String>>>,
-}
-
-impl NotificationHandler<DeliveryDue> for CourierPlanner {
-    async fn handle(&self, event: &DeliveryDue) -> Result<(), SendError> {
-        self.journal
-            .borrow_mut()
-            .push(format!("Kurier geplant {}", event.tracking));
-        Ok(())
-    }
-}
-
-/// Kündigt jedes fällige Paket an der Haustür an und schreibt das ins Protokoll.
-struct DoorNotice {
-    journal: Rc<RefCell<Vec<String>>>,
-}
-
-impl NotificationHandler<DeliveryDue> for DoorNotice {
-    async fn handle(&self, event: &DeliveryDue) -> Result<(), SendError> {
-        self.journal
-            .borrow_mut()
-            .push(format!("Tür-Hinweis {}", event.tracking));
-        Ok(())
-    }
-}
-
 #[tokio::test]
 async fn custom_strategy_transient_handler_publishes_through_received_mediator_in_its_order() {
     let journal = Rc::new(RefCell::new(Vec::new()));
@@ -155,21 +59,6 @@ async fn custom_strategy_transient_handler_publishes_through_received_mediator_i
         .unwrap();
 
     assert_eq!(*journal.borrow(), ["Tür-Hinweis 7", "Kurier geplant 7"]);
-}
-
-/// Zentrale, die für jedes angekommene Paket über ihren Publisher meldet, dass es zugestellt werden soll; es gibt sie nur einmal.
-struct DispatchCenter {
-    publisher: WeakMediator<NewestFirst>,
-}
-
-impl NotificationHandler<ParcelArrived> for DispatchCenter {
-    async fn handle(&self, event: &ParcelArrived) -> Result<(), SendError> {
-        self.publisher
-            .publish(DeliveryDue {
-                tracking: event.tracking,
-            })
-            .await
-    }
 }
 
 #[tokio::test]
@@ -281,25 +170,6 @@ async fn custom_strategy_without_clone_builder_clone_builds_mediators_reaching_s
     );
 }
 
-/// Fragt nach, wo das Paket mit dieser Sendungsnummer gerade ist.
-struct TrackParcel {
-    tracking: u32,
-}
-
-impl Request for TrackParcel {
-    type Response = String;
-    type Error = SendError;
-}
-
-/// Kennt den Ort jedes Pakets im Lager.
-struct TrackingDesk;
-
-impl RequestHandler<TrackParcel> for TrackingDesk {
-    async fn handle(&self, request: TrackParcel) -> Result<String, SendError> {
-        Ok(format!("Paket {} liegt im Lager", request.tracking))
-    }
-}
-
 #[tokio::test]
 async fn custom_strategy_send_returns_handler_response() {
     let mediator = MediatorBuilder::<NewestFirst>::default()
@@ -309,25 +179,6 @@ async fn custom_strategy_send_returns_handler_response() {
     let place = mediator.send(TrackParcel { tracking: 7 }).await;
 
     assert_eq!(place, Ok("Paket 7 liegt im Lager".to_owned()));
-}
-
-/// Fragt für jedes angekommene Paket über seinen Sender nach, wo es liegt, und schreibt die Antwort ins Protokoll; es gibt ihn nur einmal.
-struct ArrivalClerk {
-    sender: WeakMediator<NewestFirst>,
-    journal: Rc<RefCell<Vec<String>>>,
-}
-
-impl NotificationHandler<ParcelArrived> for ArrivalClerk {
-    async fn handle(&self, event: &ParcelArrived) -> Result<(), SendError> {
-        let place = self
-            .sender
-            .send(TrackParcel {
-                tracking: event.tracking,
-            })
-            .await?;
-        self.journal.borrow_mut().push(place);
-        Ok(())
-    }
 }
 
 #[tokio::test]
@@ -348,27 +199,6 @@ async fn custom_strategy_singleton_handler_sends_through_received_weak_mediator(
         (published, journal.borrow().clone()),
         (Ok(()), vec!["Paket 7 liegt im Lager".to_owned()])
     );
-}
-
-/// Zentrale mit Tag- und Nachtschicht: Jede Schicht meldet über ihren eigenen Publisher ein Paket zur Zustellung, die Nachtschicht das nächste; es gibt sie nur einmal.
-struct ShiftCenter {
-    day: WeakMediator<NewestFirst>,
-    night: WeakMediator<NewestFirst>,
-}
-
-impl NotificationHandler<ParcelArrived> for ShiftCenter {
-    async fn handle(&self, event: &ParcelArrived) -> Result<(), SendError> {
-        self.day
-            .publish(DeliveryDue {
-                tracking: event.tracking,
-            })
-            .await?;
-        self.night
-            .publish(DeliveryDue {
-                tracking: event.tracking.saturating_add(1),
-            })
-            .await
-    }
 }
 
 #[tokio::test]
@@ -424,42 +254,6 @@ async fn custom_strategy_singleton_handler_publishing_after_mediator_dropped_get
     assert_eq!(result, Err(SendError::MediatorDropped));
 }
 
-/// Entlädt jedes angekommene Paket vom Lastwagen; zwischen Beginn und Ende wartet es auf den Gabelstapler.
-struct Unloading {
-    journal: Rc<RefCell<Vec<String>>>,
-}
-
-impl NotificationHandler<ParcelArrived> for Unloading {
-    async fn handle(&self, event: &ParcelArrived) -> Result<(), SendError> {
-        self.journal
-            .borrow_mut()
-            .push(format!("Entladen beginnt {}", event.tracking));
-        tokio::task::yield_now().await;
-        self.journal
-            .borrow_mut()
-            .push(format!("Entladen fertig {}", event.tracking));
-        Ok(())
-    }
-}
-
-/// Scannt jedes angekommene Paket; zwischen Beginn und Ende wartet es auf den Scanner.
-struct Scanning {
-    journal: Rc<RefCell<Vec<String>>>,
-}
-
-impl NotificationHandler<ParcelArrived> for Scanning {
-    async fn handle(&self, event: &ParcelArrived) -> Result<(), SendError> {
-        self.journal
-            .borrow_mut()
-            .push(format!("Scannen beginnt {}", event.tracking));
-        tokio::task::yield_now().await;
-        self.journal
-            .borrow_mut()
-            .push(format!("Scannen fertig {}", event.tracking));
-        Ok(())
-    }
-}
-
 #[tokio::test]
 async fn concurrent_strategy_starts_second_waiting_handler_before_first_finished() {
     let journal = Rc::new(RefCell::new(Vec::new()));
@@ -486,52 +280,6 @@ async fn concurrent_strategy_starts_second_waiting_handler_before_first_finished
             "Scannen fertig 7"
         ]
     );
-}
-
-/// Ereignis: Das Paket mit dieser Sendungsnummer wurde am Wareneingang geprüft.
-struct ParcelInspected {
-    tracking: u32,
-}
-
-/// Warum ein Handler ein geprüftes Paket nicht annehmen kann.
-#[derive(Debug, PartialEq)]
-enum InspectionError {
-    Damaged(u32),
-    Held(u32),
-    Undeliverable(SendError),
-}
-
-impl From<SendError> for InspectionError {
-    fn from(error: SendError) -> Self {
-        Self::Undeliverable(error)
-    }
-}
-
-impl Notification for ParcelInspected {
-    type Error = InspectionError;
-}
-
-/// Meldet jedes geprüfte Paket als beschädigt.
-struct DamageCheck;
-
-impl NotificationHandler<ParcelInspected> for DamageCheck {
-    async fn handle(&self, event: &ParcelInspected) -> Result<(), InspectionError> {
-        Err(InspectionError::Damaged(event.tracking))
-    }
-}
-
-/// Wiegt jedes geprüfte Paket und schreibt das ins Protokoll.
-struct Weighing {
-    journal: Rc<RefCell<Vec<String>>>,
-}
-
-impl NotificationHandler<ParcelInspected> for Weighing {
-    async fn handle(&self, event: &ParcelInspected) -> Result<(), InspectionError> {
-        self.journal
-            .borrow_mut()
-            .push(format!("gewogen {}", event.tracking));
-        Ok(())
-    }
 }
 
 #[tokio::test]
@@ -588,15 +336,6 @@ async fn concurrent_strategy_runs_each_of_three_handlers_once_and_returns_ok() {
     );
 }
 
-/// Hält jedes geprüfte Paket beim Zoll fest.
-struct CustomsHold;
-
-impl NotificationHandler<ParcelInspected> for CustomsHold {
-    async fn handle(&self, event: &ParcelInspected) -> Result<(), InspectionError> {
-        Err(InspectionError::Held(event.tracking))
-    }
-}
-
 #[tokio::test]
 async fn concurrent_strategy_both_handlers_fail_returns_error_of_first_registered() {
     let mediator = MediatorBuilder::<Concurrent>::default()
@@ -628,16 +367,6 @@ async fn concurrent_strategy_only_second_handler_fails_runs_first_and_returns_se
             vec!["gewogen 7".to_owned()]
         )
     );
-}
-
-/// Prüft jedes Paket gründlich und meldet es danach als beschädigt; zwischendurch wartet sie auf den Prüfstand.
-struct ThoroughDamageCheck;
-
-impl NotificationHandler<ParcelInspected> for ThoroughDamageCheck {
-    async fn handle(&self, event: &ParcelInspected) -> Result<(), InspectionError> {
-        tokio::task::yield_now().await;
-        Err(InspectionError::Damaged(event.tracking))
-    }
 }
 
 #[tokio::test]

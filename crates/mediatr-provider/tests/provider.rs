@@ -4,11 +4,16 @@ use std::cell::{Cell, RefCell};
 use std::panic::{self, AssertUnwindSafe};
 use std::rc::Rc;
 
-use mediatr_provider::{Provider, Registration, WeakProvider};
+use mediatr_provider::{Provider, Registration};
 
-struct Config;
+mod provider_fixtures;
 
-struct Name(&'static str);
+use provider_fixtures::{
+    Alive, AuditLog, Config, Connection, Course, DeliveryNote, Document, Employee, Folder,
+    Greeting, Invoice, LedgerEntry, MenuItem, Name, Printer, Report, Repository, Scheduler,
+    Session, Settings, Student, Team, UnitOfWork, connection_recipe, counting_recipe,
+    settings_recipe,
+};
 
 #[test]
 fn instance_returns_same_object_on_every_get() {
@@ -162,8 +167,6 @@ fn singleton_returns_same_object_in_new_scope() {
     assert!(Rc::ptr_eq(&first, &second));
 }
 
-struct Greeting(String);
-
 #[test]
 fn recipe_gets_other_service_from_provider() {
     let provider = Provider::builder()
@@ -176,14 +179,6 @@ fn recipe_gets_other_service_from_provider() {
     let greeting = provider.get::<Greeting>().unwrap();
 
     assert_eq!(greeting.0, "Hallo Welt");
-}
-
-/// Eine Sitzung, die pro Scope neu entsteht; `0` ist ihre laufende Nummer.
-struct Session(u32);
-
-/// Schreibt für die ganze Anwendung mit; hält die Sitzung, die es beim Bau bekam.
-struct AuditLog {
-    session: Rc<Session>,
 }
 
 #[test]
@@ -248,20 +243,6 @@ fn upgraded_weak_provider_returns_same_singleton() {
     ));
 }
 
-/// Meldet über den geteilten Schalter, ob der Dienst noch lebt, der ihn hält: Sein `Drop` setzt ihn auf `false`.
-struct Alive(Rc<Cell<bool>>);
-
-impl Drop for Alive {
-    fn drop(&mut self) {
-        self.0.set(false);
-    }
-}
-
-/// Ein Drucker im Netz, an den die Anwendung Aufträge schickt.
-struct Printer {
-    _alive: Alive,
-}
-
 #[test]
 fn both_instances_of_same_type_are_released_with_provider() {
     let office = Rc::new(Cell::new(true));
@@ -278,12 +259,6 @@ fn both_instances_of_same_type_are_released_with_provider() {
     drop(provider);
 
     assert!(!office.get() && !lobby.get());
-}
-
-/// Plant Aufgaben für die ganze Anwendung; merkt sich den Provider, um später Dienste zu holen.
-struct Scheduler {
-    _provider: WeakProvider,
-    _alive: Alive,
 }
 
 #[test]
@@ -340,12 +315,6 @@ fn upgrade_after_scope_dropped_returns_none() {
     assert!(weak.upgrade().is_none());
 }
 
-/// Bündelt die Änderungen einer Anfrage; merkt sich ihren Scope, um später Dienste zu holen.
-struct UnitOfWork {
-    _scope: WeakProvider,
-    _alive: Alive,
-}
-
 #[test]
 fn scoped_holding_weak_scope_is_released_with_scope() {
     let open = Rc::new(Cell::new(true));
@@ -362,12 +331,6 @@ fn scoped_holding_weak_scope_is_released_with_scope() {
     drop(scope);
 
     assert!(!open.get());
-}
-
-/// Ein Bericht, der seine Aufgaben über den Scheduler plant.
-struct Report {
-    _scheduler: Rc<Scheduler>,
-    _alive: Alive,
 }
 
 #[test]
@@ -390,18 +353,6 @@ fn scoped_service_and_its_singleton_with_weak_provider_are_released_with_provide
     drop(provider);
 
     assert!(!running.get() && !open.get());
-}
-
-/// Einstellungen, die sich beim Bau auf übergeordnete Einstellungen stützen, falls es welche gibt.
-struct Settings {
-    parent: Option<Rc<Settings>>,
-}
-
-/// Bauanleitung für `Settings`, die beim Provider nach übergeordneten `Settings` fragt.
-fn settings_recipe(provider: &Provider) -> Settings {
-    Settings {
-        parent: provider.get::<Settings>(),
-    }
 }
 
 #[test]
@@ -449,12 +400,6 @@ fn scoped_recipe_asking_for_own_type_gets_none() {
     assert!(settings.parent.is_none());
 }
 
-/// Ein Ordner mit übergeordnetem Ordner und Vorlage, falls es sie gibt.
-struct Folder {
-    parent: Option<Rc<Folder>>,
-    template: Option<Rc<Folder>>,
-}
-
 #[test]
 fn recipe_asking_twice_for_own_type_gets_none_both_times() {
     let provider = Provider::builder()
@@ -467,11 +412,6 @@ fn recipe_asking_twice_for_own_type_gets_none_both_times() {
     let folder = provider.get::<Folder>().unwrap();
 
     assert!(folder.parent.is_none() && folder.template.is_none());
-}
-
-/// Ein Menüeintrag, der beim Bau alle Einträge seines Menüs sammelt.
-struct MenuItem {
-    siblings: Vec<Rc<MenuItem>>,
 }
 
 #[test]
@@ -500,16 +440,6 @@ fn recipe_asking_all_for_own_type_through_get_gets_empty_list() {
     assert!(item.siblings.is_empty());
 }
 
-/// Ein Kurs mit allen Studierenden, die beim Bau bekannt sind.
-struct Course {
-    students: Vec<Rc<Student>>,
-}
-
-/// Eine Studentin mit allen Kursen, die beim Bau bekannt sind.
-struct Student {
-    courses: Vec<Rc<Course>>,
-}
-
 #[test]
 fn mutually_dependent_recipes_get_empty_list_from_inner_all() {
     let provider = Provider::builder()
@@ -529,16 +459,6 @@ fn mutually_dependent_recipes_get_empty_list_from_inner_all() {
     ));
 }
 
-/// Ein Team mit seiner Leitung, falls es eine gibt.
-struct Team {
-    lead: Option<Rc<Employee>>,
-}
-
-/// Eine Mitarbeiterin mit ihrem Team, falls es eins gibt.
-struct Employee {
-    team: Option<Rc<Team>>,
-}
-
 #[test]
 fn mutually_dependent_recipes_get_none_for_inner_query() {
     let provider = Provider::builder()
@@ -554,9 +474,6 @@ fn mutually_dependent_recipes_get_none_for_inner_query() {
 
     assert!(team.lead.as_ref().unwrap().team.is_none());
 }
-
-/// Eine Verbindung zu einem Server, der nicht immer erreichbar ist.
-struct Connection;
 
 #[test]
 fn recipe_runs_again_after_caught_panic() {
@@ -604,11 +521,6 @@ fn scoped_recipe_runs_again_after_caught_panic() {
     assert!(connection.is_some());
 }
 
-/// Liest Daten über eine Verbindung, falls es eine gibt.
-struct Repository {
-    connection: Option<Rc<Connection>>,
-}
-
 #[test]
 fn recipe_runs_again_after_caught_panic_in_dependency() {
     let (server_up, recipe) = connection_recipe();
@@ -625,43 +537,6 @@ fn recipe_runs_again_after_caught_panic_in_dependency() {
     let repository = provider.get::<Repository>().unwrap();
 
     assert!(repository.connection.is_some());
-}
-
-/// Liefert den Schalter für den Server (anfangs aus) und eine Bauanleitung für `Connection`, die mit einem Panic abbricht, solange er aus ist.
-fn connection_recipe() -> (Rc<Cell<bool>>, impl Fn(&Provider) -> Connection) {
-    let server_up = Rc::new(Cell::new(false));
-    let reachable = Rc::clone(&server_up);
-    let recipe = move |_: &Provider| {
-        assert!(reachable.get(), "Server nicht erreichbar");
-        Connection
-    };
-    (server_up, recipe)
-}
-
-/// Liefert eine Bauanleitung für `Config` und den Zähler ihrer Läufe.
-fn counting_recipe() -> (Rc<Cell<u32>>, impl Fn(&Provider) -> Config) {
-    let calls = Rc::new(Cell::new(0_u32));
-    let counter = Rc::clone(&calls);
-    let recipe = move |_: &Provider| {
-        counter.set(counter.get().saturating_add(1));
-        Config
-    };
-    (calls, recipe)
-}
-
-/// Eine Rechnung mit ihrer Überschrift.
-struct Invoice {
-    heading: String,
-}
-
-/// Ein druckfertiges Dokument mit seinem Titel.
-struct Document(String);
-
-/// Macht aus einer Rechnung ein Dokument mit ihrer Überschrift als Titel.
-impl From<Invoice> for Document {
-    fn from(invoice: Invoice) -> Self {
-        Self(invoice.heading)
-    }
 }
 
 #[test]
@@ -688,18 +563,6 @@ fn unique_instance_twice_from_same_source_type_all_returns_first() {
         .collect();
 
     assert_eq!(titles, ["Rechnung 1"]);
-}
-
-/// Ein Lieferschein mit seiner Überschrift.
-struct DeliveryNote {
-    heading: String,
-}
-
-/// Macht aus einem Lieferschein ein Dokument mit seiner Überschrift als Titel.
-impl From<DeliveryNote> for Document {
-    fn from(note: DeliveryNote) -> Self {
-        Self(note.heading)
-    }
 }
 
 #[test]
@@ -750,16 +613,6 @@ fn unique_instance_twice_from_same_source_type_get_returns_first() {
         .map(|document| document.0.clone());
 
     assert_eq!(title.as_deref(), Some("Rechnung 1"));
-}
-
-/// Ein Eintrag im Kassenbuch mit seinem Text.
-struct LedgerEntry(String);
-
-/// Bucht eine Rechnung mit ihrer Überschrift als Text ins Kassenbuch.
-impl From<Invoice> for LedgerEntry {
-    fn from(invoice: Invoice) -> Self {
-        Self(invoice.heading)
-    }
 }
 
 #[test]

@@ -3,25 +3,14 @@
 use std::cell::{Cell, OnceCell};
 use std::rc::Rc;
 
-use mediatr_rs::{Handler, Mediator, Request, RequestHandler, SendError, Sender, WeakMediator};
+use mediatr_rs::{Handler, Mediator, SendError, Sender, WeakMediator};
 
-struct Ping(String);
+mod send_fixtures;
 
-#[derive(Debug, PartialEq)]
-struct Pong(String);
-
-impl Request for Ping {
-    type Response = Pong;
-    type Error = SendError;
-}
-
-struct PingHandler;
-
-impl RequestHandler<Ping> for PingHandler {
-    async fn handle(&self, request: Ping) -> Result<Pong, SendError> {
-        Ok(Pong(format!("{} Pong", request.0)))
-    }
-}
+use send_fixtures::{
+    Ping, PingHandler, Pong, Reject, RejectError, RejectHandler, ReplacementPingHandler, VoidPing,
+    VoidPingHandler,
+};
 
 #[tokio::test]
 async fn send_returns_handler_response() {
@@ -32,14 +21,6 @@ async fn send_returns_handler_response() {
     let response = mediator.send(Ping("Ping".to_owned())).await.unwrap();
 
     assert_eq!(response, Pong("Ping Pong".to_owned()));
-}
-
-struct ReplacementPingHandler;
-
-impl RequestHandler<Ping> for ReplacementPingHandler {
-    async fn handle(&self, request: Ping) -> Result<Pong, SendError> {
-        Ok(Pong(format!("{} Replacement", request.0)))
-    }
 }
 
 #[tokio::test]
@@ -65,24 +46,6 @@ async fn register_accepts_async_closure() {
     let response = mediator.send(Ping("Ping".to_owned())).await.unwrap();
 
     assert_eq!(response, Pong("Ping Closure".to_owned()));
-}
-
-struct VoidPing;
-
-impl Request for VoidPing {
-    type Response = ();
-    type Error = SendError;
-}
-
-struct VoidPingHandler {
-    called: Rc<Cell<bool>>,
-}
-
-impl RequestHandler<VoidPing> for VoidPingHandler {
-    async fn handle(&self, _request: VoidPing) -> Result<(), SendError> {
-        self.called.set(true);
-        Ok(())
-    }
 }
 
 #[tokio::test]
@@ -126,33 +89,6 @@ async fn send_without_handler_returns_err() {
     let response = mediator.send(Ping("Ping".to_owned())).await;
 
     assert_eq!(response, Err(SendError::NoHandler));
-}
-
-struct Reject;
-
-#[derive(Debug, PartialEq)]
-enum RejectError {
-    Undeliverable(SendError),
-    Rejected,
-}
-
-impl From<SendError> for RejectError {
-    fn from(error: SendError) -> Self {
-        Self::Undeliverable(error)
-    }
-}
-
-impl Request for Reject {
-    type Response = ();
-    type Error = RejectError;
-}
-
-struct RejectHandler;
-
-impl RequestHandler<Reject> for RejectHandler {
-    async fn handle(&self, _request: Reject) -> Result<(), RejectError> {
-        Err(RejectError::Rejected)
-    }
 }
 
 #[tokio::test]

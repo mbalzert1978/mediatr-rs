@@ -3,117 +3,14 @@
 use std::cell::{Cell, OnceCell};
 use std::rc::Rc;
 
-use mediatr_rs::{Handler, Mediator, Request, RequestHandler, SendError, Sender, WeakMediator};
+use mediatr_rs::{Handler, Mediator, RequestHandler, SendError, Sender, WeakMediator};
 
-#[derive(Clone)]
-struct Customer {
-    id: u32,
-    name: String,
-    vip: bool,
-}
+mod mediator_fixtures;
 
-/// Die VIP-Kundin mit der Nummer 7, die in den Bestell-Tests bestellt.
-fn ada() -> Customer {
-    Customer {
-        id: 7,
-        name: "Ada".to_owned(),
-        vip: true,
-    }
-}
-
-struct GetCustomer {
-    id: u32,
-}
-
-#[derive(Debug)]
-enum CustomerError {
-    NotFound,
-    Undeliverable(SendError),
-}
-
-impl From<SendError> for CustomerError {
-    fn from(error: SendError) -> Self {
-        Self::Undeliverable(error)
-    }
-}
-
-impl Request for GetCustomer {
-    type Response = Customer;
-    type Error = CustomerError;
-}
-
-/// Kennt alle Kunden; bekommt sie über den Konstruktor.
-struct CustomerDirectory {
-    customers: Vec<Customer>,
-}
-
-impl RequestHandler<GetCustomer> for CustomerDirectory {
-    async fn handle(&self, request: GetCustomer) -> Result<Customer, CustomerError> {
-        self.customers
-            .iter()
-            .find(|customer| customer.id == request.id)
-            .cloned()
-            .ok_or(CustomerError::NotFound)
-    }
-}
-
-struct PlaceOrder {
-    customer_id: u32,
-    amount: u32,
-}
-
-#[derive(Debug, PartialEq)]
-struct Confirmation {
-    customer: String,
-    total: u32,
-}
-
-#[derive(Debug)]
-enum OrderError {
-    /// Der Kunde ließ sich nicht holen; der Grund bleibt erhalten.
-    Customer(CustomerError),
-    Undeliverable,
-}
-
-impl From<SendError> for OrderError {
-    fn from(_: SendError) -> Self {
-        Self::Undeliverable
-    }
-}
-
-impl From<CustomerError> for OrderError {
-    fn from(error: CustomerError) -> Self {
-        Self::Customer(error)
-    }
-}
-
-impl Request for PlaceOrder {
-    type Response = Confirmation;
-    type Error = OrderError;
-}
-
-const VIP_DISCOUNT: u32 = 10;
-
-/// Nimmt Bestellungen an; holt den Kunden über den Sender, den er per Konstruktor bekommt.
-struct PlaceOrderHandler<S> {
-    sender: S,
-}
-
-impl<S: Sender<GetCustomer>> RequestHandler<PlaceOrder> for PlaceOrderHandler<S> {
-    async fn handle(&self, order: PlaceOrder) -> Result<Confirmation, OrderError> {
-        let customer = self
-            .sender
-            .send(GetCustomer {
-                id: order.customer_id,
-            })
-            .await?;
-        let discount = if customer.vip { VIP_DISCOUNT } else { 0 };
-        Ok(Confirmation {
-            customer: customer.name,
-            total: order.amount.saturating_sub(discount),
-        })
-    }
-}
+use mediator_fixtures::{
+    Confirmation, CustomerDirectory, CustomerError, FixedCustomer, OrderError, PlaceOrder,
+    PlaceOrderHandler, WarehouseOrderHandler, ada,
+};
 
 #[tokio::test]
 async fn handler_processes_data_fetched_through_injected_sender() {
@@ -215,24 +112,6 @@ async fn singleton_builds_handler_only_on_first_send() {
     assert_eq!(built.get(), 1);
 }
 
-/// Nimmt Bestellungen an wie [`PlaceOrderHandler`] und hält dafür die Leitung zum Lager offen; beim Freigeben legt er auf.
-struct WarehouseOrderHandler {
-    orders: PlaceOrderHandler<WeakMediator>,
-    line_open: Rc<Cell<bool>>,
-}
-
-impl RequestHandler<PlaceOrder> for WarehouseOrderHandler {
-    async fn handle(&self, order: PlaceOrder) -> Result<Confirmation, OrderError> {
-        self.orders.handle(order).await
-    }
-}
-
-impl Drop for WarehouseOrderHandler {
-    fn drop(&mut self) {
-        self.line_open.set(false);
-    }
-}
-
 #[tokio::test]
 async fn singleton_handler_with_sender_is_released_with_mediator() {
     let line_open = Rc::new(Cell::new(true));
@@ -257,15 +136,6 @@ async fn singleton_handler_with_sender_is_released_with_mediator() {
     drop(mediator);
 
     assert!(!line_open.get());
-}
-
-/// Attrappe für den Sender: antwortet auf jede Kundenabfrage mit derselben Kundin, ohne Mediator.
-struct FixedCustomer(Customer);
-
-impl Sender<GetCustomer> for FixedCustomer {
-    async fn send(&self, _request: GetCustomer) -> Result<Customer, CustomerError> {
-        Ok(self.0.clone())
-    }
 }
 
 #[tokio::test]

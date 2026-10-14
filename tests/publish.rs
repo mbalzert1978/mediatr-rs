@@ -2,34 +2,17 @@
 
 use std::cell::{Cell, OnceCell, RefCell};
 use std::error::Error;
-use std::fmt;
 use std::rc::Rc;
 
-use mediatr_rs::{
-    Handler, Mediator, Notification, NotificationHandler, Publisher, Request, RequestHandler,
-    SendError, Sender, WeakMediator,
+use mediatr_rs::{Handler, Mediator, Publisher, RequestHandler, SendError, Sender, WeakMediator};
+
+mod publish_fixtures;
+
+use publish_fixtures::{
+    Billing, Blocklist, CancellationError, CancellationMail, Checkout, CheckoutHandler, FraudCheck,
+    FraudDesk, FraudInvestigator, OrderCancelled, OrderPlaced, Packing, RecordedOrders, Refund,
+    ShippingDesk, TwoDesks, Warehouse,
 };
-
-/// Ereignis: Die Bestellung mit dieser Nummer ist eingegangen.
-struct OrderPlaced {
-    order_id: u32,
-}
-
-impl Notification for OrderPlaced {
-    type Error = SendError;
-}
-
-/// Druckt für jede eingegangene Bestellung ein Versandetikett mit ihrer Nummer.
-struct ShippingDesk {
-    labels: Rc<RefCell<Vec<u32>>>,
-}
-
-impl NotificationHandler<OrderPlaced> for ShippingDesk {
-    async fn handle(&self, event: &OrderPlaced) -> Result<(), SendError> {
-        self.labels.borrow_mut().push(event.order_id);
-        Ok(())
-    }
-}
 
 #[tokio::test]
 async fn publish_runs_registered_handler() {
@@ -57,34 +40,6 @@ async fn publish_without_handler_returns_ok() {
     assert!(matches!(result, Ok(())));
 }
 
-/// Reserviert für jede eingegangene Bestellung die Ware und schreibt das ins Protokoll.
-struct Warehouse {
-    journal: Rc<RefCell<Vec<String>>>,
-}
-
-impl NotificationHandler<OrderPlaced> for Warehouse {
-    async fn handle(&self, event: &OrderPlaced) -> Result<(), SendError> {
-        self.journal
-            .borrow_mut()
-            .push(format!("Ware reserviert für {}", event.order_id));
-        Ok(())
-    }
-}
-
-/// Stellt für jede eingegangene Bestellung eine Rechnung aus und schreibt das ins Protokoll.
-struct Billing {
-    journal: Rc<RefCell<Vec<String>>>,
-}
-
-impl NotificationHandler<OrderPlaced> for Billing {
-    async fn handle(&self, event: &OrderPlaced) -> Result<(), SendError> {
-        self.journal
-            .borrow_mut()
-            .push(format!("Rechnung für {}", event.order_id));
-        Ok(())
-    }
-}
-
 #[tokio::test]
 async fn publish_runs_both_handlers_in_registration_order() {
     let journal = Rc::new(RefCell::new(Vec::new()));
@@ -108,59 +63,6 @@ async fn publish_runs_both_handlers_in_registration_order() {
     );
 }
 
-/// Ereignis: Die Bestellung mit dieser Nummer ist storniert.
-struct OrderCancelled {
-    order_id: u32,
-}
-
-#[derive(Debug, PartialEq)]
-enum CancellationError {
-    Undeliverable(SendError),
-    PaymentProviderDown,
-}
-
-impl From<SendError> for CancellationError {
-    fn from(error: SendError) -> Self {
-        Self::Undeliverable(error)
-    }
-}
-
-impl fmt::Display for CancellationError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Undeliverable(error) => write!(f, "Storno nicht zustellbar: {error}"),
-            Self::PaymentProviderDown => f.write_str("Zahlungsdienst nicht erreichbar"),
-        }
-    }
-}
-
-impl Error for CancellationError {}
-
-impl Notification for OrderCancelled {
-    type Error = CancellationError;
-}
-
-/// Zahlt den Betrag einer stornierten Bestellung zurück; der Zahlungsdienst ist gerade nicht erreichbar.
-struct Refund;
-
-impl NotificationHandler<OrderCancelled> for Refund {
-    async fn handle(&self, _event: &OrderCancelled) -> Result<(), CancellationError> {
-        Err(CancellationError::PaymentProviderDown)
-    }
-}
-
-/// Schickt dem Kunden für jede stornierte Bestellung eine Mail mit ihrer Nummer.
-struct CancellationMail {
-    sent: Rc<RefCell<Vec<u32>>>,
-}
-
-impl NotificationHandler<OrderCancelled> for CancellationMail {
-    async fn handle(&self, event: &OrderCancelled) -> Result<(), CancellationError> {
-        self.sent.borrow_mut().push(event.order_id);
-        Ok(())
-    }
-}
-
 #[tokio::test]
 async fn publish_returns_first_handler_error_and_skips_second_handler() {
     let sent = Rc::new(RefCell::new(Vec::new()));
@@ -177,34 +79,6 @@ async fn publish_returns_first_handler_error_and_skips_second_handler() {
         (result, sent.borrow().as_slice()),
         (Err(CancellationError::PaymentProviderDown), [].as_slice())
     );
-}
-
-/// Zwei Versandstellen, die ihre Etiketten getrennt sammeln: Daran sieht ein Test, welche von zwei Registrierungen desselben Handler-Typs gelaufen ist.
-#[derive(Clone, Default)]
-struct TwoDesks {
-    front: Rc<RefCell<Vec<u32>>>,
-    back: Rc<RefCell<Vec<u32>>>,
-}
-
-impl TwoDesks {
-    /// Die vordere Versandstelle.
-    fn front(&self) -> ShippingDesk {
-        ShippingDesk {
-            labels: Rc::clone(&self.front),
-        }
-    }
-
-    /// Die hintere Versandstelle.
-    fn back(&self) -> ShippingDesk {
-        ShippingDesk {
-            labels: Rc::clone(&self.back),
-        }
-    }
-
-    /// Die Etiketten der vorderen und der hinteren Versandstelle.
-    fn labels(&self) -> (Vec<u32>, Vec<u32>) {
-        (self.front.borrow().clone(), self.back.borrow().clone())
-    }
 }
 
 #[tokio::test]
@@ -251,24 +125,6 @@ async fn publish_reaches_only_handlers_of_its_notification_type() {
     );
 }
 
-/// Packt für jede eingegangene Bestellung ein Paket; zwischen Beginn und Ende wartet es auf das Lager.
-struct Packing {
-    journal: Rc<RefCell<Vec<String>>>,
-}
-
-impl NotificationHandler<OrderPlaced> for Packing {
-    async fn handle(&self, event: &OrderPlaced) -> Result<(), SendError> {
-        self.journal
-            .borrow_mut()
-            .push(format!("Packen beginnt für {}", event.order_id));
-        tokio::task::yield_now().await;
-        self.journal
-            .borrow_mut()
-            .push(format!("Paket fertig für {}", event.order_id));
-        Ok(())
-    }
-}
-
 #[tokio::test]
 async fn publish_starts_second_handler_after_first_handler_finished_waiting() {
     let journal = Rc::new(RefCell::new(Vec::new()));
@@ -296,31 +152,6 @@ async fn publish_starts_second_handler_after_first_handler_finished_waiting() {
     );
 }
 
-/// Schließt die Bestellung mit dieser Nummer ab.
-struct Checkout {
-    order_id: u32,
-}
-
-impl Request for Checkout {
-    type Response = ();
-    type Error = SendError;
-}
-
-/// Schließt Bestellungen ab und meldet sie über den Publisher, den er per Konstruktor bekommt.
-struct CheckoutHandler<P> {
-    publisher: P,
-}
-
-impl<P: Publisher<OrderPlaced>> RequestHandler<Checkout> for CheckoutHandler<P> {
-    async fn handle(&self, checkout: Checkout) -> Result<(), SendError> {
-        self.publisher
-            .publish(OrderPlaced {
-                order_id: checkout.order_id,
-            })
-            .await
-    }
-}
-
 #[tokio::test]
 async fn request_handler_publishes_through_injected_publisher() {
     let labels = Rc::new(RefCell::new(Vec::new()));
@@ -336,18 +167,6 @@ async fn request_handler_publishes_through_injected_publisher() {
     mediator.send(Checkout { order_id: 42 }).await.unwrap();
 
     assert_eq!(*labels.borrow(), [42]);
-}
-
-/// Attrappe statt des Mediators: merkt sich die Nummer jeder gemeldeten Bestellung.
-struct RecordedOrders {
-    order_ids: Rc<RefCell<Vec<u32>>>,
-}
-
-impl Publisher<OrderPlaced> for RecordedOrders {
-    async fn publish(&self, event: OrderPlaced) -> Result<(), SendError> {
-        self.order_ids.borrow_mut().push(event.order_id);
-        Ok(())
-    }
 }
 
 #[tokio::test]
@@ -444,46 +263,6 @@ async fn subscribe_transient_builds_handler_on_every_publish() {
         .unwrap();
 
     assert_eq!(builds.get(), 2);
-}
-
-/// Ereignis: Die Bestellung mit dieser Nummer steht unter Betrugsverdacht.
-struct FraudSuspected {
-    order_id: u32,
-}
-
-impl Notification for FraudSuspected {
-    type Error = SendError;
-}
-
-/// Prüft jede eingegangene Bestellung und meldet gesperrte Nummern über den Mediator, den sie per Konstruktor bekommt.
-struct FraudCheck {
-    publisher: Mediator,
-    blocked: Vec<u32>,
-}
-
-impl NotificationHandler<OrderPlaced> for FraudCheck {
-    async fn handle(&self, event: &OrderPlaced) -> Result<(), SendError> {
-        if !self.blocked.contains(&event.order_id) {
-            return Ok(());
-        }
-        self.publisher
-            .publish(FraudSuspected {
-                order_id: event.order_id,
-            })
-            .await
-    }
-}
-
-/// Legt für jeden Betrugsverdacht einen Fall mit der Bestellnummer an.
-struct FraudDesk {
-    cases: Rc<RefCell<Vec<u32>>>,
-}
-
-impl NotificationHandler<FraudSuspected> for FraudDesk {
-    async fn handle(&self, event: &FraudSuspected) -> Result<(), SendError> {
-        self.cases.borrow_mut().push(event.order_id);
-        Ok(())
-    }
 }
 
 #[tokio::test]
@@ -587,43 +366,6 @@ async fn publish_runs_two_handler_types_subscribed_transient_in_registration_ord
         *journal.borrow(),
         ["Ware reserviert für 42", "Rechnung für 42"]
     );
-}
-
-/// Sperrt den Kunden der Bestellung mit dieser Nummer.
-struct BlockCustomer {
-    order_id: u32,
-}
-
-impl Request for BlockCustomer {
-    type Response = ();
-    type Error = SendError;
-}
-
-/// Führt die Sperrliste und trägt jede Bestellnummer ein, deren Kunde gesperrt wird.
-struct Blocklist {
-    order_ids: Rc<RefCell<Vec<u32>>>,
-}
-
-impl RequestHandler<BlockCustomer> for Blocklist {
-    async fn handle(&self, request: BlockCustomer) -> Result<(), SendError> {
-        self.order_ids.borrow_mut().push(request.order_id);
-        Ok(())
-    }
-}
-
-/// Ermittelt bei jedem Betrugsverdacht und lässt den Kunden über den Mediator sperren, den sie per Konstruktor bekommt.
-struct FraudInvestigator {
-    sender: Mediator,
-}
-
-impl NotificationHandler<FraudSuspected> for FraudInvestigator {
-    async fn handle(&self, event: &FraudSuspected) -> Result<(), SendError> {
-        self.sender
-            .send(BlockCustomer {
-                order_id: event.order_id,
-            })
-            .await
-    }
 }
 
 #[tokio::test]
