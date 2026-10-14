@@ -1,0 +1,12 @@
+error[E0599]: no method named `pre_processor` found for struct `MediatorBuilder<Sequential, (), WithHandlers>` in the current scope
+  --> tests/ui/pre_processor_after_handler.rs:34:10
+   |
+32 |       let _mediator = Mediator::builder()
+   |  _____________________-
+33 | |         .register(Handler::instance(PriceList))
+34 | |         .pre_processor(InboxStamp)
+   | |         -^^^^^^^^^^^^^ method not found in `MediatorBuilder<Sequential, (), WithHandlers>`
+   | |_________|
+   |
+   |
+   = note: the method was found for `MediatorBuilder<S, P>`

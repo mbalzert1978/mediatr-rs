@@ -20,3 +20,8 @@ fn behavior_requiring_clone_makes_send_for_non_clone_request_not_compile() {
 fn post_processor_makes_send_for_non_clone_request_not_compile() {
     trybuild::TestCases::new().compile_fail("tests/ui/post_processor_requires_clone.rs");
 }
+
+#[test]
+fn pre_processor_registered_after_first_handler_does_not_compile() {
+    trybuild::TestCases::new().compile_fail("tests/ui/pre_processor_after_handler.rs");
+}
