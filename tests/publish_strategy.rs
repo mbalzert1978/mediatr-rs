@@ -310,3 +310,42 @@ async fn custom_strategy_send_returns_handler_response() {
 
     assert_eq!(place, Ok("Paket 7 liegt im Lager".to_owned()));
 }
+
+/// Fragt für jedes angekommene Paket über seinen Sender nach, wo es liegt, und schreibt die Antwort ins Protokoll; es gibt ihn nur einmal.
+struct ArrivalClerk {
+    sender: WeakMediator<NewestFirst>,
+    journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl NotificationHandler<ParcelArrived> for ArrivalClerk {
+    async fn handle(&self, event: &ParcelArrived) -> Result<(), SendError> {
+        let place = self
+            .sender
+            .send(TrackParcel {
+                tracking: event.tracking,
+            })
+            .await?;
+        self.journal.borrow_mut().push(place);
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn custom_strategy_singleton_handler_sends_through_received_weak_mediator() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let clerk_journal = Rc::clone(&journal);
+    let mediator = MediatorBuilder::<NewestFirst>::default()
+        .register(Handler::instance(TrackingDesk))
+        .subscribe(Handler::singleton(move |sender| ArrivalClerk {
+            sender,
+            journal: Rc::clone(&clerk_journal),
+        }))
+        .build();
+
+    let published = mediator.publish(ParcelArrived { tracking: 7 }).await;
+
+    assert_eq!(
+        (published, journal.borrow().clone()),
+        (Ok(()), vec!["Paket 7 liegt im Lager".to_owned()])
+    );
+}
