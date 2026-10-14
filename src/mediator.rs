@@ -37,7 +37,6 @@ pub struct Handler<H, S = Sequential> {
 }
 
 /// Sammelt Handler und baut daraus einen [`Mediator`] mit der Publish-Strategie `S`.
-#[derive(Clone)]
 pub struct MediatorBuilder<S = Sequential> {
     provider: ProviderBuilder,
     strategy: PhantomData<S>,
@@ -232,6 +231,16 @@ impl<H, S> fmt::Debug for Handler<H, S> {
         f.debug_struct("Handler")
             .field("registration", &self.registration)
             .finish()
+    }
+}
+
+// Von Hand statt `derive`, aus demselben Grund wie bei `Mediator`.
+impl<S> Clone for MediatorBuilder<S> {
+    fn clone(&self) -> Self {
+        Self {
+            provider: self.provider.clone(),
+            strategy: PhantomData,
+        }
     }
 }
 

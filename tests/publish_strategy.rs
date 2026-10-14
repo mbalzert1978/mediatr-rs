@@ -247,3 +247,36 @@ async fn custom_strategy_without_debug_mediator_weak_mediator_and_builder_debug_
         "{outputs:?}"
     );
 }
+
+#[tokio::test]
+async fn custom_strategy_without_clone_builder_clone_builds_mediators_reaching_same_handlers() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let builder = MediatorBuilder::<NewestFirst>::default()
+        .subscribe(Handler::instance(CourierPlanner {
+            journal: Rc::clone(&journal),
+        }))
+        .subscribe(Handler::instance(DoorNotice {
+            journal: Rc::clone(&journal),
+        }));
+    let copy = builder.clone();
+
+    builder
+        .build()
+        .publish(DeliveryDue { tracking: 7 })
+        .await
+        .unwrap();
+    copy.build()
+        .publish(DeliveryDue { tracking: 8 })
+        .await
+        .unwrap();
+
+    assert_eq!(
+        *journal.borrow(),
+        [
+            "Tür-Hinweis 7",
+            "Kurier geplant 7",
+            "Tür-Hinweis 8",
+            "Kurier geplant 8"
+        ]
+    );
+}
