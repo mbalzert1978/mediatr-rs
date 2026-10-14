@@ -256,3 +256,31 @@ async fn same_behavior_registered_for_one_request_type_then_for_all_runs_twice_f
         )
     );
 }
+
+#[tokio::test]
+async fn same_behavior_registered_for_all_and_for_one_request_type_runs_once_for_another_type() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .behavior(AuditTrail {
+            journal: Rc::clone(&journal),
+        })
+        .behavior_for::<LookupStock>(AuditTrail {
+            journal: Rc::clone(&journal),
+        })
+        .register(Handler::instance(ReceiptBook {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let booked = mediator.send(BookReceipt { sku: 9 }).await;
+
+    assert_eq!(
+        (booked, journal.borrow().clone()),
+        (
+            Ok(()),
+            ["Prüfung beginnt", "Eingang gebucht für 9", "Prüfung endet"]
+                .map(str::to_owned)
+                .to_vec()
+        )
+    );
+}
