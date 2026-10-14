@@ -40,10 +40,18 @@ pub trait RequestPreProcessor<R: Request> {
 ///
 /// # Vertrag
 ///
-/// `process` endet für jeden Request und löst keine Panic aus.
+/// `process` endet für jeden Request mit `Ok` oder einem Fehler und löst keine Panic aus.
 pub trait RequestPostProcessor<R: Request> {
     /// Sieht `request` mit der `response` des Handlers.
-    fn process(&self, request: &R, response: &R::Response) -> impl Future<Output = ()>;
+    ///
+    /// # Errors
+    ///
+    /// `R::Error`, wenn `response` nicht hinaus darf; dann liefert `send` diesen Fehler statt der Antwort.
+    fn process(
+        &self,
+        request: &R,
+        response: &R::Response,
+    ) -> impl Future<Output = Result<(), R::Error>>;
 }
 
 pub(crate) use sealed::{Behaviors, Closed, Open, PostProcess, PreProcess, Slot, Stage};
@@ -155,7 +163,7 @@ impl<R: Request + Clone, B: RequestPostProcessor<R>> PipelineBehavior<R> for Pos
     async fn handle(&self, request: R, next: Next<R>) -> HandlerResult<R> {
         let copy = request.clone();
         let response = next.run(request).await?;
-        self.0.process(&copy, &response).await;
+        self.0.process(&copy, &response).await?;
         Ok(response)
     }
 }

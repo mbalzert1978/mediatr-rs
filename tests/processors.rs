@@ -8,9 +8,10 @@ use mediatr_rs::{Handler, Mediator, Sender};
 mod processors_fixtures;
 
 use processors_fixtures::{
-    InquiryLog, PriceError, PriceList, QuoteArchive, QuotePrice, QuoteShipping, RetiredFilter,
-    RetiredItems, ShippingTable, checked_and_exported, inbox_stamp, outbox_stamp, price_check,
-    price_export, price_lock, price_through_all_stages, shipping_through_general_stages, timer,
+    InquiryLog, PriceCeiling, PriceError, PriceList, QuoteArchive, QuotePrice, QuoteShipping,
+    RetiredFilter, RetiredItems, ShippingTable, checked_and_exported, inbox_stamp, outbox_stamp,
+    price_check, price_export, price_lock, price_through_all_stages,
+    shipping_through_general_stages, timer,
 };
 
 #[tokio::test]
@@ -191,6 +192,33 @@ async fn failing_pre_processor_skips_handler_and_send_returns_its_error() {
         (
             Err(PriceError::Discontinued),
             vec!["Anfrage für 7 abgelehnt".to_owned()]
+        )
+    );
+}
+
+#[tokio::test]
+async fn failing_post_processor_replaces_handler_response_with_its_error() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .post_processor(PriceCeiling {
+            max: 1000,
+            journal: Rc::clone(&journal),
+        })
+        .register(Handler::instance(PriceList {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let price = mediator.send(QuotePrice { sku: 7 }).await;
+
+    assert_eq!(
+        (price, journal.borrow().clone()),
+        (
+            Err(PriceError::AboveCeiling),
+            vec![
+                "Preis berechnet für 7".to_owned(),
+                "Preis 1999 über Obergrenze 1000".to_owned()
+            ]
         )
     );
 }

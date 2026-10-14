@@ -16,6 +16,7 @@ pub struct QuotePrice {
 #[derive(Debug, PartialEq)]
 pub enum PriceError {
     Discontinued,
+    AboveCeiling,
     Undeliverable(SendError),
 }
 
@@ -64,10 +65,11 @@ pub struct QuoteArchive {
 }
 
 impl RequestPostProcessor<QuotePrice> for QuoteArchive {
-    async fn process(&self, request: &QuotePrice, response: &u32) {
+    async fn process(&self, request: &QuotePrice, response: &u32) -> Result<(), PriceError> {
         self.journal
             .borrow_mut()
             .push(format!("Preis {response} für {} archiviert", request.sku));
+        Ok(())
     }
 }
 
@@ -103,8 +105,9 @@ pub fn price_export<const N: usize>(journal: &Rc<RefCell<Vec<String>>>) -> Price
 }
 
 impl<const N: usize> RequestPostProcessor<QuotePrice> for PriceExport<N> {
-    async fn process(&self, _request: &QuotePrice, _response: &u32) {
+    async fn process(&self, _request: &QuotePrice, _response: &u32) -> Result<(), PriceError> {
         self.journal.borrow_mut().push(format!("Export {N}"));
+        Ok(())
     }
 }
 
@@ -174,10 +177,11 @@ pub fn outbox_stamp(journal: &Rc<RefCell<Vec<String>>>) -> OutboxStamp {
 }
 
 impl<R: Request> RequestPostProcessor<R> for OutboxStamp {
-    async fn process(&self, _request: &R, _response: &R::Response) {
+    async fn process(&self, _request: &R, _response: &R::Response) -> Result<(), R::Error> {
         self.journal
             .borrow_mut()
             .push("Ausgang gestempelt".to_owned());
+        Ok(())
     }
 }
 
@@ -284,5 +288,23 @@ impl RequestPreProcessor<QuotePrice> for RetiredFilter {
             .borrow_mut()
             .push(format!("Anfrage für {} abgelehnt", request.sku));
         Err(PriceError::Discontinued)
+    }
+}
+
+/// Lässt keinen berechneten Preis über `max` hinaus und schreibt jede Überschreitung ins Protokoll.
+pub struct PriceCeiling {
+    pub max: u32,
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl RequestPostProcessor<QuotePrice> for PriceCeiling {
+    async fn process(&self, _request: &QuotePrice, response: &u32) -> Result<(), PriceError> {
+        if *response <= self.max {
+            return Ok(());
+        }
+        self.journal
+            .borrow_mut()
+            .push(format!("Preis {response} über Obergrenze {}", self.max));
+        Err(PriceError::AboveCeiling)
     }
 }

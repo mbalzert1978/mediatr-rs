@@ -1,7 +1,7 @@
 error[E0277]: the trait bound `QuotePrice: Clone` is not satisfied
-  --> tests/ui/post_processor_requires_clone.rs:38:32
+  --> tests/ui/post_processor_requires_clone.rs:40:32
    |
-38 |     let _price = mediator.send(QuotePrice { sku: 7 });
+40 |     let _price = mediator.send(QuotePrice { sku: 7 });
    |                           ---- ^^^^^^^^^^^^^^^^^^^^^ the trait `Clone` is not implemented for `QuotePrice`
    |                           |
    |                           required by a bound introduced by this call

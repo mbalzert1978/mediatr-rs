@@ -26,7 +26,9 @@ impl RequestHandler<QuoteShipping> for ShippingTable {
 struct OutboxStamp;
 
 impl<R: Request> RequestPostProcessor<R> for OutboxStamp {
-    async fn process(&self, _request: &R, _response: &R::Response) {}
+    async fn process(&self, _request: &R, _response: &R::Response) -> Result<(), R::Error> {
+        Ok(())
+    }
 }
 
 fn main() {

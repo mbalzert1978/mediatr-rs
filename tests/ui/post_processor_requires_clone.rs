@@ -27,7 +27,9 @@ impl RequestHandler<QuotePrice> for PriceList {
 struct ReplyArchive;
 
 impl<R: Request> RequestPostProcessor<R> for ReplyArchive {
-    async fn process(&self, _request: &R, _response: &R::Response) {}
+    async fn process(&self, _request: &R, _response: &R::Response) -> Result<(), R::Error> {
+        Ok(())
+    }
 }
 
 fn main() {

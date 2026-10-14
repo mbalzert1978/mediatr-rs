@@ -169,7 +169,7 @@ Quelle: MediatR `test/MediatR.Tests/Pipeline/RequestPreProcessorTests.cs`, `Pipe
 - [x] Vorverarbeiter nach dem ersten Handler registriert → kompiliert nicht · `pre_processor_registered_after_first_handler_does_not_compile`
 - [x] Nachverarbeiter nach dem ersten Handler registriert → kompiliert nicht · `post_processor_registered_after_first_handler_does_not_compile`
 - [x] Vorverarbeiter scheitert → der Handler läuft nicht; `send` liefert genau den Fehler des Vorverarbeiters · `failing_pre_processor_skips_handler_and_send_returns_its_error`
-- [ ] Nachverarbeiter scheitert → `send` liefert genau den Fehler des Nachverarbeiters statt der Antwort des Handlers
+- [x] Nachverarbeiter scheitert → `send` liefert genau den Fehler des Nachverarbeiters statt der Antwort des Handlers · `failing_post_processor_replaces_handler_response_with_its_error`
 
 ## Pipeline — Fehler-Handler und Fehler-Aktionen
 
