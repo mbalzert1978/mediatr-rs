@@ -5,8 +5,8 @@ use std::future::Future;
 use std::rc::Rc;
 
 use mediatr_rs::{
-    Handler, Mediator, MediatorBuilder, Notification, NotificationHandler, PublishStrategy,
-    Publisher, Request, RequestHandler, SendError, Sender, WeakMediator,
+    Concurrent, Handler, Mediator, MediatorBuilder, Notification, NotificationHandler,
+    PublishStrategy, Publisher, Request, RequestHandler, SendError, Sender, WeakMediator,
 };
 
 /// Ereignis: Das Paket mit dieser Sendungsnummer ist angekommen.
@@ -422,4 +422,68 @@ async fn custom_strategy_singleton_handler_publishing_after_mediator_dropped_get
     let result = center.handle(&ParcelArrived { tracking: 7 }).await;
 
     assert_eq!(result, Err(SendError::MediatorDropped));
+}
+
+/// Entlädt jedes angekommene Paket vom Lastwagen; zwischen Beginn und Ende wartet es auf den Gabelstapler.
+struct Unloading {
+    journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl NotificationHandler<ParcelArrived> for Unloading {
+    async fn handle(&self, event: &ParcelArrived) -> Result<(), SendError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Entladen beginnt {}", event.tracking));
+        tokio::task::yield_now().await;
+        self.journal
+            .borrow_mut()
+            .push(format!("Entladen fertig {}", event.tracking));
+        Ok(())
+    }
+}
+
+/// Scannt jedes angekommene Paket; zwischen Beginn und Ende wartet es auf den Scanner.
+struct Scanning {
+    journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl NotificationHandler<ParcelArrived> for Scanning {
+    async fn handle(&self, event: &ParcelArrived) -> Result<(), SendError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Scannen beginnt {}", event.tracking));
+        tokio::task::yield_now().await;
+        self.journal
+            .borrow_mut()
+            .push(format!("Scannen fertig {}", event.tracking));
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn concurrent_strategy_starts_second_waiting_handler_before_first_finished() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = MediatorBuilder::<Concurrent>::default()
+        .subscribe(Handler::instance(Unloading {
+            journal: Rc::clone(&journal),
+        }))
+        .subscribe(Handler::instance(Scanning {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    mediator
+        .publish(ParcelArrived { tracking: 7 })
+        .await
+        .unwrap();
+
+    assert_eq!(
+        *journal.borrow(),
+        [
+            "Entladen beginnt 7",
+            "Scannen beginnt 7",
+            "Entladen fertig 7",
+            "Scannen fertig 7"
+        ]
+    );
 }

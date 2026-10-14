@@ -11,4 +11,4 @@ pub use mediator::{
 };
 pub use notification::{Notification, NotificationHandler};
 pub use request::{Request, RequestHandler};
-pub use strategy::{PublishStrategy, Sequential};
+pub use strategy::{Concurrent, PublishStrategy, Sequential};
