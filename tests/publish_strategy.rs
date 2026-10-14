@@ -192,3 +192,29 @@ async fn custom_strategy_singleton_handler_publishes_through_received_weak_media
 
     assert_eq!(*journal.borrow(), ["Tür-Hinweis 7", "Kurier geplant 7"]);
 }
+
+#[tokio::test]
+async fn custom_strategy_without_clone_mediator_and_weak_mediator_clone_reaches_same_handlers() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = MediatorBuilder::<NewestFirst>::default()
+        .subscribe(Handler::singleton(
+            |publisher: WeakMediator<NewestFirst>| DispatchCenter {
+                publisher: publisher.clone(),
+            },
+        ))
+        .subscribe(Handler::instance(CourierPlanner {
+            journal: Rc::clone(&journal),
+        }))
+        .subscribe(Handler::instance(DoorNotice {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    mediator
+        .clone()
+        .publish(ParcelArrived { tracking: 7 })
+        .await
+        .unwrap();
+
+    assert_eq!(*journal.borrow(), ["Tür-Hinweis 7", "Kurier geplant 7"]);
+}

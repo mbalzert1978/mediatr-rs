@@ -17,7 +17,7 @@ use crate::{
 ///
 /// Entsteht über [`Mediator::builder`]. Verschickt wird über [`Sender`] und [`Publisher`].
 /// `S` ist die [`PublishStrategy`], nach der `publish` die Handler laufen lässt.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Mediator<S = Sequential> {
     provider: Provider,
     strategy: PhantomData<S>,
@@ -25,7 +25,7 @@ pub struct Mediator<S = Sequential> {
 
 /// Verweis auf einen [`Mediator`], der dessen Handler nicht am Leben hält; ein [`Handler::singleton`] bekommt ihn als [`Sender`] und [`Publisher`].
 /// `S` ist die Publish-Strategie dieses Mediators.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct WeakMediator<S = Sequential> {
     provider: WeakProvider,
     strategy: PhantomData<S>,
@@ -101,6 +101,23 @@ impl<S> Mediator<S> {
     fn new(provider: Provider) -> Self {
         Self {
             provider,
+            strategy: PhantomData,
+        }
+    }
+}
+
+// Von Hand statt `derive`: `derive(Clone)` verlangte `S: Clone`, obwohl nur `PhantomData<S>` von `S` abhängt.
+impl<S> Clone for Mediator<S> {
+    fn clone(&self) -> Self {
+        Self::new(self.provider.clone())
+    }
+}
+
+// Von Hand statt `derive`, aus demselben Grund wie bei `Mediator`.
+impl<S> Clone for WeakMediator<S> {
+    fn clone(&self) -> Self {
+        Self {
+            provider: self.provider.clone(),
             strategy: PhantomData,
         }
     }

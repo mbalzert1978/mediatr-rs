@@ -115,8 +115,10 @@ Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `NotificationPublisherTest
 - [x] Mediator mit eigener Publish-Strategie, die Handler in umgekehrter Reihenfolge aufruft, Notification mit zwei Handlern → beide laufen, in der Reihenfolge der eigenen Strategie · `custom_strategy_runs_both_handlers_in_its_own_order`
 - [ ] Mediator mit eigener Publish-Strategie, Request mit registriertem Handler → `send` liefert die Antwort des Handlers
 - [ ] Mediator mit eigener Publish-Strategie, Handler mit `Handler::singleton` schickt über den `WeakMediator`, den er bekommt, einen Request → `send` liefert die Antwort von dessen Handler
-- [ ] Mediator und `WeakMediator` mit eigener Publish-Strategie, die kein `Clone` hat → lassen sich klonen, und der Klon erreicht dieselben Handler
+- [x] Mediator und `WeakMediator` mit eigener Publish-Strategie, die kein `Clone` hat → lassen sich klonen, und der Klon erreicht dieselben Handler · `custom_strategy_without_clone_mediator_and_weak_mediator_clone_reaches_same_handlers`
 - [ ] Mediator, `WeakMediator` und `MediatorBuilder` mit eigener Publish-Strategie, die kein `Debug` hat, mit `{:?}` formatiert → die Ausgabe nennt die Strategie
+- [ ] `MediatorBuilder` mit eigener Publish-Strategie, die kein `Clone` hat → lässt sich klonen, und beide bauen Mediatoren, die dieselben Handler erreichen
+- [ ] Mediator mit eigener Publish-Strategie, Handler mit `Handler::singleton` meldet über den `WeakMediator`, nachdem der Mediator weggefallen ist → `publish` liefert `Err(SendError::MediatorDropped)`, kein Panic
 - [x] Mediator mit eigener Publish-Strategie, Handler mit `Handler::transient` meldet über den Mediator, den er bekommt, eine andere Notification → auch deren Handler laufen in der Reihenfolge der eigenen Strategie · `custom_strategy_transient_handler_publishes_through_received_mediator_in_its_order`
 - [x] Mediator mit eigener Publish-Strategie, Handler mit `Handler::singleton` meldet über den `WeakMediator`, den er bekommt, eine andere Notification → auch deren Handler laufen in der Reihenfolge der eigenen Strategie · `custom_strategy_singleton_handler_publishes_through_received_weak_mediator_in_its_order`
 - [ ] Strategie „alle gleichzeitig“, zwei Handler, die beide warten (`await`) → der zweite Handler startet, bevor der erste fertig ist
