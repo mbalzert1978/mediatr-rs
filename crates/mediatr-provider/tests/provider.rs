@@ -418,6 +418,19 @@ fn recipe_asking_all_for_own_type_gets_empty_list() {
     assert!(matches!(items.as_slice(), [item] if item.siblings.is_empty()));
 }
 
+#[test]
+fn recipe_asking_all_for_own_type_through_get_gets_empty_list() {
+    let provider = Provider::builder()
+        .transient(|provider| MenuItem {
+            siblings: provider.all::<MenuItem>(),
+        })
+        .build();
+
+    let item = provider.get::<MenuItem>().unwrap();
+
+    assert!(item.siblings.is_empty());
+}
+
 /// Ein Team mit seiner Leitung, falls es eine gibt.
 struct Team {
     lead: Option<Rc<Employee>>,
