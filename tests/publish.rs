@@ -217,3 +217,48 @@ async fn publish_reaches_only_handlers_of_its_notification_type() {
         ([42].as_slice(), [7].as_slice())
     );
 }
+
+/// Packt für jede eingegangene Bestellung ein Paket; zwischen Beginn und Ende wartet es auf das Lager.
+struct Packing {
+    journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl NotificationHandler<OrderPlaced> for Packing {
+    async fn handle(&self, event: &OrderPlaced) -> Result<(), SendError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Packen beginnt für {}", event.order_id));
+        tokio::task::yield_now().await;
+        self.journal
+            .borrow_mut()
+            .push(format!("Paket fertig für {}", event.order_id));
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn publish_starts_second_handler_after_first_handler_finished_waiting() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .subscribe(Packing {
+            journal: Rc::clone(&journal),
+        })
+        .subscribe(Billing {
+            journal: Rc::clone(&journal),
+        })
+        .build();
+
+    mediator
+        .publish(OrderPlaced { order_id: 42 })
+        .await
+        .unwrap();
+
+    assert_eq!(
+        *journal.borrow(),
+        [
+            "Packen beginnt für 42",
+            "Paket fertig für 42",
+            "Rechnung für 42"
+        ]
+    );
+}

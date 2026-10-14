@@ -87,7 +87,7 @@ Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `ExceptionTests.cs`, `Micr
 - [x] Notification mit zwei Handlern → beide laufen, in der Reihenfolge der Registrierung · `publish_runs_both_handlers_in_registration_order`
 - [x] Notification ohne registrierten Handler → `publish` liefert `Ok(())`, kein Panic · `publish_without_handler_returns_ok`
 - [x] Zwei Notification-Typen mit je eigenem Handler → jede Notification erreicht nur ihre Handler · `publish_reaches_only_handlers_of_its_notification_type`
-- [ ] Erster Handler wartet (`await`), bevor er fertig ist → der zweite Handler startet erst danach
+- [x] Erster Handler wartet (`await`), bevor er fertig ist → der zweite Handler startet erst danach · `publish_starts_second_handler_after_first_handler_finished_waiting`
 - [x] Erster von zwei Handlern liefert einen Fehler → `publish` gibt genau diesen Fehler zurück, der zweite Handler läuft nicht · `publish_returns_first_handler_error_and_skips_second_handler`
 - [x] Derselbe Handler-Typ zweimal für dieselbe Notification registriert → `publish` führt ihn einmal aus, und zwar den zuerst registrierten · `publish_runs_handler_type_registered_twice_once_with_first_registration`
 - [ ] Request-Handler bekommt einen Publisher per Konstruktor und meldet darüber ein Ereignis → die Handler dieser Notification laufen
