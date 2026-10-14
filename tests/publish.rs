@@ -189,3 +189,31 @@ async fn publish_runs_handler_type_registered_twice_once_with_first_registration
         ([42].as_slice(), [].as_slice())
     );
 }
+
+#[tokio::test]
+async fn publish_reaches_only_handlers_of_its_notification_type() {
+    let labels = Rc::new(RefCell::new(Vec::new()));
+    let sent = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .subscribe(ShippingDesk {
+            labels: Rc::clone(&labels),
+        })
+        .subscribe(CancellationMail {
+            sent: Rc::clone(&sent),
+        })
+        .build();
+
+    mediator
+        .publish(OrderPlaced { order_id: 42 })
+        .await
+        .unwrap();
+    mediator
+        .publish(OrderCancelled { order_id: 7 })
+        .await
+        .unwrap();
+
+    assert_eq!(
+        (labels.borrow().as_slice(), sent.borrow().as_slice()),
+        ([42].as_slice(), [7].as_slice())
+    );
+}
