@@ -553,3 +553,36 @@ async fn concurrent_strategy_runs_second_handler_after_first_fails_and_returns_f
         )
     );
 }
+
+#[tokio::test]
+async fn concurrent_strategy_runs_each_of_three_handlers_once_and_returns_ok() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = MediatorBuilder::<Concurrent>::default()
+        .subscribe(Handler::instance(Stockroom {
+            journal: Rc::clone(&journal),
+        }))
+        .subscribe(Handler::instance(Recipient {
+            journal: Rc::clone(&journal),
+        }))
+        .subscribe(Handler::instance(Scanning {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let published = mediator.publish(ParcelArrived { tracking: 7 }).await;
+
+    let mut entries = journal.borrow().clone();
+    entries.sort();
+    assert_eq!(
+        (published, entries),
+        (
+            Ok(()),
+            vec![
+                "Empfänger benachrichtigt 7".to_owned(),
+                "Scannen beginnt 7".to_owned(),
+                "Scannen fertig 7".to_owned(),
+                "eingelagert 7".to_owned()
+            ]
+        )
+    );
+}
