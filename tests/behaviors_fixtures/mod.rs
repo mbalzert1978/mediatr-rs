@@ -182,3 +182,21 @@ pub fn audited_locked_and_timed(handled: &str) -> Vec<String> {
     .map(str::to_owned)
     .to_vec()
 }
+
+/// Belegt die Laderampe, solange ein Wareneingang gebucht wird.
+pub struct LoadingDock {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl PipelineBehavior<BookReceipt> for LoadingDock {
+    async fn handle(
+        &self,
+        request: BookReceipt,
+        next: Next<BookReceipt>,
+    ) -> Result<(), StockError> {
+        self.journal.borrow_mut().push("Rampe belegt".to_owned());
+        let booked = next.run(request).await;
+        self.journal.borrow_mut().push("Rampe frei".to_owned());
+        booked
+    }
+}

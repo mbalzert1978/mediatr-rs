@@ -8,8 +8,8 @@ use mediatr_rs::{Handler, Mediator, Sender};
 mod behaviors_fixtures;
 
 use behaviors_fixtures::{
-    AuditTrail, BookReceipt, LookupStock, ReceiptBook, RetryOnce, ShelfLock, SlowStockLedger,
-    StockLedger, audit_and_stopwatch, audited_and_timed, audited_locked_and_timed,
+    AuditTrail, BookReceipt, LoadingDock, LookupStock, ReceiptBook, RetryOnce, ShelfLock,
+    SlowStockLedger, StockLedger, audit_and_stopwatch, audited_and_timed, audited_locked_and_timed,
 };
 
 #[tokio::test]
@@ -281,6 +281,41 @@ async fn same_behavior_registered_for_all_and_for_one_request_type_runs_once_for
             ["Prüfung beginnt", "Eingang gebucht für 9", "Prüfung endet"]
                 .map(str::to_owned)
                 .to_vec()
+        )
+    );
+}
+
+#[tokio::test]
+async fn unit_response_behavior_for_one_request_type_then_one_for_all_wrap_handler_first_registered_outermost()
+ {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .behavior_for::<BookReceipt>(LoadingDock {
+            journal: Rc::clone(&journal),
+        })
+        .behavior(AuditTrail {
+            journal: Rc::clone(&journal),
+        })
+        .register(Handler::instance(ReceiptBook {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let booked = mediator.send(BookReceipt { sku: 9 }).await;
+
+    assert_eq!(
+        (booked, journal.borrow().clone()),
+        (
+            Ok(()),
+            [
+                "Rampe belegt",
+                "Prüfung beginnt",
+                "Eingang gebucht für 9",
+                "Prüfung endet",
+                "Rampe frei"
+            ]
+            .map(str::to_owned)
+            .to_vec()
         )
     );
 }
