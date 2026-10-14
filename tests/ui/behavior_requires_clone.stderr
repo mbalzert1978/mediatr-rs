@@ -1,0 +1,27 @@
+error[E0277]: the trait bound `LookupStock: Clone` is not satisfied
+  --> tests/ui/behavior_requires_clone.rs:43:32
+   |
+43 |     let _stock = mediator.send(LookupStock { sku: 4 });
+   |                           ---- ^^^^^^^^^^^^^^^^^^^^^^ the trait `Clone` is not implemented for `LookupStock`
+   |                           |
+   |                           required by a bound introduced by this call
+   |
+help: the trait `mediatr_rs::Sender<R>` is implemented for `Mediator<S, P>`
+  --> src/mediator.rs
+   |
+   | impl<S, P: Behaviors<R>, R: Request + 'static> Sender<R> for Mediator<S, P> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: required for `RetryWithCopy` to implement `PipelineBehavior<LookupStock>`
+  --> tests/ui/behavior_requires_clone.rs:29:26
+   |
+29 | impl<R: Request + Clone> PipelineBehavior<R> for RetryWithCopy {
+   |                   -----  ^^^^^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^
+   |                   |
+   |                   unsatisfied trait bound introduced here
+   = note: required for `((), mediatr_rs::pipeline::sealed::Open<RetryWithCopy>)` to implement `mediatr_rs::pipeline::sealed::Behaviors<LookupStock>`
+   = note: required for `Mediator<Sequential, ((), mediatr_rs::pipeline::sealed::Open<RetryWithCopy>)>` to implement `mediatr_rs::Sender<LookupStock>`
+help: consider annotating `LookupStock` with `#[derive(Clone)]`
+   |
+ 8 + #[derive(Clone)]
+ 9 | struct LookupStock {
+   |
