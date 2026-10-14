@@ -232,6 +232,29 @@ impl Drop for Alive {
     }
 }
 
+/// Ein Drucker im Netz, an den die Anwendung Aufträge schickt.
+struct Printer {
+    _alive: Alive,
+}
+
+#[test]
+fn both_instances_of_same_type_are_released_with_provider() {
+    let office = Rc::new(Cell::new(true));
+    let lobby = Rc::new(Cell::new(true));
+    let provider = Provider::builder()
+        .instance(Printer {
+            _alive: Alive(Rc::clone(&office)),
+        })
+        .instance(Printer {
+            _alive: Alive(Rc::clone(&lobby)),
+        })
+        .build();
+
+    drop(provider);
+
+    assert!(!office.get() && !lobby.get());
+}
+
 /// Plant Aufgaben für die ganze Anwendung; merkt sich den Provider, um später Dienste zu holen.
 struct Scheduler {
     _provider: WeakProvider,
