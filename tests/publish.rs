@@ -483,3 +483,32 @@ async fn subscribe_transient_handler_publishes_through_received_mediator() {
 
     assert_eq!(*cases.borrow(), [13]);
 }
+
+#[tokio::test]
+async fn publish_runs_handler_type_subscribed_and_subscribed_transient_once_with_first_registration()
+ {
+    let front_labels = Rc::new(RefCell::new(Vec::new()));
+    let back_labels = Rc::new(RefCell::new(Vec::new()));
+    let back = Rc::clone(&back_labels);
+    let mediator = Mediator::builder()
+        .subscribe(ShippingDesk {
+            labels: Rc::clone(&front_labels),
+        })
+        .subscribe_transient(move |_publisher: Mediator| ShippingDesk {
+            labels: Rc::clone(&back),
+        })
+        .build();
+
+    mediator
+        .publish(OrderPlaced { order_id: 42 })
+        .await
+        .unwrap();
+
+    assert_eq!(
+        (
+            front_labels.borrow().as_slice(),
+            back_labels.borrow().as_slice()
+        ),
+        ([42].as_slice(), [].as_slice())
+    );
+}

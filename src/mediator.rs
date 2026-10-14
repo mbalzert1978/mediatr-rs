@@ -184,7 +184,7 @@ impl MediatorBuilder {
         }
     }
 
-    /// Registriert `make` für Notifications vom Typ `N`; jedes `publish` baut den Handler damit neu und gibt ihm den [`Mediator`] als [`Sender`] und [`Publisher`].
+    /// Registriert `make` für Notifications vom Typ `N`; jedes `publish` baut den Handler damit neu und gibt ihm den [`Mediator`] als [`Sender`] und [`Publisher`]. Ist für `N` schon ein Handler vom Typ `H` registriert, fällt `make` weg.
     #[must_use]
     pub fn subscribe_transient<N, H>(self, make: impl Fn(Mediator) -> H + 'static) -> Self
     where
@@ -192,13 +192,14 @@ impl MediatorBuilder {
         H: NotificationHandler<N> + 'static,
     {
         Self {
-            provider: self
-                .provider
-                .register(Registration::transient(move |provider| {
+            provider: self.provider.register(
+                Registration::transient(move |provider| {
                     erase_notification_handler(make(Mediator {
                         provider: provider.clone(),
                     }))
-                })),
+                })
+                .unique_by::<H>(),
+            ),
         }
     }
 
