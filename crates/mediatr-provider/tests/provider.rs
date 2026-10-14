@@ -186,6 +186,19 @@ fn singleton_built_from_scope_gets_scoped_service_of_provider() {
 }
 
 #[test]
+fn two_scoped_registrations_of_same_type_build_one_object_each() {
+    let scope = Provider::builder()
+        .scoped(|_| Name("haupt"))
+        .scoped(|_| Name("ersatz"))
+        .build()
+        .scope();
+
+    let names: Vec<_> = scope.all::<Name>().iter().map(|name| name.0).collect();
+
+    assert_eq!(names, ["haupt", "ersatz"]);
+}
+
+#[test]
 fn cloned_scope_returns_same_scoped_service() {
     let (calls, recipe) = counting_recipe();
     let scope = Provider::builder().scoped(recipe).build().scope();

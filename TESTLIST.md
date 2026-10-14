@@ -66,7 +66,10 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] Dienst mit `singleton` registriert → `all` liefert dasselbe Objekt wie `get` · `singleton_all_returns_same_object_as_get`
 - [x] Dienst mit `scoped` registriert → `all` liefert im selben Scope dasselbe Objekt wie `get`; ein neuer Scope baut neu · `scoped_all_returns_same_object_as_get_within_scope`
 - [x] Bauanleitung fragt mit `all` nach ihrem eigenen Typ → die Abfrage liefert eine leere Liste, kein Panic und keine Endlosschleife · `recipe_asking_all_for_own_type_gets_empty_list`
-- [ ] Zwei Dienste desselben Typs mit `scoped` registriert → `all` liefert im selben Scope zwei verschiedene Objekte, je eins pro Bauanleitung
+- [ ] Bauanleitung fragt mit `all` nach ihrem eigenen Typ, die äußere Abfrage kommt über `get` → die innere Abfrage liefert eine leere Liste, kein Panic und keine Endlosschleife
+- [ ] Zwei Bauanleitungen fragen einander mit `all` ab → die innere Abfrage liefert eine leere Liste, kein Panic und keine Endlosschleife
+- [ ] Zwei Bauanleitungen desselben Typs, die erste fragt mit `get` nach ihrem eigenen Typ, die äußere Abfrage kommt über `all` → die innere Abfrage liefert `None`
+- [x] Zwei Dienste desselben Typs mit `scoped` registriert → `all` liefert im selben Scope zwei verschiedene Objekte, je eins pro Bauanleitung · `two_scoped_registrations_of_same_type_build_one_object_each`
 - [ ] Zweimal `instance` für denselben Typ, der Provider fällt weg → beide Dienste werden freigegeben (ihr `Drop` läuft)
 
 ## Notification — `publish`

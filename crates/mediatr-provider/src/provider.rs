@@ -9,8 +9,8 @@ use std::rc::{Rc, Weak};
 // Rc reicht, solange kein Testlisten-Punkt Threads verlangt; dann Arc.
 type Services = HashMap<TypeId, Vec<Rc<dyn Any>>>;
 
-/// Dienste, die ein Scope schon gebaut hat, je Typ einer.
-type Built = RefCell<HashMap<TypeId, Rc<dyn Any>>>;
+/// Dienste verschiedener Typen, die ein Scope schon gebaut hat, je `scoped`-Registrierung einer, nach ihrer Platznummer.
+type Built = RefCell<HashMap<usize, Rc<dyn Any>>>;
 
 /// Liefert bei jedem Aufruf einen Dienst vom Typ `T`, gebaut mit dem übergebenen Provider oder gemerkt in seinem Scope.
 // dyn: `get` kennt nur `T`, nicht den Typ der Bauanleitung. Bauanleitungen verschiedener
@@ -155,7 +155,9 @@ impl ProviderBuilder {
     /// Registriert `recipe`; die erste Abfrage in einem Scope baut den Dienst, jede weitere im selben Scope liefert dasselbe Objekt.
     #[must_use]
     pub fn scoped<T: 'static>(self, recipe: impl Fn(&Provider) -> T + 'static) -> Self {
-        self.recipe(move |provider| scoped_service(provider, &recipe))
+        // Die Zahl der Registrierungen davor ist für jede Registrierung eine andere Platznummer.
+        let slot = self.services.values().map(Vec::len).sum();
+        self.recipe(move |provider| scoped_service(provider, slot, &recipe))
     }
 
     /// Baut den Provider mit allen registrierten Diensten.
@@ -204,20 +206,23 @@ impl Drop for Building<'_> {
     }
 }
 
-/// Liefert den Dienst vom Typ `T` aus dem Scope von `provider`; fehlt er dort, baut `recipe` ihn, und der Scope merkt ihn sich.
-fn scoped_service<T: 'static>(provider: &Provider, recipe: impl Fn(&Provider) -> T) -> Rc<T> {
-    let id = TypeId::of::<T>();
+/// Liefert den Dienst auf Platz `slot` im Scope von `provider`; fehlt er dort, baut `recipe` ihn, und der Scope merkt ihn sich.
+fn scoped_service<T: 'static>(
+    provider: &Provider,
+    slot: usize,
+    recipe: impl Fn(&Provider) -> T,
+) -> Rc<T> {
     let cached = provider
         .built
         .borrow()
-        .get(&id)
+        .get(&slot)
         .and_then(|service| Rc::clone(service).downcast().ok());
     cached.unwrap_or_else(|| {
         let service = Rc::new(recipe(provider));
         provider
             .built
             .borrow_mut()
-            .insert(id, Rc::clone(&service) as Rc<dyn Any>);
+            .insert(slot, Rc::clone(&service) as Rc<dyn Any>);
         service
     })
 }
