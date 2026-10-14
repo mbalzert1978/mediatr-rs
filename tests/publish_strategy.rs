@@ -651,3 +651,29 @@ async fn concurrent_strategy_both_fail_first_after_await_returns_error_of_first_
 
     assert_eq!(published, Err(InspectionError::Damaged(7)));
 }
+
+#[tokio::test]
+async fn concurrent_strategy_equally_waiting_handlers_finish_in_registration_order() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = MediatorBuilder::<Concurrent>::default()
+        .subscribe(Handler::instance(Unloading {
+            journal: Rc::clone(&journal),
+        }))
+        .subscribe(Handler::instance(Scanning {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    mediator
+        .publish(ParcelArrived { tracking: 7 })
+        .await
+        .unwrap();
+
+    let finished: Vec<_> = journal
+        .borrow()
+        .iter()
+        .filter(|entry| entry.contains("fertig"))
+        .cloned()
+        .collect();
+    assert_eq!(finished, ["Entladen fertig 7", "Scannen fertig 7"]);
+}
