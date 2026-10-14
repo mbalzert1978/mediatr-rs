@@ -222,3 +222,37 @@ async fn same_behavior_registered_for_all_and_for_one_request_type_runs_twice_fo
         )
     );
 }
+
+#[tokio::test]
+async fn same_behavior_registered_for_one_request_type_then_for_all_runs_twice_for_that_type() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .behavior_for::<LookupStock>(AuditTrail {
+            journal: Rc::clone(&journal),
+        })
+        .behavior(AuditTrail {
+            journal: Rc::clone(&journal),
+        })
+        .register(Handler::instance(StockLedger {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let stock = mediator.send(LookupStock { sku: 4 }).await;
+
+    assert_eq!(
+        (stock, journal.borrow().clone()),
+        (
+            Ok(12),
+            [
+                "Prüfung beginnt",
+                "Prüfung beginnt",
+                "Bestand gelesen für 4",
+                "Prüfung endet",
+                "Prüfung endet"
+            ]
+            .map(str::to_owned)
+            .to_vec()
+        )
+    );
+}

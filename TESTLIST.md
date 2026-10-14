@@ -143,6 +143,8 @@ Quelle: MediatR `test/MediatR.Tests/PipelineTests.cs`, `MicrosoftExtensionsDI/Pi
 - [x] Zwei Behaviors, jedes dreimal abwechselnd registriert → jedes läuft pro `send` genau einmal, in der Reihenfolge seiner ersten Registrierung · `two_behaviors_registered_three_times_alternately_run_once_in_first_registration_order`
 - [x] Dasselbe Behavior zweimal nur für einen Request-Typ registriert → es läuft pro `send` genau einmal · `same_behavior_registered_twice_for_one_request_type_runs_once`
 - [x] Dasselbe Behavior einmal für alle Request-Typen und einmal nur für einen registriert → ein Request dieses Typs läuft durch beide · `same_behavior_registered_for_all_and_for_one_request_type_runs_twice_for_that_type`
+- [x] Dasselbe Behavior zuerst nur für einen Request-Typ, dann für alle registriert → ein Request dieses Typs läuft durch beide · `same_behavior_registered_for_one_request_type_then_for_all_runs_twice_for_that_type`
+- [ ] Dasselbe Behavior einmal für alle Request-Typen und einmal nur für einen registriert → ein Request eines anderen Typs läuft nur einmal hindurch
 - [ ] Zwölf Behaviors → sie umschließen den Handler in Registrierungsreihenfolge, das erste außen
 - [ ] Behaviors und Publish-Strategie `Concurrent` zusammen → `send` läuft durch die Behaviors, `publish` lässt die Handler gleichzeitig laufen
 - [x] Ein Behavior nach dem ersten Handler registriert → kompiliert nicht · `behavior_registered_after_first_handler_does_not_compile`
