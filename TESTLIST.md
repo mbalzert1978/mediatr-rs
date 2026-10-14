@@ -127,7 +127,7 @@ Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `NotificationPublisherTest
 - [x] Strategie „alle gleichzeitig“, Notification mit drei Handlern, keiner scheitert → `publish` liefert `Ok(())`, jeder Handler lief genau einmal · `concurrent_strategy_runs_each_of_three_handlers_once_and_returns_ok`
 - [x] Strategie „alle gleichzeitig“, der erste von zwei Handlern liefert einen Fehler → der zweite Handler läuft trotzdem, `publish` liefert den Fehler des ersten · `concurrent_strategy_runs_second_handler_after_first_fails_and_returns_first_error`
 - [x] Strategie „alle gleichzeitig“, beide von zwei Handlern liefern einen Fehler → `publish` liefert den Fehler des zuerst registrierten · `concurrent_strategy_both_handlers_fail_returns_error_of_first_registered`
-- [ ] Strategie „alle gleichzeitig“, beide von zwei Handlern liefern einen Fehler, der zuerst registrierte erst nach einem `await` → `publish` liefert trotzdem den Fehler des zuerst registrierten
+- [x] Strategie „alle gleichzeitig“, beide von zwei Handlern liefern einen Fehler, der zuerst registrierte erst nach einem `await` → `publish` liefert trotzdem den Fehler des zuerst registrierten · `concurrent_strategy_both_fail_first_after_await_returns_error_of_first_registered`
 - [x] Strategie „alle gleichzeitig“, nur der zweite von zwei Handlern liefert einen Fehler → der erste lief, `publish` liefert den Fehler des zweiten · `concurrent_strategy_only_second_handler_fails_runs_first_and_returns_second_error`
 
 ## Pipeline — Behaviors

@@ -629,3 +629,25 @@ async fn concurrent_strategy_only_second_handler_fails_runs_first_and_returns_se
         )
     );
 }
+
+/// Prüft jedes Paket gründlich und meldet es danach als beschädigt; zwischendurch wartet sie auf den Prüfstand.
+struct ThoroughDamageCheck;
+
+impl NotificationHandler<ParcelInspected> for ThoroughDamageCheck {
+    async fn handle(&self, event: &ParcelInspected) -> Result<(), InspectionError> {
+        tokio::task::yield_now().await;
+        Err(InspectionError::Damaged(event.tracking))
+    }
+}
+
+#[tokio::test]
+async fn concurrent_strategy_both_fail_first_after_await_returns_error_of_first_registered() {
+    let mediator = MediatorBuilder::<Concurrent>::default()
+        .subscribe(Handler::instance(ThoroughDamageCheck))
+        .subscribe(Handler::instance(CustomsHold))
+        .build();
+
+    let published = mediator.publish(ParcelInspected { tracking: 7 }).await;
+
+    assert_eq!(published, Err(InspectionError::Damaged(7)));
+}
