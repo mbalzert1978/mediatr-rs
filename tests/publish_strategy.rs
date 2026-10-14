@@ -487,3 +487,69 @@ async fn concurrent_strategy_starts_second_waiting_handler_before_first_finished
         ]
     );
 }
+
+/// Ereignis: Das Paket mit dieser Sendungsnummer wurde am Wareneingang geprüft.
+struct ParcelInspected {
+    tracking: u32,
+}
+
+/// Warum ein Handler ein geprüftes Paket nicht annehmen kann.
+#[derive(Debug, PartialEq)]
+enum InspectionError {
+    Damaged(u32),
+    Undeliverable(SendError),
+}
+
+impl From<SendError> for InspectionError {
+    fn from(error: SendError) -> Self {
+        Self::Undeliverable(error)
+    }
+}
+
+impl Notification for ParcelInspected {
+    type Error = InspectionError;
+}
+
+/// Meldet jedes geprüfte Paket als beschädigt.
+struct DamageCheck;
+
+impl NotificationHandler<ParcelInspected> for DamageCheck {
+    async fn handle(&self, event: &ParcelInspected) -> Result<(), InspectionError> {
+        Err(InspectionError::Damaged(event.tracking))
+    }
+}
+
+/// Wiegt jedes geprüfte Paket und schreibt das ins Protokoll.
+struct Weighing {
+    journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl NotificationHandler<ParcelInspected> for Weighing {
+    async fn handle(&self, event: &ParcelInspected) -> Result<(), InspectionError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("gewogen {}", event.tracking));
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn concurrent_strategy_runs_second_handler_after_first_fails_and_returns_first_error() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = MediatorBuilder::<Concurrent>::default()
+        .subscribe(Handler::instance(DamageCheck))
+        .subscribe(Handler::instance(Weighing {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let published = mediator.publish(ParcelInspected { tracking: 7 }).await;
+
+    assert_eq!(
+        (published, journal.borrow().clone()),
+        (
+            Err(InspectionError::Damaged(7)),
+            vec!["gewogen 7".to_owned()]
+        )
+    );
+}

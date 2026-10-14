@@ -123,8 +123,9 @@ Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `NotificationPublisherTest
 - [x] Mediator mit eigener Publish-Strategie, Handler mit `Handler::transient` meldet über den Mediator, den er bekommt, eine andere Notification → auch deren Handler laufen in der Reihenfolge der eigenen Strategie · `custom_strategy_transient_handler_publishes_through_received_mediator_in_its_order`
 - [x] Mediator mit eigener Publish-Strategie, Handler mit `Handler::singleton` meldet über den `WeakMediator`, den er bekommt, eine andere Notification → auch deren Handler laufen in der Reihenfolge der eigenen Strategie · `custom_strategy_singleton_handler_publishes_through_received_weak_mediator_in_its_order`
 - [x] Strategie „alle gleichzeitig“, zwei Handler, die beide warten (`await`) → der zweite Handler startet, bevor der erste fertig ist · `concurrent_strategy_starts_second_waiting_handler_before_first_finished`
+- [ ] Strategie „alle gleichzeitig“, zwei Handler, die gleich lange warten → sie werden in der Reihenfolge der Registrierung fertig
 - [ ] Strategie „alle gleichzeitig“, Notification mit drei Handlern, keiner scheitert → `publish` liefert `Ok(())`, jeder Handler lief genau einmal
-- [ ] Strategie „alle gleichzeitig“, der erste von zwei Handlern liefert einen Fehler → der zweite Handler läuft trotzdem, `publish` liefert den Fehler des ersten
+- [x] Strategie „alle gleichzeitig“, der erste von zwei Handlern liefert einen Fehler → der zweite Handler läuft trotzdem, `publish` liefert den Fehler des ersten · `concurrent_strategy_runs_second_handler_after_first_fails_and_returns_first_error`
 
 ## Pipeline — Behaviors
 

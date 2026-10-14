@@ -38,6 +38,7 @@ impl PublishStrategy for Sequential {
 }
 
 /// Startet alle Handler gleichzeitig auf demselben Thread: Wartet einer, läuft der nächste weiter.
+/// Jeder Handler läuft zu Ende, auch nach einem Fehler; danach liefert `publish` den Fehler des zuerst registrierten Handlers, der gescheitert ist.
 ///
 /// # Achtung
 ///
