@@ -218,3 +218,32 @@ async fn custom_strategy_without_clone_mediator_and_weak_mediator_clone_reaches_
 
     assert_eq!(*journal.borrow(), ["Tür-Hinweis 7", "Kurier geplant 7"]);
 }
+
+#[tokio::test]
+async fn custom_strategy_without_debug_mediator_weak_mediator_and_builder_debug_names_strategy() {
+    let weak_output = Rc::new(RefCell::new(String::new()));
+    let seen = Rc::clone(&weak_output);
+    let builder = MediatorBuilder::<NewestFirst>::default().subscribe(Handler::singleton(
+        move |publisher: WeakMediator<NewestFirst>| {
+            *seen.borrow_mut() = format!("{publisher:?}");
+            DispatchCenter { publisher }
+        },
+    ));
+    let builder_output = format!("{builder:?}");
+    let mediator = builder.build();
+
+    mediator
+        .publish(ParcelArrived { tracking: 7 })
+        .await
+        .unwrap();
+
+    let outputs = [
+        format!("{mediator:?}"),
+        weak_output.borrow().clone(),
+        builder_output,
+    ];
+    assert!(
+        outputs.iter().all(|output| output.contains("NewestFirst")),
+        "{outputs:?}"
+    );
+}

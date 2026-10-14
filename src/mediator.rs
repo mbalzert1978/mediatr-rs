@@ -17,7 +17,6 @@ use crate::{
 ///
 /// Entsteht über [`Mediator::builder`]. Verschickt wird über [`Sender`] und [`Publisher`].
 /// `S` ist die [`PublishStrategy`], nach der `publish` die Handler laufen lässt.
-#[derive(Debug)]
 pub struct Mediator<S = Sequential> {
     provider: Provider,
     strategy: PhantomData<S>,
@@ -25,7 +24,6 @@ pub struct Mediator<S = Sequential> {
 
 /// Verweis auf einen [`Mediator`], der dessen Handler nicht am Leben hält; ein [`Handler::singleton`] bekommt ihn als [`Sender`] und [`Publisher`].
 /// `S` ist die Publish-Strategie dieses Mediators.
-#[derive(Debug)]
 pub struct WeakMediator<S = Sequential> {
     provider: WeakProvider,
     strategy: PhantomData<S>,
@@ -39,7 +37,7 @@ pub struct Handler<H, S = Sequential> {
 }
 
 /// Sammelt Handler und baut daraus einen [`Mediator`] mit der Publish-Strategie `S`.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct MediatorBuilder<S = Sequential> {
     provider: ProviderBuilder,
     strategy: PhantomData<S>,
@@ -103,6 +101,36 @@ impl<S> Mediator<S> {
             provider,
             strategy: PhantomData,
         }
+    }
+}
+
+// Von Hand statt `derive`: `derive(Debug)` verlangte `S: Debug`; `PhantomData<S>` nennt die Strategie auch ohne.
+impl<S> fmt::Debug for Mediator<S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Mediator")
+            .field("provider", &self.provider)
+            .field("strategy", &self.strategy)
+            .finish()
+    }
+}
+
+// Von Hand statt `derive`, aus demselben Grund wie bei `Mediator`.
+impl<S> fmt::Debug for WeakMediator<S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("WeakMediator")
+            .field("provider", &self.provider)
+            .field("strategy", &self.strategy)
+            .finish()
+    }
+}
+
+// Von Hand statt `derive`, aus demselben Grund wie bei `Mediator`.
+impl<S> fmt::Debug for MediatorBuilder<S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MediatorBuilder")
+            .field("provider", &self.provider)
+            .field("strategy", &self.strategy)
+            .finish()
     }
 }
 
