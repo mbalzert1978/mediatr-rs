@@ -54,6 +54,15 @@ fn all_returns_every_instance_in_registration_order() {
 }
 
 #[test]
+fn all_without_registration_returns_empty_list() {
+    let provider = Provider::builder().instance(Name("alt")).build();
+
+    let configs = provider.all::<Config>();
+
+    assert!(configs.is_empty());
+}
+
+#[test]
 fn transient_runs_recipe_on_every_get() {
     let (calls, recipe) = counting_recipe();
     let provider = Provider::builder().transient(recipe).build();
