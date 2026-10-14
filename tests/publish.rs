@@ -162,3 +162,30 @@ async fn publish_returns_first_handler_error_and_skips_second_handler() {
         (Err(CancellationError::PaymentProviderDown), [].as_slice())
     );
 }
+
+#[tokio::test]
+async fn publish_runs_handler_type_registered_twice_once_with_first_registration() {
+    let front_labels = Rc::new(RefCell::new(Vec::new()));
+    let back_labels = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .subscribe(ShippingDesk {
+            labels: Rc::clone(&front_labels),
+        })
+        .subscribe(ShippingDesk {
+            labels: Rc::clone(&back_labels),
+        })
+        .build();
+
+    mediator
+        .publish(OrderPlaced { order_id: 42 })
+        .await
+        .unwrap();
+
+    assert_eq!(
+        (
+            front_labels.borrow().as_slice(),
+            back_labels.borrow().as_slice()
+        ),
+        ([42].as_slice(), [].as_slice())
+    );
+}

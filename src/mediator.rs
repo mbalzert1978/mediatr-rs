@@ -155,7 +155,7 @@ impl MediatorBuilder {
         }
     }
 
-    /// Registriert `handler` für Notifications vom Typ `N`.
+    /// Registriert `handler` für Notifications vom Typ `N`; ist für `N` schon ein Handler vom Typ `H` registriert, fällt `handler` weg.
     #[must_use]
     pub fn subscribe<N, H>(self, handler: H) -> Self
     where
@@ -163,7 +163,9 @@ impl MediatorBuilder {
         H: NotificationHandler<N> + 'static,
     {
         Self {
-            provider: self.provider.instance(erase_notification_handler(handler)),
+            provider: self
+                .provider
+                .unique_instance(handler, erase_notification_handler),
         }
     }
 
