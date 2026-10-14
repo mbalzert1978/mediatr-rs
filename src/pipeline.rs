@@ -14,7 +14,8 @@ pub use next::Next;
 pub use post_processor::RequestPostProcessor;
 pub use pre_processor::RequestPreProcessor;
 pub(crate) use sealed::{
-    Behaviors, Closed, Open, RequestPostProcessorBehavior, RequestPreProcessorBehavior, Slot, Stage,
+    Behaviors, Closed, OpenBehavior, RequestPostProcessorBehavior, RequestPreProcessorBehavior,
+    Slot, Stage,
 };
 
 /// Umschließt den Handler von Requests vom Typ `R`: läuft davor und danach und entscheidet, ob es weitergeht.

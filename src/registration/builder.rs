@@ -7,7 +7,7 @@ use std::rc::Rc;
 use mediatr_provider::{Provider, ProviderBuilder, Registration};
 
 use crate::pipeline::{
-    Closed, Open, RequestPostProcessorBehavior, RequestPreProcessorBehavior, Slot, Stage,
+    Closed, OpenBehavior, RequestPostProcessorBehavior, RequestPreProcessorBehavior, Slot, Stage,
 };
 use crate::wrappers::{
     BehaviorWrapper, wrap_behavior, wrap_notification_handler, wrap_request_handler,
@@ -78,7 +78,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     /// [`Sender::send`](crate::Sender::send) verlangt, dass `behavior` [`PipelineBehavior`] für den Request-Typ ist.
     /// Ist ein Behavior vom Typ `B` schon registriert, läuft nur das erste, an seinem Platz.
     #[must_use]
-    pub fn behavior<B: 'static>(self, behavior: B) -> MediatorBuilder<S, (P, Open<B>)> {
+    pub fn behavior<B: 'static>(self, behavior: B) -> MediatorBuilder<S, (P, OpenBehavior<B>)> {
         self.open(behavior, Stage::Around)
     }
 
@@ -98,7 +98,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     pub fn pre_processor<B: 'static>(
         self,
         pre_processor: B,
-    ) -> MediatorBuilder<S, (P, Open<RequestPreProcessorBehavior<B>>)> {
+    ) -> MediatorBuilder<S, (P, OpenBehavior<RequestPreProcessorBehavior<B>>)> {
         self.open(RequestPreProcessorBehavior(pre_processor), Stage::Before)
     }
 
@@ -110,7 +110,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     pub fn post_processor<B: 'static>(
         self,
         post_processor: B,
-    ) -> MediatorBuilder<S, (P, Open<RequestPostProcessorBehavior<B>>)> {
+    ) -> MediatorBuilder<S, (P, OpenBehavior<RequestPostProcessorBehavior<B>>)> {
         self.open(RequestPostProcessorBehavior(post_processor), Stage::After)
     }
 
@@ -133,10 +133,14 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     }
 
     /// Builder, dessen Kette zusätzlich mit `behavior` für alle Request-Typen auf der Stufe `stage` endet.
-    fn open<B: 'static>(self, behavior: B, stage: Stage) -> MediatorBuilder<S, (P, Open<B>)> {
+    fn open<B: 'static>(
+        self,
+        behavior: B,
+        stage: Stage,
+    ) -> MediatorBuilder<S, (P, OpenBehavior<B>)> {
         let slot = Slot(self.slots);
         self.with_behavior(
-            Open {
+            OpenBehavior {
                 behavior: Rc::new(behavior),
                 slot,
                 stage,

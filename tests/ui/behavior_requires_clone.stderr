@@ -18,8 +18,8 @@ note: required for `RetryWithCopy` to implement `PipelineBehavior<LookupStock>`
    |                   -----  ^^^^^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^
    |                   |
    |                   unsatisfied trait bound introduced here
-   = note: required for `((), mediatr_rs::pipeline::sealed::Open<RetryWithCopy>)` to implement `mediatr_rs::pipeline::sealed::Behaviors<LookupStock>`
-   = note: required for `Mediator<ForeachAwaitPublisher, ((), mediatr_rs::pipeline::sealed::Open<RetryWithCopy>)>` to implement `mediatr_rs::Sender<LookupStock>`
+   = note: required for `((), mediatr_rs::pipeline::sealed::OpenBehavior<RetryWithCopy>)` to implement `mediatr_rs::pipeline::sealed::Behaviors<LookupStock>`
+   = note: required for `Mediator<ForeachAwaitPublisher, ((), mediatr_rs::pipeline::sealed::OpenBehavior<RetryWithCopy>)>` to implement `mediatr_rs::Sender<LookupStock>`
 help: consider annotating `LookupStock` with `#[derive(Clone)]`
    |
  8 + #[derive(Clone)]

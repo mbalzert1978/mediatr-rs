@@ -39,7 +39,7 @@ pub enum Stage {
 pub struct Slot(pub(crate) usize);
 
 /// Ein Behavior für alle Request-Typen, als Glied der Kette.
-pub struct Open<B> {
+pub struct OpenBehavior<B> {
     pub(crate) behavior: Rc<B>,
     pub(crate) slot: Slot,
     pub(crate) stage: Stage,
@@ -61,7 +61,7 @@ pub struct Closed {
 }
 
 // Von Hand statt `derive`: `derive(Clone)` verlangte `B: Clone`, obwohl nur der `Rc` geklont wird.
-impl<B> Clone for Open<B> {
+impl<B> Clone for OpenBehavior<B> {
     fn clone(&self) -> Self {
         Self {
             behavior: Rc::clone(&self.behavior),
@@ -72,9 +72,9 @@ impl<B> Clone for Open<B> {
 }
 
 // Von Hand statt `derive`: `derive(Debug)` verlangte `B: Debug`.
-impl<B> fmt::Debug for Open<B> {
+impl<B> fmt::Debug for OpenBehavior<B> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Open")
+        f.debug_struct("OpenBehavior")
             .field("slot", &self.slot)
             .field("stage", &self.stage)
             .finish_non_exhaustive()
@@ -103,7 +103,7 @@ impl<R: Request> Behaviors<R> for () {
     }
 }
 
-impl<R, P, B> Behaviors<R> for (P, Open<B>)
+impl<R, P, B> Behaviors<R> for (P, OpenBehavior<B>)
 where
     R: Request + 'static,
     P: Behaviors<R>,
