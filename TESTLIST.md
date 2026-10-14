@@ -164,7 +164,7 @@ Quelle: MediatR `test/MediatR.Tests/Pipeline/RequestPreProcessorTests.cs`, `Pipe
 - [x] Zwei Vorverarbeiter nur für einen Request-Typ und zwei für alle, ebenso vier Nachverarbeiter → alle Vorverarbeiter laufen in Registrierungsreihenfolge vor dem Handler, alle Nachverarbeiter in Registrierungsreihenfolge danach · `pre_and_post_processors_for_one_and_all_request_types_run_in_registration_order`
 - [x] Behaviors, Vor- und Nachverarbeiter teils für alle Request-Typen, teils nur für einen → dieser Request läuft durch Vorverarbeiter, Behaviors (außen nach innen), Handler, Nachverarbeiter; ein anderer Request nur durch die allgemeinen, in derselben Reihenfolge · `processors_run_outside_behaviors_and_other_request_only_through_general_ones`
 - [x] Handler scheitert, ein Nachverarbeiter ist registriert → er läuft nicht; `send` liefert den Fehler des Handlers · `failing_handler_skips_post_processor_and_send_returns_handler_error`
-- [ ] Nachverarbeiter registriert, Request ohne `Clone` → `send` kompiliert nicht
+- [x] Nachverarbeiter registriert, Request ohne `Clone` → `send` kompiliert nicht · `post_processor_makes_send_for_non_clone_request_not_compile`
 - [ ] Derselbe Vorverarbeiter-Typ zweimal registriert → er läuft pro `send` einmal
 - [ ] Vorverarbeiter nach dem ersten Handler registriert → kompiliert nicht
 - [ ] Nachverarbeiter nach dem ersten Handler registriert → kompiliert nicht

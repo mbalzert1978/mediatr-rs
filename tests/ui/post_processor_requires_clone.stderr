@@ -1,0 +1,21 @@
+error[E0277]: the trait bound `QuotePrice: Clone` is not satisfied
+  --> tests/ui/post_processor_requires_clone.rs:38:32
+   |
+38 |     let _price = mediator.send(QuotePrice { sku: 7 });
+   |                           ---- ^^^^^^^^^^^^^^^^^^^^^ the trait `Clone` is not implemented for `QuotePrice`
+   |                           |
+   |                           required by a bound introduced by this call
+   |
+help: the trait `mediatr_rs::Sender<R>` is implemented for `Mediator<S, P>`
+  --> src/mediator.rs
+   |
+   | impl<S, P: Behaviors<R>, R: Request + 'static> Sender<R> for Mediator<S, P> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: required for `mediatr_rs::pipeline::sealed::PostProcess<ReplyArchive>` to implement `PipelineBehavior<QuotePrice>`
+   = note: required for `((), mediatr_rs::pipeline::sealed::Open<mediatr_rs::pipeline::sealed::PostProcess<ReplyArchive>>)` to implement `mediatr_rs::pipeline::sealed::Behaviors<QuotePrice>`
+   = note: required for `Mediator<Sequential, ((), mediatr_rs::pipeline::sealed::Open<mediatr_rs::pipeline::sealed::PostProcess<ReplyArchive>>)>` to implement `mediatr_rs::Sender<QuotePrice>`
+help: consider annotating `QuotePrice` with `#[derive(Clone)]`
+   |
+ 8 + #[derive(Clone)]
+ 9 | struct QuotePrice {
+   |

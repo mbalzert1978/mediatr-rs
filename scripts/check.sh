@@ -8,8 +8,10 @@ source scripts/lib.sh
 
 # Von außen lassen sich Lints abschalten (RUSTFLAGS="--cap-lints allow", eigener rustc-Wrapper,
 # anderes clippy.toml, rustflags in einer Cargo-Config). Leere RUSTFLAGS überschreiben jede Config.
-export RUSTFLAGS="" RUSTDOCFLAGS="" CARGO_ENCODED_RUSTFLAGS="" CARGO_BUILD_RUSTFLAGS=""
-unset RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER CARGO_BUILD_RUSTC_WRAPPER CLIPPY_CONF_DIR
+# CARGO_ENCODED_RUSTFLAGS wird entfernt statt leer gesetzt: Leer schlüge es auch die Flags, die trybuild
+# per --config setzt (--verbose), und rustc kürzte dann lange Typnamen in den erwarteten Fehlermeldungen.
+export RUSTFLAGS="" RUSTDOCFLAGS="" CARGO_BUILD_RUSTFLAGS=""
+unset CARGO_ENCODED_RUSTFLAGS RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER CARGO_BUILD_RUSTC_WRAPPER CLIPPY_CONF_DIR
 
 failed=0
 gate() { # gate <name> <befehl...>
