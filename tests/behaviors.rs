@@ -66,8 +66,7 @@ impl PipelineBehavior<LookupStock> for RetryOnce {
 #[tokio::test]
 async fn behavior_retries_cloned_next_after_handler_error_and_returns_second_response() {
     let calls = Rc::new(Cell::new(0));
-    let mediator = Mediator::builder()
-        .behavior(Handler::instance(RetryOnce))
+    let mediator = Mediator::with_behaviors((RetryOnce,))
         .register(Handler::instance(SlowStockLedger {
             calls: Rc::clone(&calls),
         }))
@@ -92,52 +91,63 @@ impl RequestHandler<LookupStock> for StockLedger {
     }
 }
 
-/// Schreibt vor und nach jeder Bestandsabfrage einen Eintrag ins Prüfprotokoll.
+/// Schreibt vor und nach jedem Request einen Eintrag ins Prüfprotokoll.
 struct AuditTrail {
     journal: Rc<RefCell<Vec<String>>>,
 }
 
-impl PipelineBehavior<LookupStock> for AuditTrail {
-    async fn handle(
-        &self,
-        request: LookupStock,
-        next: Next<LookupStock>,
-    ) -> Result<u32, StockError> {
+impl<R: Request> PipelineBehavior<R> for AuditTrail {
+    async fn handle(&self, request: R, next: Next<R>) -> Result<R::Response, R::Error> {
         self.journal.borrow_mut().push("Prüfung beginnt".to_owned());
-        let stock = next.run(request).await;
+        let response = next.run(request).await;
         self.journal.borrow_mut().push("Prüfung endet".to_owned());
-        stock
+        response
     }
 }
 
-/// Misst jede Bestandsabfrage und schreibt Start und Ende ins Protokoll.
+/// Misst jeden Request und schreibt Start und Ende ins Protokoll.
 struct Stopwatch {
     journal: Rc<RefCell<Vec<String>>>,
 }
 
-impl PipelineBehavior<LookupStock> for Stopwatch {
-    async fn handle(
-        &self,
-        request: LookupStock,
-        next: Next<LookupStock>,
-    ) -> Result<u32, StockError> {
+impl<R: Request> PipelineBehavior<R> for Stopwatch {
+    async fn handle(&self, request: R, next: Next<R>) -> Result<R::Response, R::Error> {
         self.journal.borrow_mut().push("Messung startet".to_owned());
-        let stock = next.run(request).await;
+        let response = next.run(request).await;
         self.journal.borrow_mut().push("Messung stoppt".to_owned());
-        stock
+        response
     }
+}
+
+/// Prüfprotokoll und Stoppuhr, die beide in `journal` schreiben; die Prüfung liegt außen.
+fn audit_and_stopwatch(journal: &Rc<RefCell<Vec<String>>>) -> (AuditTrail, Stopwatch) {
+    (
+        AuditTrail {
+            journal: Rc::clone(journal),
+        },
+        Stopwatch {
+            journal: Rc::clone(journal),
+        },
+    )
+}
+
+/// Was [`audit_and_stopwatch`] um den Protokolleintrag `handled` eines Handlers herum ins Protokoll schreibt.
+fn audited_and_timed(handled: &str) -> Vec<String> {
+    [
+        "Prüfung beginnt",
+        "Messung startet",
+        handled,
+        "Messung stoppt",
+        "Prüfung endet",
+    ]
+    .map(str::to_owned)
+    .to_vec()
 }
 
 #[tokio::test]
 async fn two_behaviors_wrap_handler_first_registered_outermost() {
     let journal = Rc::new(RefCell::new(Vec::new()));
-    let mediator = Mediator::builder()
-        .behavior(Handler::instance(AuditTrail {
-            journal: Rc::clone(&journal),
-        }))
-        .behavior(Handler::instance(Stopwatch {
-            journal: Rc::clone(&journal),
-        }))
+    let mediator = Mediator::with_behaviors(audit_and_stopwatch(&journal))
         .register(Handler::instance(StockLedger {
             journal: Rc::clone(&journal),
         }))
@@ -147,16 +157,7 @@ async fn two_behaviors_wrap_handler_first_registered_outermost() {
 
     assert_eq!(
         (stock, journal.borrow().clone()),
-        (
-            Ok(12),
-            vec![
-                "Prüfung beginnt".to_owned(),
-                "Messung startet".to_owned(),
-                "Bestand gelesen für 4".to_owned(),
-                "Messung stoppt".to_owned(),
-                "Prüfung endet".to_owned()
-            ]
-        )
+        (Ok(12), audited_and_timed("Bestand gelesen für 4"))
     );
 }
 
@@ -184,52 +185,10 @@ impl RequestHandler<BookReceipt> for ReceiptBook {
     }
 }
 
-/// Schreibt vor und nach jeder Eingangsbuchung einen Eintrag ins Prüfprotokoll.
-struct ReceiptAudit {
-    journal: Rc<RefCell<Vec<String>>>,
-}
-
-impl PipelineBehavior<BookReceipt> for ReceiptAudit {
-    async fn handle(
-        &self,
-        request: BookReceipt,
-        next: Next<BookReceipt>,
-    ) -> Result<(), StockError> {
-        self.journal.borrow_mut().push("Prüfung beginnt".to_owned());
-        let booked = next.run(request).await;
-        self.journal.borrow_mut().push("Prüfung endet".to_owned());
-        booked
-    }
-}
-
-/// Misst jede Eingangsbuchung und schreibt Start und Ende ins Protokoll.
-struct ReceiptStopwatch {
-    journal: Rc<RefCell<Vec<String>>>,
-}
-
-impl PipelineBehavior<BookReceipt> for ReceiptStopwatch {
-    async fn handle(
-        &self,
-        request: BookReceipt,
-        next: Next<BookReceipt>,
-    ) -> Result<(), StockError> {
-        self.journal.borrow_mut().push("Messung startet".to_owned());
-        let booked = next.run(request).await;
-        self.journal.borrow_mut().push("Messung stoppt".to_owned());
-        booked
-    }
-}
-
 #[tokio::test]
 async fn two_behaviors_wrap_unit_response_handler_first_registered_outermost() {
     let journal = Rc::new(RefCell::new(Vec::new()));
-    let mediator = Mediator::builder()
-        .behavior(Handler::instance(ReceiptAudit {
-            journal: Rc::clone(&journal),
-        }))
-        .behavior(Handler::instance(ReceiptStopwatch {
-            journal: Rc::clone(&journal),
-        }))
+    let mediator = Mediator::with_behaviors(audit_and_stopwatch(&journal))
         .register(Handler::instance(ReceiptBook {
             journal: Rc::clone(&journal),
         }))
@@ -239,15 +198,35 @@ async fn two_behaviors_wrap_unit_response_handler_first_registered_outermost() {
 
     assert_eq!(
         (booked, journal.borrow().clone()),
+        (Ok(()), audited_and_timed("Eingang gebucht für 4"))
+    );
+}
+
+#[tokio::test]
+async fn two_behaviors_wrap_handlers_of_every_request_type_first_registered_outermost() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::with_behaviors(audit_and_stopwatch(&journal))
+        .register(Handler::instance(StockLedger {
+            journal: Rc::clone(&journal),
+        }))
+        .register(Handler::instance(ReceiptBook {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let stock = mediator.send(LookupStock { sku: 4 }).await;
+    let booked = mediator.send(BookReceipt { sku: 9 }).await;
+
+    assert_eq!(
+        (stock, booked, journal.borrow().clone()),
         (
+            Ok(12),
             Ok(()),
-            vec![
-                "Prüfung beginnt".to_owned(),
-                "Messung startet".to_owned(),
-                "Eingang gebucht für 4".to_owned(),
-                "Messung stoppt".to_owned(),
-                "Prüfung endet".to_owned()
+            [
+                audited_and_timed("Bestand gelesen für 4"),
+                audited_and_timed("Eingang gebucht für 9")
             ]
+            .concat()
         )
     );
 }

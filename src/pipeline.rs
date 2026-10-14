@@ -5,7 +5,7 @@ use std::future::Future;
 use std::rc::Rc;
 
 use crate::Request;
-use crate::erased::{ErasedBehavior, ErasedHandler};
+use crate::erased::{ErasedBehavior, ErasedHandler, erase_behavior};
 use crate::request::HandlerResult;
 
 /// Umschließt den Handler von Requests vom Typ `R`: läuft davor und danach und entscheidet, ob es weitergeht.
@@ -21,6 +21,53 @@ pub trait PipelineBehavior<R: Request> {
     /// `R::Error`, wenn das Behavior oder ein späterer Schritt `request` nicht beantworten kann.
     fn handle(&self, request: R, next: Next<R>) -> impl Future<Output = HandlerResult<R>>;
 }
+
+pub(crate) use sealed::Behaviors;
+
+mod sealed {
+    use std::rc::Rc;
+
+    use crate::Request;
+    use crate::erased::ErasedBehavior;
+
+    /// Ein Tupel von Behaviors, die alle Requests vom Typ `R` umschließen.
+    ///
+    /// Öffentlich, weil [`Sender`](crate::Sender) für [`Mediator`](crate::Mediator) es verlangt;
+    /// in einem privaten Modul, damit nur diese Crate es implementiert.
+    ///
+    /// # Vertrag
+    ///
+    /// `erase` liefert genau ein gelöschtes Behavior je Tupel-Element, in Tupel-Reihenfolge, und löst keine Panic aus.
+    pub trait Behaviors<R: Request>: 'static {
+        /// Die Behaviors aus `behaviors` mit gelöschtem Typ, in Tupel-Reihenfolge.
+        fn erase(behaviors: &Rc<Self>) -> Vec<Rc<ErasedBehavior<R>>>;
+    }
+}
+
+impl<R: Request> Behaviors<R> for () {
+    fn erase(_behaviors: &Rc<Self>) -> Vec<Rc<ErasedBehavior<R>>> {
+        Vec::new()
+    }
+}
+
+/// Implementiert [`Behaviors`] für ein Tupel aus Behaviors.
+/// Ein Makro, weil weder Funktion noch Generic über die Länge eines Tupels abstrahieren.
+macro_rules! behaviors_for_tuple {
+    ($($index:tt $behavior:ident),+) => {
+        impl<R, $($behavior),+> Behaviors<R> for ($($behavior,)+)
+        where
+            R: Request + 'static,
+            $($behavior: PipelineBehavior<R> + 'static,)+
+        {
+            fn erase(behaviors: &Rc<Self>) -> Vec<Rc<ErasedBehavior<R>>> {
+                vec![$(Rc::new(erase_behavior(Rc::clone(behaviors), |all: &Self| &all.$index))),+]
+            }
+        }
+    };
+}
+
+behaviors_for_tuple!(0 A);
+behaviors_for_tuple!(0 A, 1 B);
 
 /// Der Rest der Pipeline hinter einem Behavior; [`Next::run`] schickt einen Request hinein.
 pub struct Next<R: Request> {

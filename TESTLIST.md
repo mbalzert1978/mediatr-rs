@@ -132,16 +132,16 @@ Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `NotificationPublisherTest
 
 ## Pipeline — Behaviors
 
-Quelle: MediatR `test/MediatR.Tests/PipelineTests.cs`, `MicrosoftExtensionsDI/PipelineTests.cs`, `MicrosoftExtensionsDI/PipeLineMultiCallToConstructorTest.cs`, `SendTests.cs` (Timeout-Tests); `docs/mediatr-concepts.md` (Behavior bricht ab). Das zuerst registrierte Behavior liegt außen. Doppelte Behavior-Typen: `TryAddEnumerable` behält das zuerst registrierte.
+Quelle: MediatR `test/MediatR.Tests/PipelineTests.cs`, `MicrosoftExtensionsDI/PipelineTests.cs`, `MicrosoftExtensionsDI/PipeLineMultiCallToConstructorTest.cs`, `SendTests.cs` (Timeout-Tests); `docs/mediatr-concepts.md` (Behavior bricht ab). Anders als MediatR gelten Behaviors immer für alle Request-Typen (Entscheidung Markus); man registriert sie beim Bau des Mediators, das zuerst registrierte liegt außen.
 
-- [x] Zwei Behaviors für einen Request-Typ → das zuerst registrierte läuft außen: außen-vorher, innen-vorher, Handler, innen-nachher, außen-nachher; `send` liefert die Antwort des Handlers · `two_behaviors_wrap_handler_first_registered_outermost`
+- [x] Zwei Behaviors, ein Request → das zuerst registrierte läuft außen: außen-vorher, innen-vorher, Handler, innen-nachher, außen-nachher; `send` liefert die Antwort des Handlers · `two_behaviors_wrap_handler_first_registered_outermost`
 - [x] Behavior klont den nächsten Schritt und ruft ihn nach einem Fehler des Handlers noch einmal auf → der Handler läuft zweimal, `send` liefert die Antwort des zweiten Laufs · `behavior_retries_cloned_next_after_handler_error_and_returns_second_response`
-- [x] Zwei Behaviors für einen Request ohne Antwort (Antworttyp `()`) → sie umschließen den Handler in derselben Reihenfolge, das zuerst registrierte außen · `two_behaviors_wrap_unit_response_handler_first_registered_outermost`
-- [ ] Zwei Behaviors für alle Request-Typen → sie umschließen den Handler jedes Requests, das zuerst registrierte außen; `send` liefert die Antwort des Handlers
-- [ ] Zwei Behaviors für alle Request-Typen, Request ohne Antwort (Antworttyp `()`) → sie umschließen den Handler in derselben Reihenfolge, das zuerst registrierte außen
-- [ ] Zwei Behaviors für alle Request-Typen und eins nur für einen Request-Typ → dieser Request läuft durch alle drei in Registrierungsreihenfolge, ein anderer Request nur durch die zwei allgemeinen; beide bekommen die Antwort ihres Handlers
-- [ ] Zwei Behaviors für alle Request-Typen, jedes dreimal abwechselnd registriert → jedes läuft pro `send` genau einmal, in der Reihenfolge seiner ersten Registrierung
-- [ ] Zuerst ein Behavior nur für einen Request-Typ ohne Antwort, dann eins für alle Request-Typen registriert → beide laufen in Registrierungsreihenfolge vor dem Handler
+- [x] Zwei Behaviors, Request ohne Antwort (Antworttyp `()`) → sie umschließen den Handler in derselben Reihenfolge, das zuerst registrierte außen · `two_behaviors_wrap_unit_response_handler_first_registered_outermost`
+- [x] Zwei Behaviors, Requests zweier Typen mit je eigenem Handler → jeder Request läuft durch beide Behaviors, das zuerst registrierte außen; `send` liefert jeweils die Antwort seines Handlers · `two_behaviors_wrap_handlers_of_every_request_type_first_registered_outermost`
+- [ ] Zwei Behaviors, jedes dreimal abwechselnd registriert → jedes läuft pro `send` genau einmal, in der Reihenfolge seiner ersten Registrierung
+- [ ] Zwölf Behaviors → sie umschließen den Handler in Registrierungsreihenfolge, das erste außen
+- [ ] Behaviors und Publish-Strategie `Concurrent` zusammen → `send` läuft durch die Behaviors, `publish` lässt die Handler gleichzeitig laufen
+- [ ] Ein Behavior verlangt mehr vom Request (z. B. `Clone`), ein Request-Typ erfüllt das nicht → `send` für diesen Typ kompiliert nicht
 - [ ] Handler mit `Handler::transient` registriert und von einem Behavior umschlossen → ein `send` baut den Handler genau einmal, das Behavior läuft genau einmal um ihn herum
 - [ ] Behavior ruft den nächsten Schritt nicht auf und liefert selbst eine Antwort → `send` liefert diese Antwort, der Handler läuft nicht
 - [ ] Behavior setzt eine Frist, der Handler eines Requests mit Antwort braucht länger → `send` liefert `Err` statt einer Antwort, der Handler wird nicht fertig

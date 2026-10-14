@@ -1,4 +1,4 @@
-//! Löscht den Typ registrierter Handler oder Behaviors, damit verschieden typisierte im Provider zusammen liegen.
+//! Löscht den Typ registrierter Handler oder Behaviors, damit verschieden typisierte hinter einem gemeinsamen Typ zusammen liegen.
 
 use std::future::Future;
 use std::pin::Pin;
@@ -10,7 +10,8 @@ use crate::{Next, Notification, NotificationHandler, PipelineBehavior, Request, 
 
 /// Eine Future mit gelöschtem Typ, die auf diesem Thread läuft (nicht `Send`) und höchstens `'a` lang leiht.
 // dyn: Handler, Behaviors und ihre Futures verschiedener Typen liegen hinter einem gemeinsamen Typ;
-// `Sender::send` und `Publisher::publish` kennen nur den Nachrichtentyp, nicht den Handler- oder Behavior-Typ.
+// `Sender::send` und `Publisher::publish` kennen nur den Nachrichtentyp, nicht den Handler-Typ;
+// [`Next`] kennt nur den Request-Typ, nicht die Typen der Behaviors.
 type LocalBoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 
 /// Ein Handler mit gelöschtem Typ: nimmt einen `R` und liefert später dessen Antwort oder Fehler.
@@ -58,20 +59,22 @@ async fn notify<N: Notification, H: NotificationHandler<N>>(
 pub(crate) type ErasedBehavior<R> =
     Box<dyn Fn(R, Next<R>) -> LocalBoxFuture<'static, HandlerResult<R>>>;
 
-/// Verpackt `behavior` als [`ErasedBehavior`].
-pub(crate) fn erase_behavior<R, B>(behavior: Rc<B>) -> ErasedBehavior<R>
+/// Verpackt das Behavior, das `pick` aus `behaviors` holt, als [`ErasedBehavior`].
+pub(crate) fn erase_behavior<R, P, B>(behaviors: Rc<P>, pick: fn(&P) -> &B) -> ErasedBehavior<R>
 where
     R: Request + 'static,
+    P: 'static,
     B: PipelineBehavior<R> + 'static,
 {
-    Box::new(move |request, next| Box::pin(wrap(Rc::clone(&behavior), request, next)))
+    Box::new(move |request, next| Box::pin(wrap(Rc::clone(&behaviors), pick, request, next)))
 }
 
-/// Ruft `behavior` auf; die Future besitzt das Behavior, damit sie ohne Leihe auskommt.
-async fn wrap<R: Request, B: PipelineBehavior<R>>(
-    behavior: Rc<B>,
+/// Ruft das Behavior auf, das `pick` aus `behaviors` holt; die Future besitzt die Behaviors, damit sie ohne Leihe auskommt.
+async fn wrap<R: Request, P, B: PipelineBehavior<R>>(
+    behaviors: Rc<P>,
+    pick: fn(&P) -> &B,
     request: R,
     next: Next<R>,
 ) -> HandlerResult<R> {
-    behavior.handle(request, next).await
+    pick(&behaviors).handle(request, next).await
 }
