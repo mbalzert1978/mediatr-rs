@@ -51,6 +51,8 @@ pub struct WeakProvider {
 #[derive(Debug, Clone, Default)]
 pub struct ProviderBuilder {
     services: Services,
+    /// Paare aus Diensttyp und Quelltyp, die [`ProviderBuilder::unique_instance`] schon registriert hat.
+    sources: HashSet<(TypeId, TypeId)>,
 }
 
 impl Provider {
@@ -135,6 +137,19 @@ impl ProviderBuilder {
     pub fn instance<T: 'static>(self, service: T) -> Self {
         let service = Rc::new(service);
         self.recipe(move |_| Rc::clone(&service))
+    }
+
+    /// Registriert `into(source)` wie [`instance`](Self::instance); hat `unique_instance` für `T` schon einen Dienst aus einem `S` registriert, fällt dieser weg.
+    #[must_use]
+    pub fn unique_instance<S: 'static, T: 'static>(
+        mut self,
+        source: S,
+        into: impl FnOnce(S) -> T,
+    ) -> Self {
+        if !self.sources.insert((TypeId::of::<T>(), TypeId::of::<S>())) {
+            return self;
+        }
+        self.instance(into(source))
     }
 
     /// Registriert `recipe`; jede Abfrage baut den Dienst damit neu.

@@ -32,7 +32,7 @@ Quelle: MediatR `Mediator(IServiceProvider)` speichert keine Handler; es holt si
 
 ## Provider-Crate `mediatr-provider`
 
-Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSingleton`, `AddScoped`, `AddTransient`); MediatR `test/MediatR.Tests/MicrosoftExtensionsDI/TypeResolutionTests.cs` (`ShouldNotThrowWithMissingEnumerables`). Der Container registriert und baut Dienste; vom Mediator weiß er nichts.
+Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSingleton`, `AddScoped`, `AddTransient`, `TryAddEnumerable` als `unique_instance`); MediatR `test/MediatR.Tests/MicrosoftExtensionsDI/TypeResolutionTests.cs` (`ShouldNotThrowWithMissingEnumerables`). Der Container registriert und baut Dienste; vom Mediator weiß er nichts.
 
 - [x] Dienst mit `instance` registriert → jede Abfrage beim Provider liefert dasselbe Objekt · `instance_returns_same_object_on_every_get`
 - [x] Dienst nicht registriert → die Abfrage beim Provider liefert `None` · `get_without_registration_returns_none`
@@ -71,6 +71,11 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] Zwei Bauanleitungen desselben Typs, die erste fragt mit `get` nach ihrem eigenen Typ, die äußere Abfrage kommt über `all` → die innere Abfrage liefert `None` · `first_of_two_recipes_asking_for_own_type_through_all_gets_none`
 - [x] Zwei Dienste desselben Typs mit `scoped` registriert → `all` liefert im selben Scope zwei verschiedene Objekte, je eins pro Bauanleitung · `two_scoped_registrations_of_same_type_build_one_object_each`
 - [x] Zweimal `instance` für denselben Typ, der Provider fällt weg → beide Dienste werden freigegeben (ihr `Drop` läuft) · `both_instances_of_same_type_are_released_with_provider`
+- [x] Zweimal `unique_instance` für denselben Typ, beide aus demselben Quelltyp umgewandelt → `all` liefert nur den zuerst registrierten Dienst · `unique_instance_twice_from_same_source_type_all_returns_first`
+- [ ] Zweimal `unique_instance` für denselben Typ, beide aus demselben Quelltyp umgewandelt → `get` liefert den zuerst registrierten Dienst
+- [ ] Zweimal `unique_instance` für denselben Typ, aus verschiedenen Quelltypen umgewandelt → `all` liefert beide, in der Reihenfolge der Registrierung
+- [ ] `unique_instance` aus demselben Quelltyp für zwei verschiedene Typen → jede Abfrage nach einem der beiden Typen liefert ihren Dienst
+- [ ] Erst `instance`, dann `unique_instance` für denselben Typ → `all` liefert beide, in der Reihenfolge der Registrierung
 
 ## Notification — `publish`
 
