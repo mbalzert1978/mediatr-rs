@@ -775,3 +775,24 @@ fn unique_instance_from_same_source_type_for_two_service_types_registers_both() 
         (Some("Rechnung 1"), Some("Rechnung 2"))
     );
 }
+
+#[test]
+fn instance_then_unique_instance_of_same_type_all_returns_both_in_order() {
+    let provider = Provider::builder()
+        .instance(Document("Aushang".to_owned()))
+        .unique_instance(
+            Invoice {
+                heading: "Rechnung 1".to_owned(),
+            },
+            Document::from,
+        )
+        .build();
+
+    let titles: Vec<_> = provider
+        .all::<Document>()
+        .iter()
+        .map(|document| document.0.clone())
+        .collect();
+
+    assert_eq!(titles, ["Aushang", "Rechnung 1"]);
+}
