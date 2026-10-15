@@ -207,7 +207,7 @@ Quelle: MediatR `test/MediatR.Tests/CreateStreamTests.cs`; `src/MediatR/Wrappers
 - [x] Stream-Request mit registriertem Stream-Handler → der Stream liefert genau die Elemente des Handlers und endet danach · `create_stream_yields_exactly_handler_items_then_ends`
 - [x] Handler bekommt einen Sender per Konstruktor und fordert darüber einen Stream an → er bekommt die Elemente des Stream-Handlers · `handler_requests_stream_through_constructor_sender_and_gets_handler_items`
 - [x] Stream-Request ohne registrierten Stream-Handler → der Stream liefert einen Fehler, kein Panic · `create_stream_without_handler_yields_no_handler_error`
-- [ ] Zwei Stream-Handler nacheinander für denselben Stream-Request-Typ registriert → der Stream liefert die Elemente des zuletzt registrierten
+- [x] Zwei Stream-Handler nacheinander für denselben Stream-Request-Typ registriert → der Stream liefert die Elemente des zuletzt registrierten · `register_stream_twice_keeps_last_stream_handler`
 - [ ] Stream angefordert, aber nie gelesen → der Stream-Handler läuft nicht
 
 ## Stream-Request — Stream-Behaviors

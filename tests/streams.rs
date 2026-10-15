@@ -57,3 +57,28 @@ async fn handler_requests_stream_through_constructor_sender_and_gets_handler_ite
 
     assert_eq!(count, Ok(3));
 }
+
+#[tokio::test]
+async fn register_stream_twice_keeps_last_stream_handler() {
+    let mediator = Mediator::builder()
+        .register_stream(Handler::instance(GuestBook {
+            guests: vec!["Anna".to_owned()],
+        }))
+        .register_stream(Handler::instance(GuestBook {
+            guests: vec!["Dora".to_owned(), "Emil".to_owned()],
+        }))
+        .build();
+
+    let arrivals: Vec<_> = mediator
+        .create_stream(ListArrivals { day: 5 })
+        .collect()
+        .await;
+
+    assert_eq!(
+        arrivals,
+        vec![
+            Ok("Dora am Tag 5".to_owned()),
+            Ok("Emil am Tag 5".to_owned())
+        ]
+    );
+}
