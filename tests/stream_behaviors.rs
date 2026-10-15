@@ -9,9 +9,9 @@ use mediatr_rs::{Handler, Mediator, StreamSender};
 mod stream_behaviors_fixtures;
 
 use stream_behaviors_fixtures::{
-    Concierge, DepartureBoard, FrontOffice, ListArrivals, ListDepartures, NightPorter, bellboy,
-    concierge, concierge_and_night_porter_around, concierge_bellboy_and_night_porter_around,
-    night_porter,
+    Concierge, DepartureBoard, FrontOffice, Greeter, ListArrivals, ListDepartures, NightPorter,
+    bellboy, concierge, concierge_and_night_porter_around,
+    concierge_bellboy_and_night_porter_around, night_porter,
 };
 
 #[tokio::test]
@@ -110,5 +110,33 @@ async fn stream_behavior_for_one_type_joins_general_ones_in_registration_order_o
             concierge_bellboy_and_night_porter_around("Anreisen für Tag 3 nachgeschlagen"),
             concierge_and_night_porter_around("Abreisen für Tag 3 nachgeschlagen")
         )
+    );
+}
+
+#[tokio::test]
+async fn stream_behavior_adding_one_item_before_and_after_three_handler_items_yields_five_in_order()
+{
+    let mediator = Mediator::builder()
+        .stream_behavior::<ListArrivals>(Greeter)
+        .register_stream(Handler::instance(FrontOffice {
+            guests: vec!["Anna".to_owned(), "Ben".to_owned(), "Clara".to_owned()],
+            journal: Rc::new(RefCell::new(Vec::new())),
+        }))
+        .build();
+
+    let arrivals: Vec<_> = mediator
+        .create_stream(ListArrivals { day: 1 })
+        .collect()
+        .await;
+
+    assert_eq!(
+        arrivals,
+        vec![
+            Ok("Begrüßung".to_owned()),
+            Ok("Anna am Tag 1".to_owned()),
+            Ok("Ben am Tag 1".to_owned()),
+            Ok("Clara am Tag 1".to_owned()),
+            Ok("Abschied".to_owned())
+        ]
     );
 }

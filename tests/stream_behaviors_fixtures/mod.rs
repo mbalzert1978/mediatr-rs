@@ -176,3 +176,18 @@ pub fn night_porter(journal: &Rc<RefCell<Vec<String>>>) -> NightPorter {
         journal: Rc::clone(journal),
     }
 }
+
+/// Der Empfang: Er stellt jeder Anreiseliste eine Begrüßung voran und hängt einen Abschied an.
+pub struct Greeter;
+
+impl StreamPipelineBehavior<ListArrivals> for Greeter {
+    fn handle(
+        &self,
+        request: ListArrivals,
+        next: StreamNext<ListArrivals>,
+    ) -> impl Stream<Item = Result<String, SendError>> + use<> {
+        futures_util::stream::iter([Ok("Begrüßung".to_owned())])
+            .chain(next.run(request))
+            .chain(futures_util::stream::iter([Ok("Abschied".to_owned())]))
+    }
+}
