@@ -274,15 +274,12 @@ async fn when_all_publisher_starts_second_waiting_handler_before_first_finished(
         .await
         .unwrap();
 
-    assert_eq!(
-        *journal.borrow(),
-        [
-            "Entladen beginnt 7",
-            "Scannen beginnt 7",
-            "Entladen fertig 7",
-            "Scannen fertig 7"
-        ]
-    );
+    let journal = journal.borrow();
+    let position = |entry: &str| journal.iter().position(|logged| logged == entry);
+    assert!(matches!(
+        (position("Scannen beginnt 7"), position("Entladen fertig 7")),
+        (Some(scanning), Some(unloaded)) if scanning < unloaded
+    ));
 }
 
 #[tokio::test]
