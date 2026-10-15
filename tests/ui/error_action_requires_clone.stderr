@@ -1,0 +1,21 @@
+error[E0277]: the trait bound `OrderTaxi: Clone` is not satisfied
+  --> tests/ui/error_action_requires_clone.rs:40:31
+   |
+40 |     let _taxi = mediator.send(OrderTaxi { house: 12 });
+   |                          ---- ^^^^^^^^^^^^^^^^^^^^^^^ the trait `Clone` is not implemented for `OrderTaxi`
+   |                          |
+   |                          required by a bound introduced by this call
+   |
+help: the trait `mediatr_rs::Sender<R>` is implemented for `Mediator<S, P>`
+  --> src/mediator.rs
+   |
+   | impl<S, P: Behaviors<R>, R: Request + 'static> Sender<R> for Mediator<S, P> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: required for `mediatr_rs::pipeline::sealed::RequestErrorActionProcessorBehavior<ControlRoom>` to implement `PipelineBehavior<OrderTaxi>`
+   = note: required for `((), mediatr_rs::pipeline::sealed::OpenBehavior<mediatr_rs::pipeline::sealed::RequestErrorActionProcessorBehavior<ControlRoom>>)` to implement `mediatr_rs::pipeline::sealed::Behaviors<OrderTaxi>`
+   = note: required for `Mediator<ForeachAwaitPublisher, ((), mediatr_rs::pipeline::sealed::OpenBehavior<mediatr_rs::pipeline::sealed::RequestErrorActionProcessorBehavior<ControlRoom>>)>` to implement `mediatr_rs::Sender<OrderTaxi>`
+help: consider annotating `OrderTaxi` with `#[derive(Clone)]`
+   |
+ 8 + #[derive(Clone)]
+ 9 | struct OrderTaxi {
+   |
