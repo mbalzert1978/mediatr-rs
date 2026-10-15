@@ -35,3 +35,8 @@ fn post_processor_registered_after_first_handler_does_not_compile() {
 fn error_handler_registered_after_first_handler_does_not_compile() {
     trybuild::TestCases::new().compile_fail("tests/ui/error_handler_after_handler.rs");
 }
+
+#[test]
+fn error_action_registered_after_first_handler_does_not_compile() {
+    trybuild::TestCases::new().compile_fail("tests/ui/error_action_after_handler.rs");
+}

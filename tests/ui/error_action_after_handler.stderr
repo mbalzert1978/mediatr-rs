@@ -1,0 +1,12 @@
+error[E0599]: no method named `open_request_error_action` found for struct `MediatorBuilder<ForeachAwaitPublisher, (), WithHandlers>` in the current scope
+  --> tests/ui/error_action_after_handler.rs:37:10
+   |
+35 |       let _mediator = Mediator::builder()
+   |  _____________________-
+36 | |         .register(Handler::instance(OpenHotel))
+37 | |         .open_request_error_action(BookingAlert)
+   | |         -^^^^^^^^^^^^^^^^^^^^^^^^^ method not found in `MediatorBuilder<ForeachAwaitPublisher, (), WithHandlers>`
+   | |_________|
+   |
+   |
+   = note: the method was found for `MediatorBuilder<S, P>`
