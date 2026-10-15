@@ -1,11 +1,10 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use futures_core::Stream;
 use futures_util::StreamExt;
 use mediatr_rs::{
     Request, RequestHandler, SendError, StreamRequest, StreamRequestHandler, StreamSender,
 };
+
+use crate::common::Journal;
 
 /// Fragt die Gäste ab, die an diesem Tag anreisen.
 pub struct ListArrivals {
@@ -68,7 +67,7 @@ impl<M: StreamSender<ListArrivals>> RequestHandler<CountArrivals> for ArrivalBoa
 
 /// Die Rezeption: Sie notiert jedes Nachschlagen der Anreisen im Protokoll und kennt noch keine Gäste.
 pub struct FrontOffice {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl StreamRequestHandler<ListArrivals> for FrontOffice {

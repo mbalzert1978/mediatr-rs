@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::rc::Rc;
 use std::task::Poll;
 
@@ -8,6 +7,8 @@ use mediatr_rs::{
     Next, PipelineBehavior, Request, RequestHandler, SendError, StreamNext, StreamPipelineBehavior,
     StreamRequest, StreamRequestHandler,
 };
+
+use crate::common::Journal;
 
 /// Fragt die Gäste ab, die an diesem Tag anreisen.
 pub struct ListArrivals {
@@ -22,7 +23,7 @@ impl StreamRequest for ListArrivals {
 /// Die Rezeption: Sie notiert jedes Nachschlagen der Anreisen im Protokoll und meldet dann ihre Gäste.
 pub struct FrontOffice {
     pub guests: Vec<String>,
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl StreamRequestHandler<ListArrivals> for FrontOffice {
@@ -45,7 +46,7 @@ impl StreamRequestHandler<ListArrivals> for FrontOffice {
 
 /// Der Stream, den `inner` liefert; „`who` vorher“ steht im Protokoll, bevor `inner` läuft, „`who` nachher“ nach dem letzten Element.
 fn journaled<F: FnOnce() -> S, S: Stream>(
-    journal: &Rc<RefCell<Vec<String>>>,
+    journal: &Journal,
     who: &'static str,
     inner: F,
 ) -> impl Stream<Item = S::Item> + use<F, S> {
@@ -59,7 +60,7 @@ fn journaled<F: FnOnce() -> S, S: Stream>(
 
 /// Der Concierge begleitet jede Abfrage und schreibt Beginn und Ende ins Protokoll.
 pub struct Concierge {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl<R: StreamRequest + 'static> StreamPipelineBehavior<R> for Concierge {
@@ -74,7 +75,7 @@ impl<R: StreamRequest + 'static> StreamPipelineBehavior<R> for Concierge {
 
 /// Der Nachtportier begleitet jede Abfrage und schreibt Beginn und Ende ins Protokoll.
 pub struct NightPorter {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl<R: StreamRequest + 'static> StreamPipelineBehavior<R> for NightPorter {
@@ -112,7 +113,7 @@ impl StreamRequest for ListDepartures {
 
 /// Die Abreisetafel: Sie notiert jedes Nachschlagen der Abreisen im Protokoll und meldet keine Gäste.
 pub struct DepartureBoard {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl StreamRequestHandler<ListDepartures> for DepartureBoard {
@@ -129,7 +130,7 @@ impl StreamRequestHandler<ListDepartures> for DepartureBoard {
 
 /// Der Page begleitet nur Abfragen der Anreisen und schreibt Beginn und Ende ins Protokoll.
 pub struct Bellboy {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl StreamPipelineBehavior<ListArrivals> for Bellboy {
@@ -158,21 +159,21 @@ pub fn concierge_bellboy_and_night_porter_around(handled: &str) -> Vec<String> {
 }
 
 /// Concierge, der in `journal` schreibt.
-pub fn concierge(journal: &Rc<RefCell<Vec<String>>>) -> Concierge {
+pub fn concierge(journal: &Journal) -> Concierge {
     Concierge {
         journal: Rc::clone(journal),
     }
 }
 
 /// Page, der in `journal` schreibt.
-pub fn bellboy(journal: &Rc<RefCell<Vec<String>>>) -> Bellboy {
+pub fn bellboy(journal: &Journal) -> Bellboy {
     Bellboy {
         journal: Rc::clone(journal),
     }
 }
 
 /// Nachtportier, der in `journal` schreibt.
-pub fn night_porter(journal: &Rc<RefCell<Vec<String>>>) -> NightPorter {
+pub fn night_porter(journal: &Journal) -> NightPorter {
     NightPorter {
         journal: Rc::clone(journal),
     }
@@ -209,7 +210,7 @@ impl StreamPipelineBehavior<ListArrivals> for ClosedDesk {
 
 /// Die Türprotokollierung: Sie umschließt jeden Request und schreibt Öffnen und Schließen ins Protokoll.
 pub struct DoorLog {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl<R: Request> PipelineBehavior<R> for DoorLog {
@@ -233,7 +234,7 @@ impl Request for CheckIn {
 
 /// Der Check-in-Schalter: Er schreibt jeden Check-in ins Protokoll.
 pub struct CheckInDesk {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestHandler<CheckIn> for CheckInDesk {

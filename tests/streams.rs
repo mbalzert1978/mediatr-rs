@@ -1,13 +1,14 @@
 //! Tests für den Abschnitt „Stream-Request — Stream anfordern“ in `TESTLIST.md`.
 
-use std::cell::RefCell;
 use std::rc::Rc;
 
 use futures_util::StreamExt;
 use mediatr_rs::{Handler, Mediator, SendError, Sender, StreamSender};
 
+mod common;
 mod streams_fixtures;
 
+use common::Journal;
 use streams_fixtures::{ArrivalBoard, CountArrivals, FrontOffice, GuestBook, ListArrivals};
 
 #[tokio::test]
@@ -88,7 +89,7 @@ async fn register_stream_twice_keeps_last_stream_handler() {
 
 #[tokio::test]
 async fn unread_stream_does_not_run_stream_handler() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .register_stream(Handler::instance(FrontOffice {
             journal: Rc::clone(&journal),

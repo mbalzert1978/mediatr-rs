@@ -1,10 +1,9 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use mediatr_rs::{
     Next, PipelineBehavior, Request, RequestErrorAction, RequestErrorHandler, RequestHandler,
     RequestPostProcessor, RequestPreProcessor, SendError,
 };
+
+use crate::common::Journal;
 
 /// Bucht das Hotelzimmer mit dieser Nummer und liefert die Buchungsnummer.
 #[derive(Clone)]
@@ -38,7 +37,7 @@ impl Request for BookRoom {
 
 /// Ein ausgebuchtes Hotel: Es schreibt jede Anfrage ins Protokoll und lehnt sie ab.
 pub struct FullHotel {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestHandler<BookRoom> for FullHotel {
@@ -52,7 +51,7 @@ impl RequestHandler<BookRoom> for FullHotel {
 
 /// Schlägt bei jeder gescheiterten Buchung Alarm im Protokoll.
 pub struct BookingAlert {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestErrorAction<BookRoom> for BookingAlert {
@@ -67,7 +66,7 @@ impl RequestErrorAction<BookRoom> for BookingAlert {
 
 /// Informiert den Gast über jede gescheiterte Buchung und schreibt das ins Protokoll.
 pub struct GuestNotice {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestErrorAction<BookRoom> for GuestNotice {
@@ -82,7 +81,7 @@ impl RequestErrorAction<BookRoom> for GuestNotice {
 
 /// Setzt jede gescheiterte Buchung auf die Warteliste und liefert die Wartelistennummer als Buchungsnummer.
 pub struct WaitingList {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestErrorHandler<BookRoom> for WaitingList {
@@ -96,7 +95,7 @@ impl RequestErrorHandler<BookRoom> for WaitingList {
 
 /// Bucht bei jeder gescheiterten Buchung ein Zimmer im Partnerhotel und liefert dessen Buchungsnummer.
 pub struct PartnerHotel {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestErrorHandler<BookRoom> for PartnerHotel {
@@ -110,7 +109,7 @@ impl RequestErrorHandler<BookRoom> for PartnerHotel {
 
 /// Prüft bei jeder gescheiterten Buchung, ob sich überbuchen lässt; das geht nie, darum reicht sie den Fehler weiter.
 pub struct OverbookingCheck {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestErrorHandler<BookRoom> for OverbookingCheck {
@@ -124,7 +123,7 @@ impl RequestErrorHandler<BookRoom> for OverbookingCheck {
 
 /// Eine geschlossene Warteliste: Sie schreibt jede gescheiterte Buchung ins Protokoll und scheitert selbst.
 pub struct ClosedWaitingList {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestErrorHandler<BookRoom> for ClosedWaitingList {
@@ -139,7 +138,7 @@ impl RequestErrorHandler<BookRoom> for ClosedWaitingList {
 
 /// Lässt keine Buchung durch, weil jede Zahlung abgelehnt wird, und schreibt jede Ablehnung ins Protokoll.
 pub struct PaymentGate {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl PipelineBehavior<BookRoom> for PaymentGate {
@@ -153,7 +152,7 @@ impl PipelineBehavior<BookRoom> for PaymentGate {
 
 /// Eine kaputte Alarmanlage: Sie schreibt jede gescheiterte Buchung ins Protokoll und scheitert dann selbst.
 pub struct BrokenAlarm {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestErrorAction<BookRoom> for BrokenAlarm {
@@ -167,7 +166,7 @@ impl RequestErrorAction<BookRoom> for BrokenAlarm {
 
 /// Ein Hotel mit freien Zimmern: Es schreibt jede Buchung ins Protokoll und liefert die Buchungsnummer.
 pub struct OpenHotel {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestHandler<BookRoom> for OpenHotel {
@@ -181,7 +180,7 @@ impl RequestHandler<BookRoom> for OpenHotel {
 
 /// Prüft vor jeder Buchung, ob das Zimmer renoviert wird; das ist immer so, darum lehnt sie jede Buchung ab und schreibt das ins Protokoll.
 pub struct RenovationCheck {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestPreProcessor<BookRoom> for RenovationCheck {
@@ -195,7 +194,7 @@ impl RequestPreProcessor<BookRoom> for RenovationCheck {
 
 /// Schickt nach jeder Buchung eine Bestätigung; der Versand scheitert immer, das schreibt sie ins Protokoll.
 pub struct ConfirmationMail {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestPostProcessor<BookRoom> for ConfirmationMail {
@@ -209,7 +208,7 @@ impl RequestPostProcessor<BookRoom> for ConfirmationMail {
 
 /// Die Rezeption: Sie schreibt jeden Fehler einer Buchung, den sie bekommt, ins Protokoll und reicht ihn weiter.
 pub struct FrontDesk {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestErrorHandler<BookRoom> for FrontDesk {
@@ -234,7 +233,7 @@ impl Request for CancelBooking {
 
 /// Ein Hotel ohne Erstattung: Es schreibt jede Stornierung ins Protokoll und lehnt sie ab.
 pub struct NoRefunds {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestHandler<CancelBooking> for NoRefunds {

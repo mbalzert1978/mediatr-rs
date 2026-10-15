@@ -1,11 +1,11 @@
-use std::cell::RefCell;
 use std::future::Future;
-use std::rc::Rc;
 
 use mediatr_rs::{
     Mediator, Notification, NotificationHandler, NotificationPublisher, Publisher, Request,
     RequestHandler, SendError, Sender, WeakMediator,
 };
+
+use crate::common::Journal;
 
 /// Ereignis: Das Paket mit dieser Sendungsnummer ist angekommen.
 pub struct ParcelArrived {
@@ -18,7 +18,7 @@ impl Notification for ParcelArrived {
 
 /// Lagert jedes angekommene Paket ein und schreibt das ins Protokoll.
 pub struct Stockroom {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl NotificationHandler<ParcelArrived> for Stockroom {
@@ -32,7 +32,7 @@ impl NotificationHandler<ParcelArrived> for Stockroom {
 
 /// Benachrichtigt den Empfänger jedes angekommenen Pakets und schreibt das ins Protokoll.
 pub struct Recipient {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl NotificationHandler<ParcelArrived> for Recipient {
@@ -85,7 +85,7 @@ impl NotificationHandler<ParcelArrived> for Dispatcher {
 
 /// Plant für jedes fällige Paket einen Kurier und schreibt das ins Protokoll.
 pub struct CourierPlanner {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl NotificationHandler<DeliveryDue> for CourierPlanner {
@@ -99,7 +99,7 @@ impl NotificationHandler<DeliveryDue> for CourierPlanner {
 
 /// Kündigt jedes fällige Paket an der Haustür an und schreibt das ins Protokoll.
 pub struct DoorNotice {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl NotificationHandler<DeliveryDue> for DoorNotice {
@@ -148,7 +148,7 @@ impl RequestHandler<TrackParcel> for TrackingDesk {
 /// Fragt für jedes angekommene Paket über seinen Sender nach, wo es liegt, und schreibt die Antwort ins Protokoll; es gibt ihn nur einmal.
 pub struct ArrivalClerk {
     pub sender: WeakMediator<NewestFirst>,
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl NotificationHandler<ParcelArrived> for ArrivalClerk {
@@ -187,7 +187,7 @@ impl NotificationHandler<ParcelArrived> for ShiftCenter {
 
 /// Entlädt jedes angekommene Paket vom Lastwagen; zwischen Beginn und Ende wartet es auf den Gabelstapler.
 pub struct Unloading {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl NotificationHandler<ParcelArrived> for Unloading {
@@ -205,7 +205,7 @@ impl NotificationHandler<ParcelArrived> for Unloading {
 
 /// Scannt jedes angekommene Paket; zwischen Beginn und Ende wartet es auf den Scanner.
 pub struct Scanning {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl NotificationHandler<ParcelArrived> for Scanning {
@@ -255,7 +255,7 @@ impl NotificationHandler<ParcelInspected> for DamageCheck {
 
 /// Wiegt jedes geprüfte Paket und schreibt das ins Protokoll.
 pub struct Weighing {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl NotificationHandler<ParcelInspected> for Weighing {

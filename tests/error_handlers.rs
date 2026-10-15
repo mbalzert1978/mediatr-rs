@@ -1,12 +1,13 @@
 //! Tests für den Abschnitt „Pipeline — Fehler-Handler und Fehler-Aktionen“ in `TESTLIST.md`.
 
-use std::cell::RefCell;
 use std::rc::Rc;
 
 use mediatr_rs::{Handler, Mediator, Sender};
 
+mod common;
 mod error_handlers_fixtures;
 
+use common::Journal;
 use error_handlers_fixtures::{
     BookRoom, BookingAlert, BookingError, BrokenAlarm, CancelBooking, ClosedWaitingList,
     ConfirmationMail, FrontDesk, FullHotel, GuestNotice, NoRefunds, OpenHotel, OverbookingCheck,
@@ -15,7 +16,7 @@ use error_handlers_fixtures::{
 
 #[tokio::test]
 async fn error_action_runs_on_handler_error_and_send_returns_handler_error() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_action(BookingAlert {
             journal: Rc::clone(&journal),
@@ -41,13 +42,13 @@ async fn error_action_runs_on_handler_error_and_send_returns_handler_error() {
 
 #[tokio::test]
 async fn error_action_runs_once_per_send_on_handler_error() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_action(BookingAlert {
             journal: Rc::clone(&journal),
         })
         .register(Handler::instance(FullHotel {
-            journal: Rc::new(RefCell::new(Vec::new())),
+            journal: Journal::default(),
         }))
         .build();
 
@@ -65,7 +66,7 @@ async fn error_action_runs_once_per_send_on_handler_error() {
 
 #[tokio::test]
 async fn two_error_actions_both_run_on_handler_error_and_send_returns_handler_error() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_action(BookingAlert {
             journal: Rc::clone(&journal),
@@ -95,7 +96,7 @@ async fn two_error_actions_both_run_on_handler_error_and_send_returns_handler_er
 
 #[tokio::test]
 async fn first_error_handler_replacement_is_returned_and_second_error_handler_does_not_run() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_handler(WaitingList {
             journal: Rc::clone(&journal),
@@ -124,7 +125,7 @@ async fn first_error_handler_replacement_is_returned_and_second_error_handler_do
 
 #[tokio::test]
 async fn error_handler_without_replacement_lets_send_return_original_error() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_handler(OverbookingCheck {
             journal: Rc::clone(&journal),
@@ -150,7 +151,7 @@ async fn error_handler_without_replacement_lets_send_return_original_error() {
 
 #[tokio::test]
 async fn failing_error_handler_makes_send_return_its_error_instead_of_original() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_handler(ClosedWaitingList {
             journal: Rc::clone(&journal),
@@ -176,13 +177,13 @@ async fn failing_error_handler_makes_send_return_its_error_instead_of_original()
 
 #[tokio::test]
 async fn error_handler_without_replacement_runs_once_per_send_on_handler_error() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_handler(OverbookingCheck {
             journal: Rc::clone(&journal),
         })
         .register(Handler::instance(FullHotel {
-            journal: Rc::new(RefCell::new(Vec::new())),
+            journal: Journal::default(),
         }))
         .build();
 
@@ -200,7 +201,7 @@ async fn error_handler_without_replacement_runs_once_per_send_on_handler_error()
 
 #[tokio::test]
 async fn error_handler_replacement_is_returned_and_error_action_does_not_run() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_action(BookingAlert {
             journal: Rc::clone(&journal),
@@ -230,7 +231,7 @@ async fn error_handler_replacement_is_returned_and_error_action_does_not_run() {
 #[tokio::test]
 async fn error_handler_without_replacement_and_error_action_both_run_and_send_returns_handler_error()
  {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_action(BookingAlert {
             journal: Rc::clone(&journal),
@@ -261,7 +262,7 @@ async fn error_handler_without_replacement_and_error_action_both_run_and_send_re
 #[tokio::test]
 async fn failing_behavior_before_handler_runs_error_handler_and_error_action_and_send_returns_its_error()
  {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_behavior(PaymentGate {
             journal: Rc::clone(&journal),
@@ -294,7 +295,7 @@ async fn failing_behavior_before_handler_runs_error_handler_and_error_action_and
 
 #[tokio::test]
 async fn failing_error_action_makes_send_return_its_error_instead_of_handler_error() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_action(BrokenAlarm {
             journal: Rc::clone(&journal),
@@ -320,7 +321,7 @@ async fn failing_error_action_makes_send_return_its_error_instead_of_handler_err
 
 #[tokio::test]
 async fn successful_handler_skips_error_action_and_send_returns_its_response() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_action(BookingAlert {
             journal: Rc::clone(&journal),
@@ -340,7 +341,7 @@ async fn successful_handler_skips_error_action_and_send_returns_its_response() {
 
 #[tokio::test]
 async fn failing_pre_processor_runs_error_action_and_send_returns_its_error() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_pre_processor(RenovationCheck {
             journal: Rc::clone(&journal),
@@ -369,7 +370,7 @@ async fn failing_pre_processor_runs_error_action_and_send_returns_its_error() {
 
 #[tokio::test]
 async fn failing_post_processor_runs_error_action_and_send_returns_its_error() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_post_processor(ConfirmationMail {
             journal: Rc::clone(&journal),
@@ -399,7 +400,7 @@ async fn failing_post_processor_runs_error_action_and_send_returns_its_error() {
 
 #[tokio::test]
 async fn second_error_handler_gets_error_passed_on_by_first_instead_of_original() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_handler(ClosedWaitingList {
             journal: Rc::clone(&journal),
@@ -426,7 +427,7 @@ async fn second_error_handler_gets_error_passed_on_by_first_instead_of_original(
 
 #[tokio::test]
 async fn successful_handler_skips_error_handler_and_send_returns_its_response() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_handler(WaitingList {
             journal: Rc::clone(&journal),
@@ -446,7 +447,7 @@ async fn successful_handler_skips_error_handler_and_send_returns_its_response() 
 
 #[tokio::test]
 async fn same_error_action_type_registered_twice_runs_once_per_send() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_action(BookingAlert {
             journal: Rc::clone(&journal),
@@ -472,7 +473,7 @@ async fn same_error_action_type_registered_twice_runs_once_per_send() {
 
 #[tokio::test]
 async fn same_error_handler_type_registered_twice_runs_once_per_send() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_handler(OverbookingCheck {
             journal: Rc::clone(&journal),
@@ -498,7 +499,7 @@ async fn same_error_handler_type_registered_twice_runs_once_per_send() {
 
 #[tokio::test]
 async fn error_action_for_one_request_type_runs_only_for_that_type() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .request_error_action::<BookRoom>(BookingAlert {
             journal: Rc::clone(&journal),
@@ -529,7 +530,7 @@ async fn error_action_for_one_request_type_runs_only_for_that_type() {
 
 #[tokio::test]
 async fn error_handler_for_one_request_type_runs_only_for_that_type() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .request_error_handler::<BookRoom>(OverbookingCheck {
             journal: Rc::clone(&journal),

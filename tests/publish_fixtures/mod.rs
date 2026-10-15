@@ -8,6 +8,8 @@ use mediatr_rs::{
     Sender,
 };
 
+use crate::common::Journal;
+
 /// Ereignis: Die Bestellung mit dieser Nummer ist eingegangen.
 pub struct OrderPlaced {
     pub order_id: u32,
@@ -31,7 +33,7 @@ impl NotificationHandler<OrderPlaced> for ShippingDesk {
 
 /// Reserviert für jede eingegangene Bestellung die Ware und schreibt das ins Protokoll.
 pub struct Warehouse {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl NotificationHandler<OrderPlaced> for Warehouse {
@@ -45,7 +47,7 @@ impl NotificationHandler<OrderPlaced> for Warehouse {
 
 /// Stellt für jede eingegangene Bestellung eine Rechnung aus und schreibt das ins Protokoll.
 pub struct Billing {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl NotificationHandler<OrderPlaced> for Billing {
@@ -140,7 +142,7 @@ impl TwoDesks {
 
 /// Packt für jede eingegangene Bestellung ein Paket; zwischen Beginn und Ende wartet es auf das Lager.
 pub struct Packing {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl NotificationHandler<OrderPlaced> for Packing {

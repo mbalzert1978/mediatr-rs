@@ -8,8 +8,10 @@ use mediatr_rs::{
     WhenAllPublisher,
 };
 
+mod common;
 mod notification_publishers_fixtures;
 
+use common::Journal;
 use notification_publishers_fixtures::{
     ArrivalClerk, CourierPlanner, CustomsHold, DamageCheck, DeliveryDue, DispatchCenter,
     Dispatcher, DoorNotice, InspectionError, NewestFirst, ParcelArrived, ParcelInspected,
@@ -19,7 +21,7 @@ use notification_publishers_fixtures::{
 
 #[tokio::test]
 async fn custom_publisher_runs_both_handlers_in_its_own_order() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = MediatorBuilder::<NewestFirst>::default()
         .subscribe(Handler::instance(Stockroom {
             journal: Rc::clone(&journal),
@@ -42,7 +44,7 @@ async fn custom_publisher_runs_both_handlers_in_its_own_order() {
 
 #[tokio::test]
 async fn custom_publisher_transient_handler_publishes_through_received_mediator_in_its_order() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = MediatorBuilder::<NewestFirst>::default()
         .subscribe(Handler::transient(|publisher| Dispatcher { publisher }))
         .subscribe(Handler::instance(CourierPlanner {
@@ -64,7 +66,7 @@ async fn custom_publisher_transient_handler_publishes_through_received_mediator_
 #[tokio::test]
 async fn custom_publisher_singleton_handler_publishes_through_received_weak_mediator_in_its_order()
 {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = MediatorBuilder::<NewestFirst>::default()
         .subscribe(Handler::singleton(|publisher| DispatchCenter { publisher }))
         .subscribe(Handler::instance(CourierPlanner {
@@ -85,7 +87,7 @@ async fn custom_publisher_singleton_handler_publishes_through_received_weak_medi
 
 #[tokio::test]
 async fn custom_publisher_without_clone_mediator_and_weak_mediator_clone_reaches_same_handlers() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = MediatorBuilder::<NewestFirst>::default()
         .subscribe(Handler::singleton(
             |publisher: WeakMediator<NewestFirst>| DispatchCenter {
@@ -140,7 +142,7 @@ async fn custom_publisher_without_debug_mediator_weak_mediator_and_builder_debug
 
 #[tokio::test]
 async fn custom_publisher_without_clone_builder_clone_builds_mediators_reaching_same_handlers() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let builder = MediatorBuilder::<NewestFirst>::default()
         .subscribe(Handler::instance(CourierPlanner {
             journal: Rc::clone(&journal),
@@ -184,7 +186,7 @@ async fn custom_publisher_send_returns_handler_response() {
 
 #[tokio::test]
 async fn custom_publisher_singleton_handler_sends_through_received_weak_mediator() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let clerk_journal = Rc::clone(&journal);
     let mediator = MediatorBuilder::<NewestFirst>::default()
         .register(Handler::instance(TrackingDesk))
@@ -204,7 +206,7 @@ async fn custom_publisher_singleton_handler_sends_through_received_weak_mediator
 
 #[tokio::test]
 async fn custom_publisher_singleton_handler_publishes_through_weak_mediator_and_its_clone() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = MediatorBuilder::<NewestFirst>::default()
         .subscribe(Handler::singleton(
             |publisher: WeakMediator<NewestFirst>| ShiftCenter {
@@ -257,7 +259,7 @@ async fn custom_publisher_singleton_handler_publishing_after_mediator_dropped_ge
 
 #[tokio::test]
 async fn when_all_publisher_starts_second_waiting_handler_before_first_finished() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = MediatorBuilder::<WhenAllPublisher>::default()
         .subscribe(Handler::instance(Unloading {
             journal: Rc::clone(&journal),
@@ -285,7 +287,7 @@ async fn when_all_publisher_starts_second_waiting_handler_before_first_finished(
 
 #[tokio::test]
 async fn when_all_publisher_runs_second_handler_after_first_fails_and_returns_first_error() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = MediatorBuilder::<WhenAllPublisher>::default()
         .subscribe(Handler::instance(DamageCheck))
         .subscribe(Handler::instance(Weighing {
@@ -306,7 +308,7 @@ async fn when_all_publisher_runs_second_handler_after_first_fails_and_returns_fi
 
 #[tokio::test]
 async fn when_all_publisher_runs_each_of_three_handlers_once_and_returns_ok() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = MediatorBuilder::<WhenAllPublisher>::default()
         .subscribe(Handler::instance(Stockroom {
             journal: Rc::clone(&journal),
@@ -351,7 +353,7 @@ async fn when_all_publisher_both_handlers_fail_returns_error_of_first_registered
 
 #[tokio::test]
 async fn when_all_publisher_only_second_handler_fails_runs_first_and_returns_second_error() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = MediatorBuilder::<WhenAllPublisher>::default()
         .subscribe(Handler::instance(Weighing {
             journal: Rc::clone(&journal),
@@ -384,7 +386,7 @@ async fn when_all_publisher_both_fail_first_after_await_returns_error_of_first_r
 
 #[tokio::test]
 async fn when_all_publisher_equally_waiting_handlers_finish_in_registration_order() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = MediatorBuilder::<WhenAllPublisher>::default()
         .subscribe(Handler::instance(Unloading {
             journal: Rc::clone(&journal),

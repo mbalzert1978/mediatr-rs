@@ -1,13 +1,14 @@
 //! Tests für den Abschnitt „Stream-Request — Stream-Behaviors“ in `TESTLIST.md`.
 
-use std::cell::RefCell;
 use std::rc::Rc;
 
 use futures_util::StreamExt;
 use mediatr_rs::{Handler, Mediator, Sender, StreamSender};
 
+mod common;
 mod stream_behaviors_fixtures;
 
+use common::Journal;
 use stream_behaviors_fixtures::{
     CheckIn, CheckInDesk, ClosedDesk, Concierge, DepartureBoard, DoorLog, FrontOffice, Greeter,
     ListArrivals, ListDepartures, NightPorter, bellboy, concierge,
@@ -16,7 +17,7 @@ use stream_behaviors_fixtures::{
 
 #[tokio::test]
 async fn two_open_stream_behaviors_wrap_handler_first_registered_outside_items_unchanged() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_stream_behavior(Concierge {
             journal: Rc::clone(&journal),
@@ -49,7 +50,7 @@ async fn two_open_stream_behaviors_wrap_handler_first_registered_outside_items_u
 
 #[tokio::test]
 async fn two_stream_behaviors_for_one_type_wrap_handler_in_registration_order_items_unchanged() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .stream_behavior::<ListArrivals>(Concierge {
             journal: Rc::clone(&journal),
@@ -80,7 +81,7 @@ async fn two_stream_behaviors_for_one_type_wrap_handler_in_registration_order_it
 #[tokio::test]
 async fn stream_behavior_for_one_type_joins_general_ones_in_registration_order_other_type_gets_only_general()
  {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_stream_behavior(concierge(&journal))
         .stream_behavior::<ListArrivals>(bellboy(&journal))
@@ -120,7 +121,7 @@ async fn stream_behavior_adding_one_item_before_and_after_three_handler_items_yi
         .stream_behavior::<ListArrivals>(Greeter)
         .register_stream(Handler::instance(FrontOffice {
             guests: vec!["Anna".to_owned(), "Ben".to_owned(), "Clara".to_owned()],
-            journal: Rc::new(RefCell::new(Vec::new())),
+            journal: Journal::default(),
         }))
         .build();
 
@@ -143,7 +144,7 @@ async fn stream_behavior_adding_one_item_before_and_after_three_handler_items_yi
 
 #[tokio::test]
 async fn unread_stream_runs_no_stream_behavior() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_stream_behavior(concierge(&journal))
         .register_stream(Handler::instance(FrontOffice {
@@ -160,7 +161,7 @@ async fn unread_stream_runs_no_stream_behavior() {
 
 #[tokio::test]
 async fn stream_behavior_not_reading_next_stream_keeps_stream_handler_from_running() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .stream_behavior::<ListArrivals>(ClosedDesk)
         .register_stream(Handler::instance(FrontOffice {
@@ -182,7 +183,7 @@ async fn stream_behavior_not_reading_next_stream_keeps_stream_handler_from_runni
 
 #[tokio::test]
 async fn same_stream_behavior_type_registered_twice_runs_once_per_stream() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_stream_behavior(concierge(&journal))
         .open_stream_behavior(concierge(&journal))
@@ -209,7 +210,7 @@ async fn same_stream_behavior_type_registered_twice_runs_once_per_stream() {
 
 #[tokio::test]
 async fn behavior_for_all_request_types_does_not_wrap_stream() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_behavior(DoorLog {
             journal: Rc::clone(&journal),
@@ -233,7 +234,7 @@ async fn behavior_for_all_request_types_does_not_wrap_stream() {
 
 #[tokio::test]
 async fn stream_behavior_for_all_stream_request_types_does_not_wrap_send() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_stream_behavior(concierge(&journal))
         .register(Handler::instance(CheckInDesk {
@@ -251,7 +252,7 @@ async fn stream_behavior_for_all_stream_request_types_does_not_wrap_send() {
 
 #[tokio::test]
 async fn behavior_for_one_request_type_does_not_wrap_stream() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .behavior::<CheckIn>(DoorLog {
             journal: Rc::clone(&journal),
@@ -275,7 +276,7 @@ async fn behavior_for_one_request_type_does_not_wrap_stream() {
 
 #[tokio::test]
 async fn stream_behavior_for_one_stream_request_type_does_not_wrap_send() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .stream_behavior::<ListArrivals>(concierge(&journal))
         .register(Handler::instance(CheckInDesk {

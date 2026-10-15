@@ -1,12 +1,13 @@
 //! Tests für den Abschnitt „Pipeline — Behaviors“ in `TESTLIST.md`.
 
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::rc::Rc;
 use std::time::Duration;
 
 use mediatr_rs::{Handler, Mediator, MediatorBuilder, Publisher, Sender, WhenAllPublisher};
 
 mod behaviors_fixtures;
+mod common;
 
 use behaviors_fixtures::{
     AuditTrail, BookReceipt, Deadline, LoadingDock, LookupStock, ReceiptBook, RemoteReceiving,
@@ -14,6 +15,7 @@ use behaviors_fixtures::{
     StockCache, StockCounted, StockError, StockLedger, audit_and_stopwatch, audited_and_timed,
     audited_locked_and_timed, checkpoint, labeled_and_reordered_together, passed_checkpoints,
 };
+use common::Journal;
 
 #[tokio::test]
 async fn behavior_retries_cloned_next_after_handler_error_and_returns_second_response() {
@@ -32,7 +34,7 @@ async fn behavior_retries_cloned_next_after_handler_error_and_returns_second_res
 
 #[tokio::test]
 async fn two_behaviors_wrap_handler_first_registered_outermost() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let (audit, stopwatch) = audit_and_stopwatch(&journal);
     let mediator = Mediator::builder()
         .open_behavior(audit)
@@ -52,7 +54,7 @@ async fn two_behaviors_wrap_handler_first_registered_outermost() {
 
 #[tokio::test]
 async fn two_behaviors_wrap_unit_response_handler_first_registered_outermost() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let (audit, stopwatch) = audit_and_stopwatch(&journal);
     let mediator = Mediator::builder()
         .open_behavior(audit)
@@ -72,7 +74,7 @@ async fn two_behaviors_wrap_unit_response_handler_first_registered_outermost() {
 
 #[tokio::test]
 async fn two_behaviors_wrap_handlers_of_every_request_type_first_registered_outermost() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let (audit, stopwatch) = audit_and_stopwatch(&journal);
     let mediator = Mediator::builder()
         .open_behavior(audit)
@@ -104,7 +106,7 @@ async fn two_behaviors_wrap_handlers_of_every_request_type_first_registered_oute
 
 #[tokio::test]
 async fn behavior_between_two_open_behaviors_wraps_only_its_requests_in_registration_order() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let (audit, stopwatch) = audit_and_stopwatch(&journal);
     let mediator = Mediator::builder()
         .open_behavior(audit)
@@ -139,7 +141,7 @@ async fn behavior_between_two_open_behaviors_wraps_only_its_requests_in_registra
 
 #[tokio::test]
 async fn two_behaviors_registered_three_times_alternately_run_once_in_first_registration_order() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let (audit, stopwatch) = audit_and_stopwatch(&journal);
     let (second_audit, second_stopwatch) = audit_and_stopwatch(&journal);
     let (third_audit, third_stopwatch) = audit_and_stopwatch(&journal);
@@ -165,7 +167,7 @@ async fn two_behaviors_registered_three_times_alternately_run_once_in_first_regi
 
 #[tokio::test]
 async fn same_behavior_registered_twice_for_one_request_type_runs_once() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .behavior::<LookupStock>(ShelfLock {
             journal: Rc::clone(&journal),
@@ -193,7 +195,7 @@ async fn same_behavior_registered_twice_for_one_request_type_runs_once() {
 
 #[tokio::test]
 async fn same_behavior_registered_for_all_and_for_one_request_type_runs_twice_for_that_type() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_behavior(AuditTrail {
             journal: Rc::clone(&journal),
@@ -227,7 +229,7 @@ async fn same_behavior_registered_for_all_and_for_one_request_type_runs_twice_fo
 
 #[tokio::test]
 async fn same_behavior_registered_for_one_request_type_then_for_all_runs_twice_for_that_type() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .behavior::<LookupStock>(AuditTrail {
             journal: Rc::clone(&journal),
@@ -261,7 +263,7 @@ async fn same_behavior_registered_for_one_request_type_then_for_all_runs_twice_f
 
 #[tokio::test]
 async fn same_behavior_registered_for_all_and_for_one_request_type_runs_once_for_another_type() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_behavior(AuditTrail {
             journal: Rc::clone(&journal),
@@ -289,7 +291,7 @@ async fn same_behavior_registered_for_all_and_for_one_request_type_runs_once_for
 
 #[tokio::test]
 async fn unit_response_behavior_then_open_behavior_wrap_handler_first_registered_outermost() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .behavior::<BookReceipt>(LoadingDock {
             journal: Rc::clone(&journal),
@@ -323,7 +325,7 @@ async fn unit_response_behavior_then_open_behavior_wrap_handler_first_registered
 
 #[tokio::test]
 async fn twelve_behaviors_wrap_handler_first_registered_outermost() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_behavior(checkpoint::<0>(&journal))
         .open_behavior(checkpoint::<1>(&journal))
@@ -352,7 +354,7 @@ async fn twelve_behaviors_wrap_handler_first_registered_outermost() {
 
 #[tokio::test]
 async fn behaviors_with_when_all_publisher_wrap_send_and_publish_starts_handlers_together() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let (audit, stopwatch) = audit_and_stopwatch(&journal);
     let mediator = MediatorBuilder::<WhenAllPublisher>::default()
         .open_behavior(audit)
@@ -387,7 +389,7 @@ async fn behaviors_with_when_all_publisher_wrap_send_and_publish_starts_handlers
 
 #[tokio::test]
 async fn transient_handler_wrapped_by_behavior_is_built_once_per_send_and_wrapped_once() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let builds = Rc::new(Cell::new(0_u32));
     let ledger_journal = Rc::clone(&journal);
     let ledger_builds = Rc::clone(&builds);
@@ -419,7 +421,7 @@ async fn transient_handler_wrapped_by_behavior_is_built_once_per_send_and_wrappe
 
 #[tokio::test]
 async fn behavior_answering_without_next_returns_its_response_and_handler_does_not_run() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .behavior::<LookupStock>(StockCache { cached: 7 })
         .register(Handler::instance(StockLedger {
@@ -434,7 +436,7 @@ async fn behavior_answering_without_next_returns_its_response_and_handler_does_n
 
 #[tokio::test(start_paused = true)]
 async fn behavior_deadline_shorter_than_handler_returns_err_and_handler_does_not_finish() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .behavior::<LookupStock>(Deadline {
             limit: Duration::from_secs(5),
@@ -458,7 +460,7 @@ async fn behavior_deadline_shorter_than_handler_returns_err_and_handler_does_not
 #[tokio::test(start_paused = true)]
 async fn behavior_deadline_shorter_than_unit_response_handler_returns_err_and_handler_does_not_finish()
  {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .behavior::<BookReceipt>(Deadline {
             limit: Duration::from_secs(5),

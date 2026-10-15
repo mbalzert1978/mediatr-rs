@@ -1,10 +1,11 @@
-use std::cell::RefCell;
 use std::rc::Rc;
 
 use mediatr_rs::{
     Next, PipelineBehavior, Request, RequestHandler, RequestPostProcessor, RequestPreProcessor,
     SendError,
 };
+
+use crate::common::Journal;
 
 /// Fragt den Preis des Artikels mit dieser Nummer in Cent ab.
 #[derive(Clone)]
@@ -33,7 +34,7 @@ impl Request for QuotePrice {
 
 /// Berechnet Preise und schreibt jede Berechnung ins Protokoll.
 pub struct PriceList {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestHandler<QuotePrice> for PriceList {
@@ -47,7 +48,7 @@ impl RequestHandler<QuotePrice> for PriceList {
 
 /// Schreibt jede eingehende Preisanfrage ins Protokoll, bevor sie berechnet wird.
 pub struct InquiryLog {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestPreProcessor<QuotePrice> for InquiryLog {
@@ -61,7 +62,7 @@ impl RequestPreProcessor<QuotePrice> for InquiryLog {
 
 /// Legt jeden berechneten Preis mit seiner Anfrage im Archiv ab.
 pub struct QuoteArchive {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestPostProcessor<QuotePrice> for QuoteArchive {
@@ -75,11 +76,11 @@ impl RequestPostProcessor<QuotePrice> for QuoteArchive {
 
 /// Prüfschritt Nummer `N` vor jeder Preisberechnung; schreibt in `journal`.
 pub struct PriceCheck<const N: usize> {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 /// Prüfschritt Nummer `N`, der in `journal` schreibt.
-pub fn price_check<const N: usize>(journal: &Rc<RefCell<Vec<String>>>) -> PriceCheck<N> {
+pub fn price_check<const N: usize>(journal: &Journal) -> PriceCheck<N> {
     PriceCheck {
         journal: Rc::clone(journal),
     }
@@ -94,11 +95,11 @@ impl<const N: usize> RequestPreProcessor<QuotePrice> for PriceCheck<N> {
 
 /// Export Nummer `N` nach jeder Preisberechnung; schreibt in `journal`.
 pub struct PriceExport<const N: usize> {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 /// Export Nummer `N`, der in `journal` schreibt.
-pub fn price_export<const N: usize>(journal: &Rc<RefCell<Vec<String>>>) -> PriceExport<N> {
+pub fn price_export<const N: usize>(journal: &Journal) -> PriceExport<N> {
     PriceExport {
         journal: Rc::clone(journal),
     }
@@ -131,7 +132,7 @@ impl Request for QuoteShipping {
 
 /// Berechnet Versandkosten und schreibt jede Berechnung ins Protokoll.
 pub struct ShippingTable {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestHandler<QuoteShipping> for ShippingTable {
@@ -145,11 +146,11 @@ impl RequestHandler<QuoteShipping> for ShippingTable {
 
 /// Stempelt jede eingehende Anfrage im Protokoll.
 pub struct InboxStamp {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 /// Eingangsstempel, der in `journal` schreibt.
-pub fn inbox_stamp(journal: &Rc<RefCell<Vec<String>>>) -> InboxStamp {
+pub fn inbox_stamp(journal: &Journal) -> InboxStamp {
     InboxStamp {
         journal: Rc::clone(journal),
     }
@@ -166,11 +167,11 @@ impl<R: Request> RequestPreProcessor<R> for InboxStamp {
 
 /// Stempelt jede beantwortete Anfrage im Protokoll.
 pub struct OutboxStamp {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 /// Ausgangsstempel, der in `journal` schreibt.
-pub fn outbox_stamp(journal: &Rc<RefCell<Vec<String>>>) -> OutboxStamp {
+pub fn outbox_stamp(journal: &Journal) -> OutboxStamp {
     OutboxStamp {
         journal: Rc::clone(journal),
     }
@@ -187,11 +188,11 @@ impl<R: Request> RequestPostProcessor<R> for OutboxStamp {
 
 /// Misst jede Anfrage und schreibt Start und Ende ins Protokoll.
 pub struct Timer {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 /// Zeitmessung, die in `journal` schreibt.
-pub fn timer(journal: &Rc<RefCell<Vec<String>>>) -> Timer {
+pub fn timer(journal: &Journal) -> Timer {
     Timer {
         journal: Rc::clone(journal),
     }
@@ -208,11 +209,11 @@ impl<R: Request> PipelineBehavior<R> for Timer {
 
 /// Sperrt den Preis, solange er berechnet wird.
 pub struct PriceLock {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 /// Preissperre, die in `journal` schreibt.
-pub fn price_lock(journal: &Rc<RefCell<Vec<String>>>) -> PriceLock {
+pub fn price_lock(journal: &Journal) -> PriceLock {
     PriceLock {
         journal: Rc::clone(journal),
     }
@@ -261,7 +262,7 @@ pub fn shipping_through_general_stages() -> Vec<String> {
 
 /// Preisliste für ausgelaufene Artikel: Sie schreibt die Anfrage ins Protokoll und kennt keinen Preis mehr.
 pub struct RetiredItems {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestHandler<QuotePrice> for RetiredItems {
@@ -276,7 +277,7 @@ impl RequestHandler<QuotePrice> for RetiredItems {
 /// Lässt keine Preisanfrage für den ausgelaufenen Artikel `retired` durch und schreibt jede Ablehnung ins Protokoll.
 pub struct RetiredFilter {
     pub retired: u32,
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestPreProcessor<QuotePrice> for RetiredFilter {
@@ -294,7 +295,7 @@ impl RequestPreProcessor<QuotePrice> for RetiredFilter {
 /// Lässt keinen berechneten Preis über `max` hinaus und schreibt jede Überschreitung ins Protokoll.
 pub struct PriceCeiling {
     pub max: u32,
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestPostProcessor<QuotePrice> for PriceCeiling {

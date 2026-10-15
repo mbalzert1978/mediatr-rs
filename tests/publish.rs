@@ -6,8 +6,10 @@ use std::rc::Rc;
 
 use mediatr_rs::{Handler, Mediator, Publisher, RequestHandler, SendError, Sender, WeakMediator};
 
+mod common;
 mod publish_fixtures;
 
+use common::Journal;
 use publish_fixtures::{
     Billing, Blocklist, CancellationError, CancellationMail, Checkout, CheckoutHandler, FraudCheck,
     FraudDesk, FraudInvestigator, OrderCancelled, OrderPlaced, Packing, RecordedOrders, Refund,
@@ -42,7 +44,7 @@ async fn publish_without_handler_returns_ok() {
 
 #[tokio::test]
 async fn publish_runs_both_handlers_in_registration_order() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .subscribe(Handler::instance(Warehouse {
             journal: Rc::clone(&journal),
@@ -127,7 +129,7 @@ async fn publish_reaches_only_handlers_of_its_notification_type() {
 
 #[tokio::test]
 async fn publish_starts_second_handler_after_first_handler_finished_waiting() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .subscribe(Handler::instance(Packing {
             journal: Rc::clone(&journal),
@@ -346,7 +348,7 @@ async fn publish_runs_handler_type_subscribed_transient_then_instance_once_with_
 
 #[tokio::test]
 async fn publish_runs_two_handler_types_subscribed_transient_in_registration_order() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let (warehouse, billing) = (Rc::clone(&journal), Rc::clone(&journal));
     let mediator = Mediator::builder()
         .subscribe(Handler::transient(move |_publisher: Mediator| Warehouse {

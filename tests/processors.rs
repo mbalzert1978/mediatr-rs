@@ -1,12 +1,13 @@
 //! Tests für den Abschnitt „Pipeline — Vor- und Nachverarbeiter“ in `TESTLIST.md`.
 
-use std::cell::RefCell;
 use std::rc::Rc;
 
 use mediatr_rs::{Handler, Mediator, Sender};
 
+mod common;
 mod processors_fixtures;
 
+use common::Journal;
 use processors_fixtures::{
     InquiryLog, PriceCeiling, PriceError, PriceList, QuoteArchive, QuotePrice, QuoteShipping,
     RetiredFilter, RetiredItems, ShippingTable, checked_and_exported, inbox_stamp, outbox_stamp,
@@ -16,7 +17,7 @@ use processors_fixtures::{
 
 #[tokio::test]
 async fn pre_processor_runs_before_handler_with_request_and_send_returns_handler_response() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_pre_processor(InquiryLog {
             journal: Rc::clone(&journal),
@@ -43,7 +44,7 @@ async fn pre_processor_runs_before_handler_with_request_and_send_returns_handler
 #[tokio::test]
 async fn post_processor_runs_after_handler_with_request_and_response_and_send_returns_handler_response()
  {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_post_processor(QuoteArchive {
             journal: Rc::clone(&journal),
@@ -69,7 +70,7 @@ async fn post_processor_runs_after_handler_with_request_and_response_and_send_re
 
 #[tokio::test]
 async fn pre_and_post_processors_for_one_and_all_request_types_run_in_registration_order() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_pre_processor(price_check::<1>(&journal))
         .request_pre_processor::<QuotePrice>(price_check::<2>(&journal))
@@ -94,7 +95,7 @@ async fn pre_and_post_processors_for_one_and_all_request_types_run_in_registrati
 
 #[tokio::test]
 async fn processors_run_outside_behaviors_and_other_request_only_through_general_ones() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_behavior(timer(&journal))
         .open_request_post_processor(outbox_stamp(&journal))
@@ -125,7 +126,7 @@ async fn processors_run_outside_behaviors_and_other_request_only_through_general
 
 #[tokio::test]
 async fn failing_handler_skips_post_processor_and_send_returns_handler_error() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_post_processor(QuoteArchive {
             journal: Rc::clone(&journal),
@@ -148,7 +149,7 @@ async fn failing_handler_skips_post_processor_and_send_returns_handler_error() {
 
 #[tokio::test]
 async fn same_pre_processor_type_registered_twice_runs_once_per_send() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_pre_processor(InquiryLog {
             journal: Rc::clone(&journal),
@@ -174,7 +175,7 @@ async fn same_pre_processor_type_registered_twice_runs_once_per_send() {
 
 #[tokio::test]
 async fn failing_pre_processor_skips_handler_and_send_returns_its_error() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_pre_processor(RetiredFilter {
             retired: 7,
@@ -198,7 +199,7 @@ async fn failing_pre_processor_skips_handler_and_send_returns_its_error() {
 
 #[tokio::test]
 async fn failing_post_processor_replaces_handler_response_with_its_error() {
-    let journal = Rc::new(RefCell::new(Vec::new()));
+    let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_post_processor(PriceCeiling {
             max: 1000,

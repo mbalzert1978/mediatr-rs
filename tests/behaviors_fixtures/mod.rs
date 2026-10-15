@@ -1,10 +1,12 @@
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::rc::Rc;
 use std::time::Duration;
 
 use mediatr_rs::{
     Next, Notification, NotificationHandler, PipelineBehavior, Request, RequestHandler, SendError,
 };
+
+use crate::common::Journal;
 
 /// Fragt den Lagerbestand des Artikels mit dieser Nummer ab.
 pub struct LookupStock {
@@ -64,7 +66,7 @@ impl PipelineBehavior<LookupStock> for RetryOnce {
 
 /// Führt den Lagerbestand und schreibt jede Abfrage ins Protokoll.
 pub struct StockLedger {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestHandler<LookupStock> for StockLedger {
@@ -78,7 +80,7 @@ impl RequestHandler<LookupStock> for StockLedger {
 
 /// Schreibt vor und nach jedem Request einen Eintrag ins Prüfprotokoll.
 pub struct AuditTrail {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl<R: Request> PipelineBehavior<R> for AuditTrail {
@@ -92,7 +94,7 @@ impl<R: Request> PipelineBehavior<R> for AuditTrail {
 
 /// Misst jeden Request und schreibt Start und Ende ins Protokoll.
 pub struct Stopwatch {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl<R: Request> PipelineBehavior<R> for Stopwatch {
@@ -105,7 +107,7 @@ impl<R: Request> PipelineBehavior<R> for Stopwatch {
 }
 
 /// Prüfprotokoll und Stoppuhr, die beide in `journal` schreiben; die Prüfung liegt außen.
-pub fn audit_and_stopwatch(journal: &Rc<RefCell<Vec<String>>>) -> (AuditTrail, Stopwatch) {
+pub fn audit_and_stopwatch(journal: &Journal) -> (AuditTrail, Stopwatch) {
     (
         AuditTrail {
             journal: Rc::clone(journal),
@@ -141,7 +143,7 @@ impl Request for BookReceipt {
 
 /// Bucht jeden Wareneingang und schreibt das ins Protokoll.
 pub struct ReceiptBook {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestHandler<BookReceipt> for ReceiptBook {
@@ -155,7 +157,7 @@ impl RequestHandler<BookReceipt> for ReceiptBook {
 
 /// Sperrt das Regal, solange der Bestand eines Artikels gelesen wird.
 pub struct ShelfLock {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl PipelineBehavior<LookupStock> for ShelfLock {
@@ -188,7 +190,7 @@ pub fn audited_locked_and_timed(handled: &str) -> Vec<String> {
 
 /// Belegt die Laderampe, solange ein Wareneingang gebucht wird.
 pub struct LoadingDock {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl PipelineBehavior<BookReceipt> for LoadingDock {
@@ -206,11 +208,11 @@ impl PipelineBehavior<BookReceipt> for LoadingDock {
 
 /// Prüfstation Nummer `N` am Lager; schreibt vor und nach jeder Bestandsabfrage ihre Nummer ins Protokoll.
 pub struct Checkpoint<const N: usize> {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 /// Prüfstation Nummer `N`, die in `journal` schreibt.
-pub fn checkpoint<const N: usize>(journal: &Rc<RefCell<Vec<String>>>) -> Checkpoint<N> {
+pub fn checkpoint<const N: usize>(journal: &Journal) -> Checkpoint<N> {
     Checkpoint {
         journal: Rc::clone(journal),
     }
@@ -251,7 +253,7 @@ impl Notification for StockCounted {
 
 /// Druckt nach jeder Zählung ein neues Regaletikett; zwischen Beginn und Ende wartet es auf den Drucker.
 pub struct ShelfLabeling {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl NotificationHandler<StockCounted> for ShelfLabeling {
@@ -269,7 +271,7 @@ impl NotificationHandler<StockCounted> for ShelfLabeling {
 
 /// Prüft nach jeder Zählung, ob nachbestellt werden muss; zwischen Beginn und Ende wartet es auf den Lieferanten.
 pub struct ReorderCheck {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl NotificationHandler<StockCounted> for ReorderCheck {
@@ -312,7 +314,7 @@ impl PipelineBehavior<LookupStock> for StockCache {
 
 /// Führt den Bestand im Außenlager; die Suche dort dauert eine Stunde.
 pub struct RemoteWarehouse {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestHandler<LookupStock> for RemoteWarehouse {
@@ -343,7 +345,7 @@ impl<R: Request<Error = StockError>> PipelineBehavior<R> for Deadline {
 
 /// Bucht Wareneingänge im Außenlager; die Buchung dort dauert eine Stunde.
 pub struct RemoteReceiving {
-    pub journal: Rc<RefCell<Vec<String>>>,
+    pub journal: Journal,
 }
 
 impl RequestHandler<BookReceipt> for RemoteReceiving {
