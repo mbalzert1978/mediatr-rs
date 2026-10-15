@@ -43,7 +43,6 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] Dienst mit `scoped` registriert → die Bauanleitung läuft einmal pro Scope; ein neuer Scope baut neu · `scoped_runs_recipe_once_per_scope`
 - [x] Dienst mit `singleton` registriert → ein neuer Scope liefert dasselbe Objekt wie der Provider · `singleton_returns_same_object_in_new_scope`
 - [x] Bauanleitung fragt den Provider nach einem anderen registrierten Dienst → der gebaute Dienst enthält diesen Dienst · `recipe_gets_other_service_from_provider`
-- [x] Bauanleitung von `singleton` fragt nach einem `scoped`-Dienst, erste Abfrage kommt aus einem Scope → das Singleton enthält den `scoped`-Dienst des Providers, nicht den des Scopes · `singleton_built_from_scope_gets_scoped_service_of_provider`
 - [x] Bauanleitung fragt den Provider nach ihrem eigenen Typ → diese Abfrage liefert `Err(GetError::Cycle)`, kein Panic und keine Endlosschleife · `recipe_asking_for_own_type_gets_cycle`
 - [x] Zwei Bauanleitungen fragen einander ab (A braucht B, B braucht A) → die innere Abfrage nach A liefert keinen Dienst, kein Panic und keine Endlosschleife · `mutually_dependent_recipes_get_nothing_for_inner_query`
 - [x] Bauanleitung von `singleton` fragt nach ihrem eigenen Typ → diese Abfrage liefert keinen Dienst, kein Panic und keine Endlosschleife · `singleton_recipe_asking_for_own_type_gets_nothing`
@@ -60,7 +59,6 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] Schwacher Verweis auf einen Scope, der Scope fällt weg, der Provider lebt → `upgrade` liefert `None` · `upgrade_after_scope_dropped_returns_none`
 - [x] Schwacher Verweis auf einen lebenden Scope → `upgrade` liefert einen Provider, der denselben `scoped`-Dienst liefert wie der Scope · `upgraded_weak_scope_returns_same_scoped_service`
 - [x] Bauanleitung von `scoped` merkt sich den Scope schwach, der Scope fällt weg, der Provider lebt → der Dienst wird freigegeben (sein `Drop` läuft) · `scoped_holding_weak_scope_is_released_with_scope`
-- [x] `scoped`-Dienst, abgefragt beim Provider selbst, hält ein Singleton, das sich den Provider schwach merkt; der Provider fällt weg → beide werden freigegeben (ihr `Drop` läuft) · `scoped_service_and_its_singleton_with_weak_provider_are_released_with_provider`
 - [x] Zwei Dienste desselben Typs mit `instance` registriert → `all` liefert beide, in der Reihenfolge der Registrierung · `all_returns_every_instance_in_registration_order`
 - [x] Dienst nicht registriert → `all` liefert eine leere Liste · `all_without_registration_returns_empty_list`
 - [x] Dienst mit `transient` registriert → `all` baut ihn bei jeder Abfrage neu · `transient_all_runs_recipe_on_every_call`
@@ -88,7 +86,7 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] (T11) Zwei Threads fragen gleichzeitig ein `singleton` ab → die Bauanleitung läuft einmal, beide bekommen dasselbe Objekt · `two_threads_get_same_singleton_built_once`
 - [x] (T11) Zwei Threads fragen im selben Scope gleichzeitig denselben `scoped`-Dienst ab → beide bekommen dasselbe Objekt · `two_threads_get_same_scoped_service_in_one_scope`
 - [ ] Zwei `singleton`-Bauanleitungen fragen einander ab, zwei Threads starten sie gleichzeitig → `get` kommt zurück, kein Warten für immer
-- [ ] Dienst mit `scoped` registriert, Abfrage beim Provider selbst statt in einem Scope → die Abfrage liefert `Err(GetError::ScopedFromRoot)`
+- [x] Dienst mit `scoped` registriert, Abfrage beim Provider selbst statt in einem Scope → die Abfrage liefert `Err(GetError::ScopedFromRoot)` · `scoped_service_from_provider_itself_gets_scoped_from_root`
 - [ ] (T11) Bauanleitung von `singleton` fragt nach einem `scoped`-Dienst, erste Abfrage kommt aus einem Scope → diese Abfrage liefert `Err(GetError::ScopedFromRoot)`
 - [ ] (T11) Bauanleitung von `transient` fragt, abgefragt in einem Scope, nach einem `scoped`-Dienst → sie bekommt den Dienst dieses Scopes
 - [ ] (T11) Dienst mit `scoped` registriert, `all` beim Provider selbst statt in einem Scope → `all` liefert `Err(GetError::ScopedFromRoot)`

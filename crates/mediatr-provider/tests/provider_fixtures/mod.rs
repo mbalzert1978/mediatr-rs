@@ -9,13 +9,8 @@ pub struct Name(pub &'static str);
 
 pub struct Greeting(pub String);
 
-/// Eine Sitzung, die pro Scope neu entsteht; `0` ist ihre laufende Nummer.
-pub struct Session(pub u32);
-
-/// Schreibt für die ganze Anwendung mit; hält die Sitzung, die es beim Bau bekam.
-pub struct AuditLog {
-    pub session: Arc<Session>,
-}
+/// Eine Sitzung, die pro Scope neu entsteht.
+pub struct Session;
 
 /// Meldet über den geteilten Schalter, ob der Dienst noch lebt, der ihn hält: Sein `Drop` setzt ihn auf `false`.
 pub struct Alive(pub Arc<AtomicBool>);
@@ -40,12 +35,6 @@ pub struct Scheduler {
 /// Bündelt die Änderungen einer Anfrage; merkt sich ihren Scope, um später Dienste zu holen.
 pub struct UnitOfWork {
     pub _scope: WeakProvider,
-    pub _alive: Alive,
-}
-
-/// Ein Bericht, der seine Aufgaben über den Scheduler plant.
-pub struct Report {
-    pub _scheduler: Arc<Scheduler>,
     pub _alive: Alive,
 }
 

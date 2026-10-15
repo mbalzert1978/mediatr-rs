@@ -1,7 +1,7 @@
 //! Tests für den Abschnitt „Provider-Crate `mediatr-provider`“ in `TESTLIST.md`.
 
 use std::panic::{self, AssertUnwindSafe};
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Barrier, Mutex, PoisonError};
 
 use mediatr_provider::{GetError, Provider, Registration};
@@ -9,10 +9,9 @@ use mediatr_provider::{GetError, Provider, Registration};
 mod provider_fixtures;
 
 use provider_fixtures::{
-    Alive, AuditLog, Config, Connection, Course, DeliveryNote, Document, Employee, Folder,
-    Greeting, Invoice, LedgerEntry, MenuItem, Name, Printer, Report, Repository, Scheduler,
-    Session, Settings, Student, Team, UnitOfWork, connection_recipe, counting_recipe, gated_recipe,
-    settings_recipe,
+    Alive, Config, Connection, Course, DeliveryNote, Document, Employee, Folder, Greeting, Invoice,
+    LedgerEntry, MenuItem, Name, Printer, Repository, Scheduler, Session, Settings, Student, Team,
+    UnitOfWork, connection_recipe, counting_recipe, gated_recipe, settings_recipe,
 };
 
 #[test]
@@ -185,24 +184,6 @@ fn recipe_gets_other_service_from_provider() {
 }
 
 #[test]
-fn singleton_built_from_scope_gets_scoped_service_of_provider() {
-    let opened = AtomicU32::new(0);
-    let provider = Provider::builder()
-        .register(Registration::scoped(move |_| {
-            Session(opened.fetch_add(1, Ordering::SeqCst).saturating_add(1))
-        }))
-        .register(Registration::singleton(|provider| AuditLog {
-            session: provider.get::<Session>().unwrap(),
-        }))
-        .build();
-
-    let log = provider.scope().get::<AuditLog>().unwrap();
-    let provider_session = provider.get::<Session>().unwrap();
-
-    assert_eq!(log.session.0, provider_session.0);
-}
-
-#[test]
 fn two_scoped_registrations_of_same_type_build_one_object_each() {
     let scope = Provider::builder()
         .register(Registration::scoped(|_| Name("haupt")))
@@ -338,28 +319,6 @@ fn scoped_holding_weak_scope_is_released_with_scope() {
     drop(scope);
 
     assert!(!open.load(Ordering::SeqCst));
-}
-
-#[test]
-fn scoped_service_and_its_singleton_with_weak_provider_are_released_with_provider() {
-    let running = Arc::new(AtomicBool::new(true));
-    let open = Arc::new(AtomicBool::new(true));
-    let (running_flag, open_flag) = (Arc::clone(&running), Arc::clone(&open));
-    let provider = Provider::builder()
-        .register(Registration::singleton(move |provider| Scheduler {
-            _provider: provider.downgrade(),
-            _alive: Alive(Arc::clone(&running_flag)),
-        }))
-        .register(Registration::scoped(move |provider| Report {
-            _scheduler: provider.get::<Scheduler>().unwrap(),
-            _alive: Alive(Arc::clone(&open_flag)),
-        }))
-        .build();
-    provider.get::<Report>().unwrap();
-
-    drop(provider);
-
-    assert!(!running.load(Ordering::SeqCst) && !open.load(Ordering::SeqCst));
 }
 
 #[test]
@@ -890,7 +849,7 @@ fn two_threads_get_same_scoped_service_in_one_scope() {
     let provider = Provider::builder()
         .register(Registration::scoped(move |_| {
             both_building.wait();
-            Session(1)
+            Session
         }))
         .build();
     let scope = provider.scope();
@@ -903,4 +862,15 @@ fn two_threads_get_same_scoped_service_in_one_scope() {
     });
 
     assert!(Arc::ptr_eq(&first, &second));
+}
+
+#[test]
+fn scoped_service_from_provider_itself_gets_scoped_from_root() {
+    let provider = Provider::builder()
+        .register(Registration::scoped(|_| Session))
+        .build();
+
+    let session = provider.get::<Session>();
+
+    assert!(matches!(session, Err(GetError::ScopedFromRoot)));
 }

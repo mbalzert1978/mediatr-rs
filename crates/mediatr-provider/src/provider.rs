@@ -25,7 +25,7 @@ type Slot = (TypeId, usize);
 
 /// Liefert Dienste nach ihrem Typ.
 ///
-/// Entsteht über [`Provider::builder`]. Der Provider ist selbst ein Scope.
+/// Entsteht über [`Provider::builder`]. `scoped`-Dienste liefert nur ein Scope aus [`Provider::scope`].
 #[derive(Debug, Clone)]
 pub struct Provider {
     shared: Arc<Shared>,
@@ -63,7 +63,8 @@ impl Provider {
     /// # Errors
     ///
     /// Liefert [`GetError::NoService`], wenn kein Dienst vom Typ `T` registriert ist,
-    /// und [`GetError::Cycle`], wenn seine Bauanleitung auf diesem Thread gerade läuft.
+    /// [`GetError::Cycle`], wenn seine Bauanleitung auf diesem Thread gerade läuft,
+    /// und [`GetError::ScopedFromRoot`], wenn ein `scoped`-Dienst beim Provider selbst abgefragt wird.
     pub fn get<T: 'static>(&self) -> Result<Arc<T>, GetError> {
         let id = TypeId::of::<T>();
         let (index, recipe) = self
@@ -76,19 +77,19 @@ impl Provider {
             .downcast_ref::<Recipe<T>>()
             .ok_or(GetError::NoService)?;
         let _building = Building::enter(&self.shared.building, id).ok_or(GetError::Cycle)?;
-        Ok(recipe(self, (id, index)))
+        recipe(self, (id, index))
     }
 
     /// Liefert alle Dienste vom Typ `T`, in der Reihenfolge ihrer Registrierung; eine leere Liste, wenn keiner registriert ist, `Err(GetError::Cycle)`, wenn eine Bauanleitung von `T` auf diesem Thread gerade läuft.
     ///
     /// # Errors
     ///
-    /// Liefert [`GetError::Cycle`], wenn die Bauanleitung von `T` auf diesem Thread gerade läuft.
+    /// Liefert [`GetError::Cycle`], wenn die Bauanleitung von `T` auf diesem Thread gerade läuft,
+    /// und [`GetError::ScopedFromRoot`], wenn ein `scoped`-Dienst von `T` beim Provider selbst abgefragt wird.
     pub fn all<T: 'static>(&self) -> Result<Vec<Arc<T>>, GetError> {
         let id = TypeId::of::<T>();
         let _building = Building::enter(&self.shared.building, id).ok_or(GetError::Cycle)?;
-        Ok(self
-            .shared
+        self.shared
             .services
             .get(&id)
             .into_iter()
@@ -96,7 +97,7 @@ impl Provider {
             .enumerate()
             .filter_map(|(index, recipe)| Some((index, recipe.downcast_ref::<Recipe<T>>()?)))
             .map(|(index, recipe)| recipe(self, (id, index)))
-            .collect())
+            .collect::<Result<Vec<_>, _>>()
     }
 
     /// Beginnt einen neuen Scope mit denselben Diensten; `scoped`-Dienste baut er neu.
@@ -115,6 +116,11 @@ impl Provider {
             shared: Arc::downgrade(&self.shared),
             built: Arc::downgrade(&self.built),
         }
+    }
+
+    /// Ob dies der Provider selbst ist und kein Scope aus [`Provider::scope`].
+    fn is_root(&self) -> bool {
+        Arc::ptr_eq(&self.built, &self.shared.root)
     }
 
     /// Liefert den Provider, aus dem dieser Scope stammt.
