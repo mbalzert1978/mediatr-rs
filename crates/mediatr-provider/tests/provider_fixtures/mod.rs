@@ -17,6 +17,11 @@ pub struct AuditLog {
     pub session: Result<Arc<Session>, GetError>,
 }
 
+/// Ein Bericht für eine Anfrage; `session` hält, was die Abfrage nach der Sitzung beim Bau ergab.
+pub struct Report {
+    pub session: Result<Arc<Session>, GetError>,
+}
+
 /// Meldet über den geteilten Schalter, ob der Dienst noch lebt, der ihn hält: Sein `Drop` setzt ihn auf `false`.
 pub struct Alive(pub Arc<AtomicBool>);
 

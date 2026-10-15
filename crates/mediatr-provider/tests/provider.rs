@@ -10,8 +10,8 @@ mod provider_fixtures;
 
 use provider_fixtures::{
     Alive, AuditLog, Config, Connection, Course, DeliveryNote, Document, Employee, Folder,
-    Greeting, Invoice, LedgerEntry, MenuItem, Name, Printer, Repository, Scheduler, Session,
-    Settings, Student, Team, UnitOfWork, connection_recipe, counting_recipe, gated_recipe,
+    Greeting, Invoice, LedgerEntry, MenuItem, Name, Printer, Report, Repository, Scheduler,
+    Session, Settings, Student, Team, UnitOfWork, connection_recipe, counting_recipe, gated_recipe,
     settings_recipe,
 };
 
@@ -888,4 +888,20 @@ fn singleton_recipe_asking_for_scoped_service_gets_scoped_from_root() {
     let log = provider.scope().get::<AuditLog>().unwrap();
 
     assert!(matches!(log.session, Err(GetError::ScopedFromRoot)));
+}
+
+#[test]
+fn transient_recipe_in_scope_gets_scoped_service_of_scope() {
+    let provider = Provider::builder()
+        .register(Registration::scoped(|_| Session))
+        .register(Registration::transient(|provider| Report {
+            session: provider.get::<Session>(),
+        }))
+        .build();
+    let scope = provider.scope();
+
+    let report = scope.get::<Report>().unwrap();
+    let session = scope.get::<Session>().unwrap();
+
+    assert!(matches!(&report.session, Ok(own) if Arc::ptr_eq(own, &session)));
 }
