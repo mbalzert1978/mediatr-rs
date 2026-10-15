@@ -172,3 +172,27 @@ async fn failing_error_handler_makes_send_return_its_error_instead_of_original()
         )
     );
 }
+
+#[tokio::test]
+async fn error_handler_without_replacement_runs_once_per_send_on_handler_error() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .open_request_error_handler(OverbookingCheck {
+            journal: Rc::clone(&journal),
+        })
+        .register(Handler::instance(FullHotel {
+            journal: Rc::new(RefCell::new(Vec::new())),
+        }))
+        .build();
+
+    let _first = mediator.send(BookRoom { room: 12 }).await;
+    let _second = mediator.send(BookRoom { room: 14 }).await;
+
+    assert_eq!(
+        journal.borrow().clone(),
+        vec![
+            "Überbuchung für Zimmer 12 abgelehnt".to_owned(),
+            "Überbuchung für Zimmer 14 abgelehnt".to_owned()
+        ]
+    );
+}
