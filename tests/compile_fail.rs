@@ -1,4 +1,4 @@
-//! Tests für die Punkte „… kompiliert nicht“ in den Abschnitten „Pipeline — Behaviors“ und „Pipeline — Vor- und Nachverarbeiter“ in `TESTLIST.md`.
+//! Tests für die Punkte „… kompiliert nicht“ in den Abschnitten „Pipeline — Behaviors“, „Pipeline — Vor- und Nachverarbeiter“ und „Pipeline — Fehler-Handler und Fehler-Aktionen“ in `TESTLIST.md`.
 
 // trybuild prüft selbst: Der Test scheitert, wenn die Datei kompiliert oder eine andere Fehlermeldung liefert.
 #[test]
@@ -29,4 +29,9 @@ fn pre_processor_registered_after_first_handler_does_not_compile() {
 #[test]
 fn post_processor_registered_after_first_handler_does_not_compile() {
     trybuild::TestCases::new().compile_fail("tests/ui/post_processor_after_handler.rs");
+}
+
+#[test]
+fn error_handler_registered_after_first_handler_does_not_compile() {
+    trybuild::TestCases::new().compile_fail("tests/ui/error_handler_after_handler.rs");
 }

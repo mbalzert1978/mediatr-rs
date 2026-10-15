@@ -197,7 +197,7 @@ Quelle: MediatR `test/MediatR.Tests/Pipeline/RequestExceptionHandlerTests.cs`, `
 - [ ] Derselbe Fehler-Aktions-Typ zweimal registriert → sie läuft pro `send` einmal
 - [ ] Fehler-Handler registriert, Request ohne `Clone` → `send` kompiliert nicht
 - [ ] Fehler-Aktion registriert, Request ohne `Clone` → `send` kompiliert nicht
-- [ ] Fehler-Handler nach dem ersten Handler registriert → kompiliert nicht
+- [x] Fehler-Handler nach dem ersten Handler registriert → kompiliert nicht · `error_handler_registered_after_first_handler_does_not_compile`
 - [ ] Fehler-Aktion nach dem ersten Handler registriert → kompiliert nicht
 
 ## Stream-Request — Stream anfordern
