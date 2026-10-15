@@ -6,8 +6,9 @@ use std::rc::Rc;
 use futures_core::Stream;
 
 use crate::StreamRequest;
+use crate::pipeline::Deferred;
 use crate::stream_request::StreamResult;
-use crate::wrappers::{LocalBoxStream, StreamBehaviorWrapper, StreamRequestHandlerWrapper};
+use crate::wrappers::{StreamBehaviorWrapper, StreamRequestHandlerWrapper};
 
 /// Der Rest der Stream-Pipeline hinter einem Stream-Behavior; [`StreamNext::run`] schickt einen Stream-Request hinein.
 pub struct StreamNext<R: StreamRequest> {
@@ -28,13 +29,12 @@ impl<R: StreamRequest> StreamNext<R> {
         }
     }
 
-    /// Schickt `request` an den nächsten Schritt und liefert dessen Stream.
+    /// Schickt `request` an den nächsten Schritt und liefert dessen Stream; der nächste Schritt läuft erst, wenn jemand den Stream liest.
     pub fn run(mut self, request: R) -> impl Stream<Item = StreamResult<R>> + use<R> {
-        let stream: LocalBoxStream<StreamResult<R>> = match self.behaviors.pop() {
+        Deferred::new(move || match self.behaviors.pop() {
             Some(behavior) => behavior(request, self),
             None => (self.handler)(request),
-        };
-        stream
+        })
     }
 }
 

@@ -9,8 +9,8 @@ use mediatr_rs::{Handler, Mediator, StreamSender};
 mod stream_behaviors_fixtures;
 
 use stream_behaviors_fixtures::{
-    Concierge, DepartureBoard, FrontOffice, Greeter, ListArrivals, ListDepartures, NightPorter,
-    bellboy, concierge, concierge_and_night_porter_around,
+    ClosedDesk, Concierge, DepartureBoard, FrontOffice, Greeter, ListArrivals, ListDepartures,
+    NightPorter, bellboy, concierge, concierge_and_night_porter_around,
     concierge_bellboy_and_night_porter_around, night_porter,
 };
 
@@ -156,4 +156,26 @@ async fn unread_stream_runs_no_stream_behavior() {
     drop(arrivals);
 
     assert_eq!(journal.borrow().clone(), Vec::<String>::new());
+}
+
+#[tokio::test]
+async fn stream_behavior_not_reading_next_stream_keeps_stream_handler_from_running() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .stream_behavior::<ListArrivals>(ClosedDesk)
+        .register_stream(Handler::instance(FrontOffice {
+            guests: vec!["Anna".to_owned()],
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let arrivals: Vec<_> = mediator
+        .create_stream(ListArrivals { day: 6 })
+        .collect()
+        .await;
+
+    assert_eq!(
+        (arrivals, journal.borrow().clone()),
+        (Vec::new(), Vec::<String>::new())
+    );
 }

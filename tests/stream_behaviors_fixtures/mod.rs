@@ -191,3 +191,17 @@ impl StreamPipelineBehavior<ListArrivals> for Greeter {
             .chain(futures_util::stream::iter([Ok("Abschied".to_owned())]))
     }
 }
+
+/// Die geschlossene Rezeption: Sie fragt die Anreisen beim nächsten Schritt an, liest sie aber nie und meldet keine Gäste.
+pub struct ClosedDesk;
+
+impl StreamPipelineBehavior<ListArrivals> for ClosedDesk {
+    fn handle(
+        &self,
+        request: ListArrivals,
+        next: StreamNext<ListArrivals>,
+    ) -> impl Stream<Item = Result<String, SendError>> + use<> {
+        drop(next.run(request));
+        futures_util::stream::empty()
+    }
+}

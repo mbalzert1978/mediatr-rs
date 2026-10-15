@@ -225,3 +225,4 @@ Quelle: MediatR `test/MediatR.Tests/StreamPipelineTests.cs`, `Pipeline/Streams/S
 - [ ] Ein Behavior nur für einen Request-Typ ist registriert, ein Stream wird gelesen → der Stream läuft nicht durch das Behavior
 - [ ] Ein Stream-Behavior nur für einen Stream-Request-Typ ist registriert, ein Request wird gesendet → `send` läuft nicht durch das Stream-Behavior
 - [x] Stream angefordert, aber nie gelesen → kein Stream-Behavior läuft · `unread_stream_runs_no_stream_behavior`
+- [x] Ein Stream-Behavior ruft den nächsten Schritt auf, liest dessen Stream aber nicht → der Stream-Handler läuft nicht · `stream_behavior_not_reading_next_stream_keeps_stream_handler_from_running`
