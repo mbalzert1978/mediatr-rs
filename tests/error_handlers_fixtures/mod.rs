@@ -1,7 +1,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use mediatr_rs::{Request, RequestErrorAction, RequestErrorHandler, RequestHandler, SendError};
+use mediatr_rs::{
+    Next, PipelineBehavior, Request, RequestErrorAction, RequestErrorHandler, RequestHandler,
+    SendError,
+};
 
 /// Bucht das Hotelzimmer mit dieser Nummer und liefert die Buchungsnummer.
 #[derive(Clone)]
@@ -14,6 +17,7 @@ pub struct BookRoom {
 pub enum BookingError {
     FullyBooked,
     WaitingListClosed,
+    PaymentDeclined,
     Undeliverable(SendError),
 }
 
@@ -126,5 +130,19 @@ impl RequestErrorHandler<BookRoom> for ClosedWaitingList {
             request.room
         ));
         Err(BookingError::WaitingListClosed)
+    }
+}
+
+/// Lässt keine Buchung durch, weil jede Zahlung abgelehnt wird, und schreibt jede Ablehnung ins Protokoll.
+pub struct PaymentGate {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl PipelineBehavior<BookRoom> for PaymentGate {
+    async fn handle(&self, request: BookRoom, _next: Next<BookRoom>) -> Result<u64, BookingError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Zahlung für Zimmer {} abgelehnt", request.room));
+        Err(BookingError::PaymentDeclined)
     }
 }

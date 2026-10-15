@@ -184,7 +184,7 @@ Quelle: MediatR `test/MediatR.Tests/Pipeline/RequestExceptionHandlerTests.cs`, `
 - [x] Handler scheitert, ein Fehler-Handler ohne Ersatzantwort ist registriert → er läuft pro `send` genau einmal · `error_handler_without_replacement_runs_once_per_send_on_handler_error`
 - [x] Handler scheitert, ein Fehler-Handler setzt eine Ersatzantwort, zusätzlich ist eine Fehler-Aktion registriert → `send` liefert die Ersatzantwort, die Fehler-Aktion läuft nicht · `error_handler_replacement_is_returned_and_error_action_does_not_run`
 - [x] Handler scheitert, ein Fehler-Handler ohne Ersatzantwort und eine Fehler-Aktion sind registriert → beide laufen, `send` liefert den Fehler des Handlers · `error_handler_without_replacement_and_error_action_both_run_and_send_returns_handler_error`
-- [ ] Ein Behavior scheitert, bevor der Handler läuft, ein Fehler-Handler ohne Ersatzantwort und eine Fehler-Aktion sind registriert → beide laufen, `send` liefert den Fehler des Behaviors
+- [x] Ein Behavior scheitert, bevor der Handler läuft, ein Fehler-Handler ohne Ersatzantwort und eine Fehler-Aktion sind registriert → beide laufen, `send` liefert den Fehler des Behaviors · `failing_behavior_before_handler_runs_error_handler_and_error_action_and_send_returns_its_error`
 - [ ] Handler scheitert, die Fehler-Aktion scheitert selbst → `send` liefert genau den Fehler der Aktion statt den des Handlers
 - [ ] Handler hat Erfolg, eine Fehler-Aktion ist registriert → sie läuft nicht, `send` liefert die Antwort des Handlers
 - [ ] Ein Vorverarbeiter oder Nachverarbeiter scheitert, eine Fehler-Aktion ist registriert → sie läuft, `send` liefert den Fehler des Verarbeiters
