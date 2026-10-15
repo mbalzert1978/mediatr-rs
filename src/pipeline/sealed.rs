@@ -38,8 +38,8 @@ pub trait StreamBehaviors<R: StreamRequest>: 'static {
     fn wrap(&self, active: &[Slot]) -> Vec<Rc<StreamBehaviorWrapper<R>>>;
 }
 
-/// Wo ein Behavior in der Pipeline liegt.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// Wo ein Behavior in der Pipeline liegt; die Varianten stehen von außen nach innen, `Ord` folgt dieser Reihenfolge.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Stage {
     /// Außerhalb aller anderen; reagiert nach ihnen in Registrierungsreihenfolge.
     ErrorAction,

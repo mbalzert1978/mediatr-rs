@@ -1,5 +1,6 @@
 //! Der Rest der Pipeline hinter einem Behavior.
 
+use std::cmp::Reverse;
 use std::fmt;
 use std::rc::Rc;
 
@@ -12,31 +13,27 @@ use crate::wrappers::{BehaviorWrapper, RequestHandlerWrapper};
 pub struct Next<R: Request> {
     handler: Rc<RequestHandlerWrapper<R>>,
     /// Die noch ausstehenden Behaviors, das innerste zuerst; `run` nimmt das letzte, also äußerste.
-    behaviors: Vec<Rc<BehaviorWrapper<R>>>,
+    behaviors: Vec<(Stage, Rc<BehaviorWrapper<R>>)>,
 }
 
 impl<R: Request> Next<R> {
     /// Pipeline aus `behaviors`, in der Reihenfolge ihrer Registrierung, und `handler`; jedes liegt, wo seine [`Stage`] sagt.
     pub(crate) fn new(
         handler: Rc<RequestHandlerWrapper<R>>,
-        behaviors: &[(Stage, Rc<BehaviorWrapper<R>>)],
+        mut behaviors: Vec<(Stage, Rc<BehaviorWrapper<R>>)>,
     ) -> Self {
-        let at = |wanted: Stage| {
+        // Innerste Stufe zuerst; die Sortierung ist stabil, in jeder Stufe bleibt die Registrierungsreihenfolge.
+        behaviors.sort_by_key(|(stage, _)| Reverse(*stage));
+        // Bei `Around` und `Before` liegt das zuerst registrierte außen, also hinten.
+        for stage in [Stage::Around, Stage::Before] {
+            let start = behaviors.partition_point(|(other, _)| *other > stage);
+            let end = behaviors.partition_point(|(other, _)| *other >= stage);
             behaviors
-                .iter()
-                .filter(move |(stage, _)| *stage == wanted)
-                .map(|(_, behavior)| Rc::clone(behavior))
-        };
-        Self {
-            behaviors: at(Stage::Around)
-                .rev()
-                .chain(at(Stage::After))
-                .chain(at(Stage::Before).rev())
-                .chain(at(Stage::ErrorHandler))
-                .chain(at(Stage::ErrorAction))
-                .collect(),
-            handler,
+                .get_mut(start..end)
+                .into_iter()
+                .for_each(<[_]>::reverse);
         }
+        Self { handler, behaviors }
     }
 
     /// Schickt `request` an den nächsten Schritt und liefert dessen Antwort.
@@ -46,7 +43,7 @@ impl<R: Request> Next<R> {
     /// Den Fehler des nächsten Schritts.
     pub async fn run(mut self, request: R) -> HandlerResult<R> {
         match self.behaviors.pop() {
-            Some(behavior) => behavior(request, self).await,
+            Some((_, behavior)) => behavior(request, self).await,
             None => (self.handler)(request).await,
         }
     }
