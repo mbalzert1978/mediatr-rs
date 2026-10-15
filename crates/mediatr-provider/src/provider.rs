@@ -58,7 +58,7 @@ impl Provider {
         ProviderBuilder::default()
     }
 
-    /// Liefert den Dienst vom Typ `T`; `None`, wenn er fehlt oder seine Bauanleitung gerade läuft.
+    /// Liefert den zuletzt registrierten Dienst vom Typ `T`; `None`, wenn er fehlt oder seine Bauanleitung gerade läuft.
     #[must_use]
     pub fn get<T: 'static>(&self) -> Option<Rc<T>> {
         let id = TypeId::of::<T>();

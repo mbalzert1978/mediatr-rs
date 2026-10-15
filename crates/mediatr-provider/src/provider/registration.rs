@@ -8,7 +8,7 @@ use std::rc::Rc;
 use super::Slot;
 use crate::Provider;
 
-/// Liefert bei jedem Aufruf einen Dienst vom Typ `T`, gebaut mit dem übergebenen Provider oder gemerkt in seinem Scope auf dem übergebenen Platz.
+/// Liefert bei jedem Aufruf einen Dienst vom Typ `T`: neu gebaut mit dem übergebenen Provider, einmal angelegt und in der Bauanleitung gemerkt (`instance`, `singleton`), oder im Scope des übergebenen Providers auf dem übergebenen Platz gemerkt (`scoped`).
 // dyn: `get` kennt nur `T`, nicht den Typ der Bauanleitung. Bauanleitungen verschiedener
 // Typen (aus `Registration::instance`, `transient`, `singleton`, `scoped`, `map`) liegen deshalb hinter einem gemeinsamen Typ je `T`.
 pub(super) type Recipe<T> = Box<dyn Fn(&Provider, Slot) -> Rc<T>>;

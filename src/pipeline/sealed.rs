@@ -17,9 +17,9 @@ use crate::wrappers::{BehaviorWrapper, wrap_behavior};
 /// # Vertrag
 ///
 /// `wrap` liefert je Behavior der Kette, das Requests vom Typ `R` umschließt und dessen Platz in `active` steht,
-/// genau ein gelöschtes Behavior mit seiner Stufe, in Registrierungsreihenfolge, und löst keine Panic aus.
+/// genau einen [`BehaviorWrapper`] mit seiner Stufe, in Registrierungsreihenfolge, und löst keine Panic aus.
 pub trait Behaviors<R: Request>: 'static {
-    /// Die Behaviors der Kette für `R` mit gelöschtem Typ und ihrer Stufe, deren Platz in `active` steht, in Registrierungsreihenfolge.
+    /// Die Behaviors der Kette für `R` als [`BehaviorWrapper`] mit ihrer Stufe, deren Platz in `active` steht, in Registrierungsreihenfolge.
     fn wrap(&self, active: &[Slot]) -> Vec<(Stage, Rc<BehaviorWrapper<R>>)>;
 }
 
@@ -48,7 +48,7 @@ pub struct OpenBehavior<B> {
 /// Ein Vorverarbeiter als Behavior: `B` sieht den Request, dann geht dieser weiter.
 pub struct RequestPreProcessorBehavior<B>(pub(crate) B);
 
-/// Ein Nachverarbeiter als Behavior: `B` sieht eine Kopie des Requests mit der Antwort des Handlers.
+/// Ein Nachverarbeiter als Behavior: `B` sieht eine Kopie des Requests mit der Antwort der inneren Pipeline (Behaviors und Handler).
 pub struct RequestPostProcessorBehavior<B>(pub(crate) B);
 
 /// Ein Behavior nur für einen Request-Typ, als Glied der Kette.

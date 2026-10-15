@@ -1,4 +1,4 @@
-//! Ein Behavior mit gelöschtem Typ.
+//! Ein Behavior hinter einem Trait-Objekt.
 
 use std::rc::Rc;
 
@@ -6,7 +6,7 @@ use super::LocalBoxFuture;
 use crate::request::HandlerResult;
 use crate::{Next, PipelineBehavior, Request};
 
-/// Ein Behavior mit gelöschtem Typ: nimmt einen `R` und den Rest der Pipeline und liefert später die Antwort oder den Fehler.
+/// Ein Behavior für `R` als `Box<dyn Fn …>`: Die Closure hält das konkrete Behavior in einem `Rc`, nimmt einen `R` und den Rest der Pipeline und liefert später die Antwort oder den Fehler.
 // dyn: wie bei `LocalBoxFuture`, je `R`.
 pub(crate) type BehaviorWrapper<R> =
     Box<dyn Fn(R, Next<R>) -> LocalBoxFuture<'static, HandlerResult<R>>>;
@@ -20,7 +20,7 @@ where
     Box::new(move |request, next| Box::pin(wrap(Rc::clone(&behavior), request, next)))
 }
 
-/// Ruft `behavior` auf; die Future besitzt das Behavior, damit sie ohne Leihe auskommt.
+/// Ruft `behavior` auf; die Future hält einen eigenen `Rc` auf das Behavior, damit sie ohne Leihe auskommt.
 async fn wrap<R: Request, B: PipelineBehavior<R>>(
     behavior: Rc<B>,
     request: R,

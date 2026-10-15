@@ -12,7 +12,7 @@ use crate::{Next, PipelineBehavior, Request};
 ///
 /// `process` endet für jeden Request mit `Ok` oder einem Fehler und löst keine Panic aus.
 pub trait RequestPostProcessor<R: Request> {
-    /// Sieht `request` mit der `response` des Handlers.
+    /// Sieht `request` mit der `response` der inneren Pipeline (Behaviors und Handler).
     ///
     /// # Errors
     ///
