@@ -272,3 +272,21 @@ async fn behavior_for_one_request_type_does_not_wrap_stream() {
         vec!["Anreisen für Tag 9 nachgeschlagen".to_owned()]
     );
 }
+
+#[tokio::test]
+async fn stream_behavior_for_one_stream_request_type_does_not_wrap_send() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .stream_behavior::<ListArrivals>(concierge(&journal))
+        .register(Handler::instance(CheckInDesk {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let check_in = mediator.send(CheckIn { room: 6 }).await;
+
+    assert_eq!(
+        (check_in, journal.borrow().clone()),
+        (Ok(()), vec!["Check-in Zimmer 6".to_owned()])
+    );
+}
