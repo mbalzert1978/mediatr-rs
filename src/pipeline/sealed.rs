@@ -28,7 +28,9 @@ pub trait Behaviors<R: Request>: 'static {
 pub enum Stage {
     /// Außerhalb aller anderen; reagiert nach ihnen in Registrierungsreihenfolge.
     ErrorAction,
-    /// Innerhalb von `ErrorAction`, außerhalb aller anderen; läuft vor ihnen in Registrierungsreihenfolge.
+    /// Innerhalb von `ErrorAction`, außerhalb aller anderen; reagiert vor `ErrorAction` in Registrierungsreihenfolge.
+    ErrorHandler,
+    /// Innerhalb von `ErrorHandler`, außerhalb aller anderen; läuft vor ihnen in Registrierungsreihenfolge.
     Before,
     /// Innerhalb von `Before`, außerhalb von `Around`; läuft nach dem Rest in Registrierungsreihenfolge.
     After,
@@ -58,6 +60,10 @@ pub struct RequestPostProcessorBehavior<B>(pub(crate) B);
 /// Eine Fehler-Aktion als Behavior: `B` sieht eine Kopie des Requests mit dem Fehler der inneren Pipeline (Behaviors und Handler).
 #[derive(Debug)]
 pub struct RequestErrorActionProcessorBehavior<B>(pub(crate) B);
+
+/// Ein Fehler-Handler als Behavior: `B` bekommt eine Kopie des Requests mit dem Fehler der inneren Pipeline (Behaviors und Handler).
+#[derive(Debug)]
+pub struct RequestErrorProcessorBehavior<B>(pub(crate) B);
 
 /// Ein Behavior nur für einen Request-Typ, als Glied der Kette.
 /// Ein eigener [`Provider`] hält es als [`BehaviorWrapper`] dieses Typs, damit `wrap` es nur für diesen Typ findet.

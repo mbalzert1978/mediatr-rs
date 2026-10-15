@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use mediatr_rs::{Request, RequestErrorAction, RequestHandler, SendError};
+use mediatr_rs::{Request, RequestErrorAction, RequestErrorHandler, RequestHandler, SendError};
 
 /// Bucht das Hotelzimmer mit dieser Nummer und liefert die Buchungsnummer.
 #[derive(Clone)]
@@ -68,5 +68,33 @@ impl RequestErrorAction<BookRoom> for GuestNotice {
             request.room
         ));
         Ok(())
+    }
+}
+
+/// Setzt jede gescheiterte Buchung auf die Warteliste und liefert die Wartelistennummer als Buchungsnummer.
+pub struct WaitingList {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl RequestErrorHandler<BookRoom> for WaitingList {
+    async fn handle(&self, request: &BookRoom, _error: BookingError) -> Result<u64, BookingError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Zimmer {} auf der Warteliste", request.room));
+        Ok(9000)
+    }
+}
+
+/// Bucht bei jeder gescheiterten Buchung ein Zimmer im Partnerhotel und liefert dessen Buchungsnummer.
+pub struct PartnerHotel {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl RequestErrorHandler<BookRoom> for PartnerHotel {
+    async fn handle(&self, request: &BookRoom, _error: BookingError) -> Result<u64, BookingError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Zimmer {} im Partnerhotel gebucht", request.room));
+        Ok(7000)
     }
 }

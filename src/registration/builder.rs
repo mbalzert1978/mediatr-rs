@@ -7,8 +7,8 @@ use std::rc::Rc;
 use mediatr_provider::{Provider, ProviderBuilder, Registration};
 
 use crate::pipeline::{
-    Closed, OpenBehavior, RequestErrorActionProcessorBehavior, RequestPostProcessorBehavior,
-    RequestPreProcessorBehavior, Slot, Stage,
+    Closed, OpenBehavior, RequestErrorActionProcessorBehavior, RequestErrorProcessorBehavior,
+    RequestPostProcessorBehavior, RequestPreProcessorBehavior, Slot, Stage,
 };
 use crate::wrappers::{
     BehaviorWrapper, wrap_behavior, wrap_notification_handler, wrap_request_handler,
@@ -148,6 +148,21 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
         self.open(
             RequestErrorActionProcessorBehavior(error_action),
             Stage::ErrorAction,
+        )
+    }
+
+    /// Registriert `error_handler` für alle Request-Typen; er bekommt jeden Fehler, bevor eine Fehler-Aktion ihn sieht.
+    ///
+    /// [`Sender::send`](crate::Sender::send) verlangt, dass `error_handler` [`RequestErrorHandler`](crate::RequestErrorHandler) für den Request-Typ ist
+    /// und der Request [`Clone`] ist, denn der Handler verbraucht ihn.
+    #[must_use]
+    pub fn open_request_error_handler<B: 'static>(
+        self,
+        error_handler: B,
+    ) -> MediatorBuilder<S, (P, OpenBehavior<RequestErrorProcessorBehavior<B>>)> {
+        self.open(
+            RequestErrorProcessorBehavior(error_handler),
+            Stage::ErrorHandler,
         )
     }
 
