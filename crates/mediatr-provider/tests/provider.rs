@@ -53,7 +53,12 @@ fn all_returns_every_instance_in_registration_order() {
         .register(Registration::instance(Name("neu")))
         .build();
 
-    let names: Vec<_> = provider.all::<Name>().iter().map(|name| name.0).collect();
+    let names: Vec<_> = provider
+        .all::<Name>()
+        .unwrap()
+        .iter()
+        .map(|name| name.0)
+        .collect();
 
     assert_eq!(names, ["alt", "neu"]);
 }
@@ -66,7 +71,7 @@ fn all_without_registration_returns_empty_list() {
 
     let configs = provider.all::<Config>();
 
-    assert!(configs.is_empty());
+    assert!(matches!(configs, Ok(list) if list.is_empty()));
 }
 
 #[test]
@@ -89,7 +94,7 @@ fn singleton_all_returns_same_object_as_get() {
         .build();
 
     let single = provider.get::<Config>().unwrap();
-    let all = provider.all::<Config>();
+    let all = provider.all::<Config>().unwrap();
 
     assert!(matches!(all.as_slice(), [config] if Arc::ptr_eq(config, &single)));
 }
@@ -103,8 +108,8 @@ fn scoped_all_returns_same_object_as_get_within_scope() {
     let second = provider.scope();
 
     let single = first.get::<Config>().unwrap();
-    let same_scope = first.all::<Config>();
-    let other_scope = second.all::<Config>();
+    let same_scope = first.all::<Config>().unwrap();
+    let other_scope = second.all::<Config>().unwrap();
 
     assert!(matches!(same_scope.as_slice(), [config] if Arc::ptr_eq(config, &single)));
     assert!(matches!(other_scope.as_slice(), [config] if !Arc::ptr_eq(config, &single)));
@@ -205,7 +210,12 @@ fn two_scoped_registrations_of_same_type_build_one_object_each() {
         .build()
         .scope();
 
-    let names: Vec<_> = scope.all::<Name>().iter().map(|name| name.0).collect();
+    let names: Vec<_> = scope
+        .all::<Name>()
+        .unwrap()
+        .iter()
+        .map(|name| name.0)
+        .collect();
 
     assert_eq!(names, ["haupt", "ersatz"]);
 }
@@ -372,7 +382,7 @@ fn first_of_two_recipes_asking_for_own_type_through_all_gets_nothing() {
         }))
         .build();
 
-    let settings = provider.all::<Settings>();
+    let settings = provider.all::<Settings>().unwrap();
 
     assert!(matches!(settings.as_slice(), [first, _] if first.parent.is_err()));
 }
@@ -414,7 +424,7 @@ fn recipe_asking_twice_for_own_type_gets_nothing_both_times() {
 }
 
 #[test]
-fn recipe_asking_all_for_own_type_gets_empty_list() {
+fn recipe_asking_all_for_own_type_gets_cycle() {
     let provider = Provider::builder()
         .register(Registration::transient(|provider| MenuItem {
             siblings: provider.all::<MenuItem>(),
@@ -423,7 +433,9 @@ fn recipe_asking_all_for_own_type_gets_empty_list() {
 
     let items = provider.all::<MenuItem>();
 
-    assert!(matches!(items.as_slice(), [item] if item.siblings.is_empty()));
+    assert!(
+        matches!(items.as_deref(), Ok([item]) if matches!(item.siblings, Err(GetError::Cycle)))
+    );
 }
 
 #[test]
@@ -436,7 +448,7 @@ fn recipe_asking_all_for_own_type_through_get_gets_nothing() {
 
     let item = provider.get::<MenuItem>().unwrap();
 
-    assert!(item.siblings.is_empty());
+    assert!(item.siblings.is_err());
 }
 
 #[test]
@@ -453,8 +465,8 @@ fn mutually_dependent_recipes_get_nothing_from_inner_all() {
     let courses = provider.all::<Course>();
 
     assert!(matches!(
-        courses.as_slice(),
-        [course] if matches!(course.students.as_slice(), [student] if student.courses.is_empty())
+        courses.as_deref(),
+        Ok([course]) if matches!(course.students.as_deref(), Ok([student]) if student.courses.is_err())
     ));
 }
 
@@ -557,6 +569,7 @@ fn unique_instance_twice_from_same_source_type_all_returns_first() {
 
     let titles: Vec<_> = provider
         .all::<Document>()
+        .unwrap()
         .iter()
         .map(|document| document.0.clone())
         .collect();
@@ -583,6 +596,7 @@ fn unique_instance_from_different_source_types_all_returns_both_in_order() {
 
     let titles: Vec<_> = provider
         .all::<Document>()
+        .unwrap()
         .iter()
         .map(|document| document.0.clone())
         .collect();
@@ -656,6 +670,7 @@ fn instance_then_unique_instance_of_same_type_all_returns_both_in_order() {
 
     let titles: Vec<_> = provider
         .all::<Document>()
+        .unwrap()
         .iter()
         .map(|document| document.0.clone())
         .collect();
@@ -682,11 +697,13 @@ fn unique_instance_from_same_source_type_for_two_service_types_all_returns_each_
 
     let titles: Vec<_> = provider
         .all::<Document>()
+        .unwrap()
         .iter()
         .map(|document| document.0.clone())
         .collect();
     let entries: Vec<_> = provider
         .all::<LedgerEntry>()
+        .unwrap()
         .iter()
         .map(|entry| entry.0.clone())
         .collect();
@@ -736,6 +753,7 @@ fn unique_then_mapped_registration_twice_all_returns_first() {
 
     let titles: Vec<_> = provider
         .all::<Document>()
+        .unwrap()
         .iter()
         .map(|document| document.0.clone())
         .collect();
@@ -793,7 +811,7 @@ fn unique_transient_twice_from_same_source_type_all_builds_only_first() {
         .register(print("Rechnung 2"))
         .build();
 
-    let _documents = provider.all::<Document>();
+    let _documents = provider.all::<Document>().unwrap();
 
     assert_eq!(
         *built.lock().unwrap_or_else(PoisonError::into_inner),

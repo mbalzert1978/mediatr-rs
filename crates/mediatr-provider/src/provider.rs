@@ -79,14 +79,16 @@ impl Provider {
         Ok(recipe(self, (id, index)))
     }
 
-    /// Liefert alle Dienste vom Typ `T`, in der Reihenfolge ihrer Registrierung; keinen, wenn eine Bauanleitung von `T` gerade läuft.
-    #[must_use]
-    pub fn all<T: 'static>(&self) -> Vec<Arc<T>> {
+    /// Liefert alle Dienste vom Typ `T`, in der Reihenfolge ihrer Registrierung; eine leere Liste, wenn keiner registriert ist, `Err(GetError::Cycle)`, wenn eine Bauanleitung von `T` auf diesem Thread gerade läuft.
+    ///
+    /// # Errors
+    ///
+    /// Liefert [`GetError::Cycle`], wenn die Bauanleitung von `T` auf diesem Thread gerade läuft.
+    pub fn all<T: 'static>(&self) -> Result<Vec<Arc<T>>, GetError> {
         let id = TypeId::of::<T>();
-        let Some(_building) = Building::enter(&self.shared.building, id) else {
-            return Vec::new();
-        };
-        self.shared
+        let _building = Building::enter(&self.shared.building, id).ok_or(GetError::Cycle)?;
+        Ok(self
+            .shared
             .services
             .get(&id)
             .into_iter()
@@ -94,7 +96,7 @@ impl Provider {
             .enumerate()
             .filter_map(|(index, recipe)| Some((index, recipe.downcast_ref::<Recipe<T>>()?)))
             .map(|(index, recipe)| recipe(self, (id, index)))
-            .collect()
+            .collect())
     }
 
     /// Beginnt einen neuen Scope mit denselben Diensten; `scoped`-Dienste baut er neu.

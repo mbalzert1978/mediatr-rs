@@ -110,7 +110,11 @@ impl<S, P: Behaviors<R>, R: Request + 'static> Sender<R> for Mediator<S, P> {
 
 impl<S: NotificationPublisher, P, N: Notification + 'static> Publisher<N> for Mediator<S, P> {
     async fn publish(&self, notification: N) -> Result<(), N::Error> {
-        let handlers = self.provider.all::<NotificationHandlerWrapper<N>>();
+        // Kreis und Wurzel-Fehler sind über den Mediator nicht erreichbar.
+        let handlers = self
+            .provider
+            .all::<NotificationHandlerWrapper<N>>()
+            .unwrap_or_default();
         S::publish(
             handlers
                 .iter()

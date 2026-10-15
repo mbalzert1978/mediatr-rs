@@ -341,7 +341,13 @@ impl<S, P, F> MediatorBuilder<S, P, F> {
                 // Die Plätze der Behaviors, die nach dem Aussortieren der Doppelten laufen; der Provider ermittelt sie einmal.
                 .register(Registration::singleton(
                     |provider: &Provider| -> Vec<Slot> {
-                        provider.all::<Slot>().iter().map(|slot| **slot).collect()
+                        // Kreis und Wurzel-Fehler sind über den Mediator nicht erreichbar.
+                        provider
+                            .all::<Slot>()
+                            .unwrap_or_default()
+                            .iter()
+                            .map(|slot| **slot)
+                            .collect()
                     },
                 ))
                 .build(),

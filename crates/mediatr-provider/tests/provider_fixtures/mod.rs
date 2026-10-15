@@ -69,17 +69,17 @@ pub struct Folder {
 
 /// Ein Menüeintrag, der beim Bau alle Einträge seines Menüs sammelt.
 pub struct MenuItem {
-    pub siblings: Vec<Arc<MenuItem>>,
+    pub siblings: Result<Vec<Arc<MenuItem>>, GetError>,
 }
 
 /// Ein Kurs mit allen Studierenden, die beim Bau bekannt sind.
 pub struct Course {
-    pub students: Vec<Arc<Student>>,
+    pub students: Result<Vec<Arc<Student>>, GetError>,
 }
 
 /// Eine Studentin mit allen Kursen, die beim Bau bekannt sind.
 pub struct Student {
-    pub courses: Vec<Arc<Course>>,
+    pub courses: Result<Vec<Arc<Course>>, GetError>,
 }
 
 /// Ein Team mit seiner Leitung, falls es eine gibt.
