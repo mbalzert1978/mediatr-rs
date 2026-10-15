@@ -16,4 +16,6 @@ Die Rust-Form entsteht erst im TDD-Zyklus, nicht hier.
 | `IStreamRequest` + Handler + Stream-Behavior | Wie Request, die Antwort ist ein asynchroner Strom. |
 | `ISender` / `IPublisher` / `IMediator` | Send/Stream, Publish, beides. |
 
-Bewusst nicht portiert: Lizenzprüfung, Assembly-Scan, `Send(object)`/`Publish(object)`, Service-Lifetimes.
+Bewusst nicht portiert: Lizenzprüfung, Assembly-Scan, `Send(object)`/`Publish(object)`.
+
+Lebensdauern von Diensten (`AddTransient`, `AddSingleton`, `AddScoped`) und `ValidateScopes` stammen aus Microsoft.Extensions.DependencyInjection, nicht aus MediatR. Der Crate `mediatr-provider` baut sie nach.
