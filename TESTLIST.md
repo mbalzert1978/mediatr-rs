@@ -67,7 +67,7 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] Dienst mit `singleton` registriert → `all` liefert dasselbe Objekt wie `get` · `singleton_all_returns_same_object_as_get`
 - [x] Dienst mit `scoped` registriert → `all` liefert im selben Scope dasselbe Objekt wie `get`; ein neuer Scope baut neu · `scoped_all_returns_same_object_as_get_within_scope`
 - [x] Bauanleitung fragt mit `all` nach ihrem eigenen Typ → die Abfrage liefert eine leere Liste, kein Panic und keine Endlosschleife · `recipe_asking_all_for_own_type_gets_empty_list`
-- [x] Bauanleitung fragt mit `all` nach ihrem eigenen Typ, die äußere Abfrage kommt über `get` → die innere Abfrage liefert eine leere Liste, kein Panic und keine Endlosschleife · `recipe_asking_all_for_own_type_through_get_gets_empty_list`
+- [x] Bauanleitung fragt mit `all` nach ihrem eigenen Typ, die äußere Abfrage kommt über `get` → die innere Abfrage liefert keine Dienste, kein Panic und keine Endlosschleife · `recipe_asking_all_for_own_type_through_get_gets_nothing`
 - [x] Zwei Bauanleitungen fragen einander mit `all` ab → die innere Abfrage liefert eine leere Liste, kein Panic und keine Endlosschleife · `mutually_dependent_recipes_get_empty_list_from_inner_all`
 - [x] Zwei Bauanleitungen desselben Typs, die erste fragt mit `get` nach ihrem eigenen Typ, die äußere Abfrage kommt über `all` → die innere Abfrage liefert keinen Dienst · `first_of_two_recipes_asking_for_own_type_through_all_gets_nothing`
 - [x] Zwei Dienste desselben Typs mit `scoped` registriert → `all` liefert im selben Scope zwei verschiedene Objekte, je eins pro Bauanleitung · `two_scoped_registrations_of_same_type_build_one_object_each`

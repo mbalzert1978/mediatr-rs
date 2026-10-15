@@ -428,7 +428,7 @@ fn recipe_asking_all_for_own_type_gets_empty_list() {
 }
 
 #[test]
-fn recipe_asking_all_for_own_type_through_get_gets_empty_list() {
+fn recipe_asking_all_for_own_type_through_get_gets_nothing() {
     let provider = Provider::builder()
         .register(Registration::transient(|provider| MenuItem {
             siblings: provider.all::<MenuItem>(),
