@@ -20,9 +20,9 @@ pub use next::Next;
 pub use post_processor::RequestPostProcessor;
 pub use pre_processor::RequestPreProcessor;
 pub(crate) use sealed::{
-    Behaviors, Closed, OpenBehavior, OpenStreamBehavior, RequestErrorActionProcessorBehavior,
-    RequestErrorProcessorBehavior, RequestPostProcessorBehavior, RequestPreProcessorBehavior, Slot,
-    Stage, StreamBehaviors,
+    Behaviors, Closed, ClosedStream, OpenBehavior, OpenStreamBehavior,
+    RequestErrorActionProcessorBehavior, RequestErrorProcessorBehavior,
+    RequestPostProcessorBehavior, RequestPreProcessorBehavior, Slot, Stage, StreamBehaviors,
 };
 pub use stream_behavior::StreamPipelineBehavior;
 pub use stream_next::StreamNext;

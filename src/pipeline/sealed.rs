@@ -70,6 +70,14 @@ pub struct OpenStreamBehavior<B> {
     pub(crate) slot: Slot,
 }
 
+/// Ein Stream-Behavior nur für einen Stream-Request-Typ, als Glied der Kette.
+/// Ein eigener [`Provider`] hält es als [`StreamBehaviorWrapper`] dieses Typs, damit `wrap` es nur für diesen Typ findet.
+#[derive(Debug, Clone)]
+pub struct ClosedStream {
+    pub(crate) provider: Provider,
+    pub(crate) slot: Slot,
+}
+
 /// Ein Vorverarbeiter als Behavior: `B` sieht den Request, dann geht dieser weiter.
 #[derive(Debug)]
 pub struct RequestPreProcessorBehavior<B>(pub(crate) B);
@@ -212,6 +220,22 @@ where
         let mut behaviors = self.0.wrap(active);
         if active.contains(&self.1.slot) {
             behaviors.push(Rc::new(wrap_stream_behavior(Rc::clone(&self.1.behavior))));
+        }
+        behaviors
+    }
+}
+
+impl<R: Request + 'static, P: Behaviors<R>> Behaviors<R> for (P, ClosedStream) {
+    fn wrap(&self, active: &[Slot]) -> Vec<(Stage, Rc<BehaviorWrapper<R>>)> {
+        self.0.wrap(active)
+    }
+}
+
+impl<R: StreamRequest + 'static, P: StreamBehaviors<R>> StreamBehaviors<R> for (P, ClosedStream) {
+    fn wrap(&self, active: &[Slot]) -> Vec<Rc<StreamBehaviorWrapper<R>>> {
+        let mut behaviors = self.0.wrap(active);
+        if active.contains(&self.1.slot) {
+            behaviors.extend(self.1.provider.get::<StreamBehaviorWrapper<R>>());
         }
         behaviors
     }

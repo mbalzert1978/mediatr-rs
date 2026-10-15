@@ -7,18 +7,18 @@ use std::rc::Rc;
 use mediatr_provider::{Provider, ProviderBuilder, Registration};
 
 use crate::pipeline::{
-    Closed, OpenBehavior, OpenStreamBehavior, RequestErrorActionProcessorBehavior,
+    Closed, ClosedStream, OpenBehavior, OpenStreamBehavior, RequestErrorActionProcessorBehavior,
     RequestErrorProcessorBehavior, RequestPostProcessorBehavior, RequestPreProcessorBehavior, Slot,
     Stage,
 };
 use crate::wrappers::{
-    BehaviorWrapper, wrap_behavior, wrap_notification_handler, wrap_request_handler,
-    wrap_stream_request_handler,
+    BehaviorWrapper, StreamBehaviorWrapper, wrap_behavior, wrap_notification_handler,
+    wrap_request_handler, wrap_stream_behavior, wrap_stream_request_handler,
 };
 use crate::{
     ForeachAwaitPublisher, Handler, Mediator, Notification, NotificationHandler, PipelineBehavior,
     Request, RequestErrorAction, RequestErrorHandler, RequestHandler, RequestPostProcessor,
-    RequestPreProcessor, StreamRequest, StreamRequestHandler,
+    RequestPreProcessor, StreamPipelineBehavior, StreamRequest, StreamRequestHandler,
 };
 
 /// Sammelt Behaviors und Handler und baut daraus einen [`Mediator`] mit dem Notification-Publisher `S` und der Kette `P` der Behaviors.
@@ -209,6 +209,27 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
                     slot,
                 },
                 Registration::instance(slot).unique_by::<B>(),
+            )
+        })
+    }
+
+    /// Registriert `behavior` nur für Stream-Requests vom Typ `R`; es liegt innerhalb der zuvor registrierten Stream-Behaviors.
+    #[must_use]
+    pub fn stream_behavior<R: StreamRequest + 'static>(
+        self,
+        behavior: impl StreamPipelineBehavior<R> + 'static,
+    ) -> MediatorBuilder<S, (P, ClosedStream)> {
+        self.with_behavior(|slot| {
+            let unique = unique_for::<R, _>(slot, &behavior);
+            let wrapper: StreamBehaviorWrapper<R> = wrap_stream_behavior(Rc::new(behavior));
+            (
+                ClosedStream {
+                    provider: Provider::builder()
+                        .register(Registration::instance(wrapper))
+                        .build(),
+                    slot,
+                },
+                unique,
             )
         })
     }

@@ -44,3 +44,33 @@ async fn two_open_stream_behaviors_wrap_handler_first_registered_outside_items_u
         )
     );
 }
+
+#[tokio::test]
+async fn two_stream_behaviors_for_one_type_wrap_handler_in_registration_order_items_unchanged() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .stream_behavior::<ListArrivals>(Concierge {
+            journal: Rc::clone(&journal),
+        })
+        .stream_behavior::<ListArrivals>(NightPorter {
+            journal: Rc::clone(&journal),
+        })
+        .register_stream(Handler::instance(FrontOffice {
+            guests: vec!["Clara".to_owned()],
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let arrivals: Vec<_> = mediator
+        .create_stream(ListArrivals { day: 2 })
+        .collect()
+        .await;
+
+    assert_eq!(
+        (arrivals, journal.borrow().clone()),
+        (
+            vec![Ok("Clara am Tag 2".to_owned())],
+            concierge_and_night_porter_around("Anreisen für Tag 2 nachgeschlagen")
+        )
+    );
+}
