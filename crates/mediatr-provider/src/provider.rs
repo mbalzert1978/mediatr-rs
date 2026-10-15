@@ -58,12 +58,12 @@ impl Provider {
         ProviderBuilder::default()
     }
 
-    /// Liefert den zuletzt registrierten Dienst vom Typ `T`; `Err(GetError::NoService)`, wenn er fehlt oder seine Bauanleitung gerade läuft.
+    /// Liefert den zuletzt registrierten Dienst vom Typ `T`; `Err(GetError::NoService)`, wenn er fehlt, `Err(GetError::Cycle)`, wenn seine Bauanleitung auf diesem Thread gerade läuft.
     ///
     /// # Errors
     ///
-    /// Liefert [`GetError::NoService`], wenn kein Dienst vom Typ `T` registriert ist
-    /// oder seine Bauanleitung gerade läuft.
+    /// Liefert [`GetError::NoService`], wenn kein Dienst vom Typ `T` registriert ist,
+    /// und [`GetError::Cycle`], wenn seine Bauanleitung auf diesem Thread gerade läuft.
     pub fn get<T: 'static>(&self) -> Result<Arc<T>, GetError> {
         let id = TypeId::of::<T>();
         let (index, recipe) = self
@@ -75,7 +75,7 @@ impl Provider {
         let recipe = recipe
             .downcast_ref::<Recipe<T>>()
             .ok_or(GetError::NoService)?;
-        let _building = Building::enter(&self.shared.building, id).ok_or(GetError::NoService)?;
+        let _building = Building::enter(&self.shared.building, id).ok_or(GetError::Cycle)?;
         Ok(recipe(self, (id, index)))
     }
 

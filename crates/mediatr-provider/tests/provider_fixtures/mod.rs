@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Barrier};
 
-use mediatr_provider::{Provider, WeakProvider};
+use mediatr_provider::{GetError, Provider, WeakProvider};
 
 pub struct Config;
 
@@ -49,15 +49,15 @@ pub struct Report {
     pub _alive: Alive,
 }
 
-/// Einstellungen, die sich beim Bau auf übergeordnete Einstellungen stützen, falls es welche gibt.
+/// Einstellungen, die sich beim Bau auf übergeordnete Einstellungen stützen; `parent` hält, was die Abfrage danach ergab.
 pub struct Settings {
-    pub parent: Option<Arc<Settings>>,
+    pub parent: Result<Arc<Settings>, GetError>,
 }
 
 /// Bauanleitung für `Settings`, die beim Provider nach übergeordneten `Settings` fragt.
 pub fn settings_recipe(provider: &Provider) -> Settings {
     Settings {
-        parent: provider.get::<Settings>().ok(),
+        parent: provider.get::<Settings>(),
     }
 }
 

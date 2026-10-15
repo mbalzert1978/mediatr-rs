@@ -353,26 +353,28 @@ fn scoped_service_and_its_singleton_with_weak_provider_are_released_with_provide
 }
 
 #[test]
-fn recipe_asking_for_own_type_gets_none() {
+fn recipe_asking_for_own_type_gets_cycle() {
     let provider = Provider::builder()
         .register(Registration::transient(settings_recipe))
         .build();
 
     let settings = provider.get::<Settings>().unwrap();
 
-    assert!(settings.parent.is_none());
+    assert!(matches!(settings.parent, Err(GetError::Cycle)));
 }
 
 #[test]
 fn first_of_two_recipes_asking_for_own_type_through_all_gets_nothing() {
     let provider = Provider::builder()
         .register(Registration::transient(settings_recipe))
-        .register(Registration::transient(|_| Settings { parent: None }))
+        .register(Registration::transient(|_| Settings {
+            parent: Err(GetError::NoService),
+        }))
         .build();
 
     let settings = provider.all::<Settings>();
 
-    assert!(matches!(settings.as_slice(), [first, _] if first.parent.is_none()));
+    assert!(matches!(settings.as_slice(), [first, _] if first.parent.is_err()));
 }
 
 #[test]
@@ -383,7 +385,7 @@ fn singleton_recipe_asking_for_own_type_gets_nothing() {
 
     let settings = provider.get::<Settings>().unwrap();
 
-    assert!(settings.parent.is_none());
+    assert!(settings.parent.is_err());
 }
 
 #[test]
@@ -394,7 +396,7 @@ fn scoped_recipe_asking_for_own_type_in_scope_gets_nothing() {
 
     let settings = provider.scope().get::<Settings>().unwrap();
 
-    assert!(settings.parent.is_none());
+    assert!(settings.parent.is_err());
 }
 
 #[test]
