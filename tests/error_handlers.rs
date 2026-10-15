@@ -225,3 +225,34 @@ async fn error_handler_replacement_is_returned_and_error_action_does_not_run() {
         )
     );
 }
+
+#[tokio::test]
+async fn error_handler_without_replacement_and_error_action_both_run_and_send_returns_handler_error()
+ {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .open_request_error_action(BookingAlert {
+            journal: Rc::clone(&journal),
+        })
+        .open_request_error_handler(OverbookingCheck {
+            journal: Rc::clone(&journal),
+        })
+        .register(Handler::instance(FullHotel {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let booking = mediator.send(BookRoom { room: 12 }).await;
+
+    assert_eq!(
+        (booking, journal.borrow().clone()),
+        (
+            Err(BookingError::FullyBooked),
+            vec![
+                "Zimmer 12 ausgebucht".to_owned(),
+                "Überbuchung für Zimmer 12 abgelehnt".to_owned(),
+                "Alarm: Buchung für Zimmer 12 gescheitert: FullyBooked".to_owned()
+            ]
+        )
+    );
+}
