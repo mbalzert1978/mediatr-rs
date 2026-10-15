@@ -179,3 +179,30 @@ async fn stream_behavior_not_reading_next_stream_keeps_stream_handler_from_runni
         (Vec::new(), Vec::<String>::new())
     );
 }
+
+#[tokio::test]
+async fn same_stream_behavior_type_registered_twice_runs_once_per_stream() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .open_stream_behavior(concierge(&journal))
+        .open_stream_behavior(concierge(&journal))
+        .register_stream(Handler::instance(FrontOffice {
+            guests: Vec::new(),
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let _arrivals: Vec<_> = mediator
+        .create_stream(ListArrivals { day: 7 })
+        .collect()
+        .await;
+
+    assert_eq!(
+        journal.borrow().clone(),
+        vec![
+            "Concierge vorher".to_owned(),
+            "Anreisen für Tag 7 nachgeschlagen".to_owned(),
+            "Concierge nachher".to_owned()
+        ]
+    );
+}

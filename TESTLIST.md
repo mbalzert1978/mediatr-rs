@@ -218,7 +218,7 @@ Quelle: MediatR `test/MediatR.Tests/StreamPipelineTests.cs`, `Pipeline/Streams/S
 - [x] Zwei Stream-Behaviors für alle Stream-Request-Typen → sie umschließen den Handler, das zuerst registrierte außen; die Elemente kommen unverändert an · `two_open_stream_behaviors_wrap_handler_first_registered_outside_items_unchanged`
 - [x] Zwei Stream-Behaviors für alle Stream-Request-Typen und ein drittes nur für einen → bei diesem Typ laufen alle drei in Registrierungsreihenfolge um den Handler, bei einem anderen Stream-Request-Typ nur die zwei allgemeinen · `stream_behavior_for_one_type_joins_general_ones_in_registration_order_other_type_gets_only_general`
 - [x] Handler liefert drei Elemente, ein Stream-Behavior fügt vorne und hinten je eins an → der Stream liefert genau fünf Elemente in dieser Reihenfolge · `stream_behavior_adding_one_item_before_and_after_three_handler_items_yields_five_in_order`
-- [ ] Derselbe Stream-Behavior-Typ zweimal registriert → er läuft pro Stream einmal
+- [x] Derselbe Stream-Behavior-Typ zweimal registriert → er läuft pro Stream einmal · `same_stream_behavior_type_registered_twice_runs_once_per_stream`
 - [ ] Stream-Behavior nach dem ersten Handler registriert → kompiliert nicht
 - [ ] Ein Behavior für alle Request-Typen ist registriert, ein Stream wird gelesen → der Stream läuft nicht durch das Behavior
 - [ ] Ein Stream-Behavior für alle Stream-Request-Typen ist registriert, ein Request wird gesendet → `send` läuft nicht durch das Stream-Behavior
