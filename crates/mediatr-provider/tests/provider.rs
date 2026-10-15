@@ -460,7 +460,7 @@ fn mutually_dependent_recipes_get_empty_list_from_inner_all() {
 }
 
 #[test]
-fn mutually_dependent_recipes_get_none_for_inner_query() {
+fn mutually_dependent_recipes_get_nothing_for_inner_query() {
     let provider = Provider::builder()
         .register(Registration::transient(|provider| Team {
             lead: provider.get::<Employee>(),
