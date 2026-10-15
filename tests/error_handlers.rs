@@ -423,3 +423,23 @@ async fn second_error_handler_gets_error_passed_on_by_first_instead_of_original(
         ]
     );
 }
+
+#[tokio::test]
+async fn successful_handler_skips_error_handler_and_send_returns_its_response() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .open_request_error_handler(WaitingList {
+            journal: Rc::clone(&journal),
+        })
+        .register(Handler::instance(OpenHotel {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let booking = mediator.send(BookRoom { room: 12 }).await;
+
+    assert_eq!(
+        (booking, journal.borrow().clone()),
+        (Ok(4711), vec!["Zimmer 12 gebucht".to_owned()])
+    );
+}
