@@ -13,6 +13,7 @@ pub struct BookRoom {
 #[derive(Debug, PartialEq)]
 pub enum BookingError {
     FullyBooked,
+    WaitingListClosed,
     Undeliverable(SendError),
 }
 
@@ -110,5 +111,20 @@ impl RequestErrorHandler<BookRoom> for OverbookingCheck {
             .borrow_mut()
             .push(format!("Überbuchung für Zimmer {} abgelehnt", request.room));
         Err(error)
+    }
+}
+
+/// Eine geschlossene Warteliste: Sie schreibt jede gescheiterte Buchung ins Protokoll und scheitert selbst.
+pub struct ClosedWaitingList {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl RequestErrorHandler<BookRoom> for ClosedWaitingList {
+    async fn handle(&self, request: &BookRoom, _error: BookingError) -> Result<u64, BookingError> {
+        self.journal.borrow_mut().push(format!(
+            "Warteliste für Zimmer {} geschlossen",
+            request.room
+        ));
+        Err(BookingError::WaitingListClosed)
     }
 }

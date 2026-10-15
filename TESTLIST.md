@@ -180,7 +180,7 @@ Quelle: MediatR `test/MediatR.Tests/Pipeline/RequestExceptionHandlerTests.cs`, `
 - [x] Handler scheitert, zwei Fehler-Aktionen sind registriert → beide laufen, `send` liefert den Fehler des Handlers · `two_error_actions_both_run_on_handler_error_and_send_returns_handler_error`
 - [x] Handler scheitert, zwei Fehler-Handler, der erste setzt eine Ersatzantwort → `send` liefert `Ok` mit dieser Ersatzantwort, der zweite Fehler-Handler läuft nicht · `first_error_handler_replacement_is_returned_and_second_error_handler_does_not_run`
 - [x] Handler scheitert, der Fehler-Handler setzt keine Ersatzantwort → `send` liefert den ursprünglichen Fehler · `error_handler_without_replacement_lets_send_return_original_error`
-- [ ] Handler scheitert, der Fehler-Handler scheitert selbst → `send` liefert den Fehler des Fehler-Handlers, nicht den ursprünglichen
+- [x] Handler scheitert, der Fehler-Handler scheitert selbst → `send` liefert den Fehler des Fehler-Handlers, nicht den ursprünglichen · `failing_error_handler_makes_send_return_its_error_instead_of_original`
 - [ ] Handler scheitert, ein Fehler-Handler ohne Ersatzantwort ist registriert → er läuft pro `send` genau einmal
 - [ ] Handler scheitert, ein Fehler-Handler setzt eine Ersatzantwort, zusätzlich ist eine Fehler-Aktion registriert → `send` liefert die Ersatzantwort, die Fehler-Aktion läuft nicht
 - [ ] Handler scheitert, ein Fehler-Handler ohne Ersatzantwort und eine Fehler-Aktion sind registriert → beide laufen, `send` liefert den Fehler des Handlers
