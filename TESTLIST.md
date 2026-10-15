@@ -194,7 +194,7 @@ Quelle: MediatR `test/MediatR.Tests/Pipeline/RequestExceptionHandlerTests.cs`, `
 - [x] Handler hat Erfolg, ein Fehler-Handler ist registriert → er läuft nicht, `send` liefert die Antwort des Handlers · `successful_handler_skips_error_handler_and_send_returns_its_response`
 - [ ] Fehler-Handler nur für einen Request-Typ registriert, ein Request eines anderen Typs scheitert → er läuft nicht, `send` liefert dessen Fehler
 - [ ] Derselbe Fehler-Handler-Typ zweimal registriert → er läuft pro `send` einmal
-- [ ] Derselbe Fehler-Aktions-Typ zweimal registriert → sie läuft pro `send` einmal
+- [x] Derselbe Fehler-Aktions-Typ zweimal registriert → sie läuft pro `send` einmal · `same_error_action_type_registered_twice_runs_once_per_send`
 - [x] Fehler-Handler registriert, Request ohne `Clone` → `send` kompiliert nicht · `error_handler_makes_send_for_non_clone_request_not_compile`
 - [x] Fehler-Aktion registriert, Request ohne `Clone` → `send` kompiliert nicht · `error_action_makes_send_for_non_clone_request_not_compile`
 - [x] Fehler-Handler nach dem ersten Handler registriert → kompiliert nicht · `error_handler_registered_after_first_handler_does_not_compile`

@@ -443,3 +443,29 @@ async fn successful_handler_skips_error_handler_and_send_returns_its_response() 
         (Ok(4711), vec!["Zimmer 12 gebucht".to_owned()])
     );
 }
+
+#[tokio::test]
+async fn same_error_action_type_registered_twice_runs_once_per_send() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .open_request_error_action(BookingAlert {
+            journal: Rc::clone(&journal),
+        })
+        .open_request_error_action(BookingAlert {
+            journal: Rc::clone(&journal),
+        })
+        .register(Handler::instance(FullHotel {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let _booking = mediator.send(BookRoom { room: 12 }).await;
+
+    assert_eq!(
+        journal.borrow().clone(),
+        vec![
+            "Zimmer 12 ausgebucht".to_owned(),
+            "Alarm: Buchung für Zimmer 12 gescheitert: FullyBooked".to_owned()
+        ]
+    );
+}
