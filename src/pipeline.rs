@@ -1,5 +1,6 @@
 //! Die Pipeline um den Handler eines Requests.
 
+mod deferred;
 mod error_action;
 mod error_handler;
 mod next;
@@ -14,6 +15,7 @@ use std::future::Future;
 use crate::Request;
 use crate::request::HandlerResult;
 
+pub(crate) use deferred::Deferred;
 pub use error_action::RequestErrorAction;
 pub use error_handler::RequestErrorHandler;
 pub use next::Next;

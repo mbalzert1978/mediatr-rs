@@ -9,7 +9,7 @@ use futures_core::Stream;
 
 use mediatr_provider::{Provider, WeakProvider};
 
-use crate::pipeline::{Behaviors, Slot, StreamBehaviors};
+use crate::pipeline::{Behaviors, Deferred, Slot, StreamBehaviors};
 use crate::request::HandlerResult;
 use crate::stream_request::StreamResult;
 use crate::wrappers::{
@@ -156,7 +156,9 @@ impl<S, P: StreamBehaviors<R>, R: StreamRequest + 'static> StreamSender<R> for M
         // dyn: der Stream der Pipeline und `Once` sind verschiedene Typen und brauchen einen gemeinsamen.
         let stream: LocalBoxStream<StreamResult<R>> =
             match self.provider.get::<StreamRequestHandlerWrapper<R>>() {
-                Some(handler) => Box::pin(StreamNext::new(handler, behaviors).run(request)),
+                Some(handler) => Box::pin(Deferred::new(move || {
+                    StreamNext::new(handler, behaviors).run(request)
+                })),
                 None => Box::pin(Once(Some(Err(R::Error::from(SendError::NoHandler))))),
             };
         stream

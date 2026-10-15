@@ -224,4 +224,4 @@ Quelle: MediatR `test/MediatR.Tests/StreamPipelineTests.cs`, `Pipeline/Streams/S
 - [ ] Ein Stream-Behavior für alle Stream-Request-Typen ist registriert, ein Request wird gesendet → `send` läuft nicht durch das Stream-Behavior
 - [ ] Ein Behavior nur für einen Request-Typ ist registriert, ein Stream wird gelesen → der Stream läuft nicht durch das Behavior
 - [ ] Ein Stream-Behavior nur für einen Stream-Request-Typ ist registriert, ein Request wird gesendet → `send` läuft nicht durch das Stream-Behavior
-- [ ] Stream angefordert, aber nie gelesen → kein Stream-Behavior läuft
+- [x] Stream angefordert, aber nie gelesen → kein Stream-Behavior läuft · `unread_stream_runs_no_stream_behavior`

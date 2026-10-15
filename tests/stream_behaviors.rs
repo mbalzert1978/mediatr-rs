@@ -140,3 +140,20 @@ async fn stream_behavior_adding_one_item_before_and_after_three_handler_items_yi
         ]
     );
 }
+
+#[tokio::test]
+async fn unread_stream_runs_no_stream_behavior() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .open_stream_behavior(concierge(&journal))
+        .register_stream(Handler::instance(FrontOffice {
+            guests: vec!["Anna".to_owned()],
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let arrivals = mediator.create_stream(ListArrivals { day: 4 });
+    drop(arrivals);
+
+    assert_eq!(journal.borrow().clone(), Vec::<String>::new());
+}
