@@ -5,7 +5,8 @@ use std::task::Poll;
 use futures_core::Stream;
 use futures_util::StreamExt;
 use mediatr_rs::{
-    SendError, StreamNext, StreamPipelineBehavior, StreamRequest, StreamRequestHandler,
+    Next, PipelineBehavior, Request, SendError, StreamNext, StreamPipelineBehavior, StreamRequest,
+    StreamRequestHandler,
 };
 
 /// Fragt die Gäste ab, die an diesem Tag anreisen.
@@ -203,5 +204,19 @@ impl StreamPipelineBehavior<ListArrivals> for ClosedDesk {
     ) -> impl Stream<Item = Result<String, SendError>> + use<> {
         drop(next.run(request));
         futures_util::stream::empty()
+    }
+}
+
+/// Die Türprotokollierung: Sie umschließt jeden Request und schreibt Öffnen und Schließen ins Protokoll.
+pub struct DoorLog {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl<R: Request> PipelineBehavior<R> for DoorLog {
+    async fn handle(&self, request: R, next: Next<R>) -> Result<R::Response, R::Error> {
+        self.journal.borrow_mut().push("Tür auf".to_owned());
+        let response = next.run(request).await;
+        self.journal.borrow_mut().push("Tür zu".to_owned());
+        response
     }
 }

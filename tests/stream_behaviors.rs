@@ -9,8 +9,8 @@ use mediatr_rs::{Handler, Mediator, StreamSender};
 mod stream_behaviors_fixtures;
 
 use stream_behaviors_fixtures::{
-    ClosedDesk, Concierge, DepartureBoard, FrontOffice, Greeter, ListArrivals, ListDepartures,
-    NightPorter, bellboy, concierge, concierge_and_night_porter_around,
+    ClosedDesk, Concierge, DepartureBoard, DoorLog, FrontOffice, Greeter, ListArrivals,
+    ListDepartures, NightPorter, bellboy, concierge, concierge_and_night_porter_around,
     concierge_bellboy_and_night_porter_around, night_porter,
 };
 
@@ -204,5 +204,29 @@ async fn same_stream_behavior_type_registered_twice_runs_once_per_stream() {
             "Anreisen für Tag 7 nachgeschlagen".to_owned(),
             "Concierge nachher".to_owned()
         ]
+    );
+}
+
+#[tokio::test]
+async fn behavior_for_all_request_types_does_not_wrap_stream() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .open_behavior(DoorLog {
+            journal: Rc::clone(&journal),
+        })
+        .register_stream(Handler::instance(FrontOffice {
+            guests: Vec::new(),
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let _arrivals: Vec<_> = mediator
+        .create_stream(ListArrivals { day: 8 })
+        .collect()
+        .await;
+
+    assert_eq!(
+        journal.borrow().clone(),
+        vec!["Anreisen für Tag 8 nachgeschlagen".to_owned()]
     );
 }
