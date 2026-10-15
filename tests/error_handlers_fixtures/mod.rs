@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use mediatr_rs::{
     Next, PipelineBehavior, Request, RequestErrorAction, RequestErrorHandler, RequestHandler,
-    SendError,
+    RequestPreProcessor, SendError,
 };
 
 /// Bucht das Hotelzimmer mit dieser Nummer und liefert die Buchungsnummer.
@@ -19,6 +19,7 @@ pub enum BookingError {
     WaitingListClosed,
     PaymentDeclined,
     AlarmFailed,
+    UnderRenovation,
     Undeliverable(SendError),
 }
 
@@ -173,5 +174,19 @@ impl RequestHandler<BookRoom> for OpenHotel {
             .borrow_mut()
             .push(format!("Zimmer {} gebucht", request.room));
         Ok(4711)
+    }
+}
+
+/// Prüft vor jeder Buchung, ob das Zimmer renoviert wird; das ist immer so, darum lehnt sie jede Buchung ab und schreibt das ins Protokoll.
+pub struct RenovationCheck {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl RequestPreProcessor<BookRoom> for RenovationCheck {
+    async fn process(&self, request: &BookRoom) -> Result<(), BookingError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Zimmer {} wird renoviert", request.room));
+        Err(BookingError::UnderRenovation)
     }
 }
