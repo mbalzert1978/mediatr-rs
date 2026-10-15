@@ -49,7 +49,7 @@ impl RequestHandler<VoidPing> for VoidPingHandler {
 
 pub struct Reject;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RejectError {
     Undeliverable(SendError),
     Rejected,

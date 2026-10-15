@@ -23,7 +23,7 @@ pub struct GetCustomer {
     pub id: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CustomerError {
     NotFound,
     Undeliverable(SendError),
@@ -66,7 +66,7 @@ pub struct Confirmation {
     pub total: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum OrderError {
     /// Der Kunde ließ sich nicht holen; der Grund bleibt erhalten.
     Customer(CustomerError),

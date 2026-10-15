@@ -12,7 +12,7 @@ pub struct BookRoom {
 }
 
 /// Warum eine Buchung scheitert.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum BookingError {
     FullyBooked,
     WaitingListClosed,

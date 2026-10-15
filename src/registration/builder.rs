@@ -357,7 +357,7 @@ impl<S, P, F> MediatorBuilder<S, P, F> {
 }
 
 /// Meldet `slot` an; der Provider behält nur die erste Meldung je Paar aus Request-Typ `R` und Behavior-Typ `B`.
-// Eigene Funktion, weil `closed` den Behavior-Typ nicht beim Namen kennt; `_behavior` liefert ihn.
+// Eigene Funktion, weil `closed` und `stream_behavior` den Behavior-Typ nicht beim Namen kennen; `_behavior` liefert ihn.
 fn unique_for<R: 'static, B: 'static>(slot: Slot, _behavior: &B) -> Registration<Slot> {
     Registration::instance(slot).unique_by::<(R, B)>()
 }

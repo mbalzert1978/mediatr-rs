@@ -14,7 +14,7 @@ pub struct LookupStock {
 }
 
 /// Warum eine Bestandsabfrage scheitert.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum StockError {
     Timeout,
     Undeliverable(SendError),

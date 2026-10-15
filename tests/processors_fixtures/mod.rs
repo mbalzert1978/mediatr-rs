@@ -14,7 +14,7 @@ pub struct QuotePrice {
 }
 
 /// Warum eine Preisanfrage scheitert.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum PriceError {
     Discontinued,
     AboveCeiling,

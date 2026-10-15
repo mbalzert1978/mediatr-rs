@@ -57,7 +57,7 @@ async fn handler_requests_stream_through_constructor_sender_and_gets_handler_ite
         }))
         .build();
 
-    let count = mediator.send(CountArrivals { day: 3 }).await;
+    let count = mediator.send(CountArrivals { day: 5 }).await;
 
     assert_eq!(count, Ok(3));
 }

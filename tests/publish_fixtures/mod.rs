@@ -64,7 +64,7 @@ pub struct OrderCancelled {
     pub order_id: u32,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CancellationError {
     Undeliverable(SendError),
     PaymentProviderDown,

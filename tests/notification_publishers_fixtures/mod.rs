@@ -227,7 +227,7 @@ pub struct ParcelInspected {
 }
 
 /// Warum ein Handler ein geprüftes Paket nicht annehmen kann.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InspectionError {
     Damaged(u32),
     Held(u32),
