@@ -18,6 +18,7 @@ pub enum BookingError {
     FullyBooked,
     WaitingListClosed,
     PaymentDeclined,
+    AlarmFailed,
     Undeliverable(SendError),
 }
 
@@ -144,5 +145,19 @@ impl PipelineBehavior<BookRoom> for PaymentGate {
             .borrow_mut()
             .push(format!("Zahlung für Zimmer {} abgelehnt", request.room));
         Err(BookingError::PaymentDeclined)
+    }
+}
+
+/// Eine kaputte Alarmanlage: Sie schreibt jede gescheiterte Buchung ins Protokoll und scheitert dann selbst.
+pub struct BrokenAlarm {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl RequestErrorAction<BookRoom> for BrokenAlarm {
+    async fn execute(&self, request: &BookRoom, _error: &BookingError) -> Result<(), BookingError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Alarm für Zimmer {} ausgefallen", request.room));
+        Err(BookingError::AlarmFailed)
     }
 }

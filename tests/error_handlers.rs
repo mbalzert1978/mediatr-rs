@@ -8,7 +8,7 @@ use mediatr_rs::{Handler, Mediator, Sender};
 mod error_handlers_fixtures;
 
 use error_handlers_fixtures::{
-    BookRoom, BookingAlert, BookingError, ClosedWaitingList, FullHotel, GuestNotice,
+    BookRoom, BookingAlert, BookingError, BrokenAlarm, ClosedWaitingList, FullHotel, GuestNotice,
     OverbookingCheck, PartnerHotel, PaymentGate, WaitingList,
 };
 
@@ -286,6 +286,32 @@ async fn failing_behavior_before_handler_runs_error_handler_and_error_action_and
                 "Zahlung für Zimmer 12 abgelehnt".to_owned(),
                 "Überbuchung für Zimmer 12 abgelehnt".to_owned(),
                 "Alarm: Buchung für Zimmer 12 gescheitert: PaymentDeclined".to_owned()
+            ]
+        )
+    );
+}
+
+#[tokio::test]
+async fn failing_error_action_makes_send_return_its_error_instead_of_handler_error() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .open_request_error_action(BrokenAlarm {
+            journal: Rc::clone(&journal),
+        })
+        .register(Handler::instance(FullHotel {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let booking = mediator.send(BookRoom { room: 12 }).await;
+
+    assert_eq!(
+        (booking, journal.borrow().clone()),
+        (
+            Err(BookingError::AlarmFailed),
+            vec![
+                "Zimmer 12 ausgebucht".to_owned(),
+                "Alarm für Zimmer 12 ausgefallen".to_owned()
             ]
         )
     );
