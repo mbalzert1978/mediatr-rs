@@ -1,7 +1,5 @@
 //! Tests für den Abschnitt „Pipeline — Fehler-Handler und Fehler-Aktionen“ in `TESTLIST.md`.
 
-use std::rc::Rc;
-
 use mediatr_rs::{Handler, Mediator, Sender};
 
 mod common;
@@ -19,17 +17,17 @@ async fn error_action_runs_on_handler_error_and_send_returns_handler_error() {
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_action(BookingAlert {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(FullHotel {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let booking = mediator.send(BookRoom { room: 12 }).await;
 
     assert_eq!(
-        (booking, journal.borrow().clone()),
+        (booking, journal.entries()),
         (
             Err(BookingError::FullyBooked),
             vec![
@@ -45,7 +43,7 @@ async fn error_action_runs_once_per_send_on_handler_error() {
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_action(BookingAlert {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(FullHotel {
             journal: Journal::default(),
@@ -56,7 +54,7 @@ async fn error_action_runs_once_per_send_on_handler_error() {
     let _second = mediator.send(BookRoom { room: 14 }).await;
 
     assert_eq!(
-        journal.borrow().clone(),
+        journal.entries(),
         vec![
             "Alarm: Buchung für Zimmer 12 gescheitert: FullyBooked".to_owned(),
             "Alarm: Buchung für Zimmer 14 gescheitert: FullyBooked".to_owned()
@@ -69,20 +67,20 @@ async fn two_error_actions_both_run_on_handler_error_and_send_returns_handler_er
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_action(BookingAlert {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .open_request_error_action(GuestNotice {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(FullHotel {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let booking = mediator.send(BookRoom { room: 12 }).await;
 
     assert_eq!(
-        (booking, journal.borrow().clone()),
+        (booking, journal.entries()),
         (
             Err(BookingError::FullyBooked),
             vec![
@@ -99,20 +97,20 @@ async fn first_error_handler_replacement_is_returned_and_second_error_handler_do
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_handler(WaitingList {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .open_request_error_handler(PartnerHotel {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(FullHotel {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let booking = mediator.send(BookRoom { room: 12 }).await;
 
     assert_eq!(
-        (booking, journal.borrow().clone()),
+        (booking, journal.entries()),
         (
             Ok(9000),
             vec![
@@ -128,17 +126,17 @@ async fn error_handler_without_replacement_lets_send_return_original_error() {
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_handler(OverbookingCheck {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(FullHotel {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let booking = mediator.send(BookRoom { room: 12 }).await;
 
     assert_eq!(
-        (booking, journal.borrow().clone()),
+        (booking, journal.entries()),
         (
             Err(BookingError::FullyBooked),
             vec![
@@ -154,17 +152,17 @@ async fn failing_error_handler_makes_send_return_its_error_instead_of_original()
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_handler(ClosedWaitingList {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(FullHotel {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let booking = mediator.send(BookRoom { room: 12 }).await;
 
     assert_eq!(
-        (booking, journal.borrow().clone()),
+        (booking, journal.entries()),
         (
             Err(BookingError::WaitingListClosed),
             vec![
@@ -180,7 +178,7 @@ async fn error_handler_without_replacement_runs_once_per_send_on_handler_error()
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_handler(OverbookingCheck {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(FullHotel {
             journal: Journal::default(),
@@ -191,7 +189,7 @@ async fn error_handler_without_replacement_runs_once_per_send_on_handler_error()
     let _second = mediator.send(BookRoom { room: 14 }).await;
 
     assert_eq!(
-        journal.borrow().clone(),
+        journal.entries(),
         vec![
             "Überbuchung für Zimmer 12 abgelehnt".to_owned(),
             "Überbuchung für Zimmer 14 abgelehnt".to_owned()
@@ -204,20 +202,20 @@ async fn error_handler_replacement_is_returned_and_error_action_does_not_run() {
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_action(BookingAlert {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .open_request_error_handler(WaitingList {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(FullHotel {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let booking = mediator.send(BookRoom { room: 12 }).await;
 
     assert_eq!(
-        (booking, journal.borrow().clone()),
+        (booking, journal.entries()),
         (
             Ok(9000),
             vec![
@@ -234,20 +232,20 @@ async fn error_handler_without_replacement_and_error_action_both_run_and_send_re
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_action(BookingAlert {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .open_request_error_handler(OverbookingCheck {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(FullHotel {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let booking = mediator.send(BookRoom { room: 12 }).await;
 
     assert_eq!(
-        (booking, journal.borrow().clone()),
+        (booking, journal.entries()),
         (
             Err(BookingError::FullyBooked),
             vec![
@@ -265,23 +263,23 @@ async fn failing_behavior_before_handler_runs_error_handler_and_error_action_and
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_behavior(PaymentGate {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .open_request_error_action(BookingAlert {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .open_request_error_handler(OverbookingCheck {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(FullHotel {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let booking = mediator.send(BookRoom { room: 12 }).await;
 
     assert_eq!(
-        (booking, journal.borrow().clone()),
+        (booking, journal.entries()),
         (
             Err(BookingError::PaymentDeclined),
             vec![
@@ -298,17 +296,17 @@ async fn failing_error_action_makes_send_return_its_error_instead_of_handler_err
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_action(BrokenAlarm {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(FullHotel {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let booking = mediator.send(BookRoom { room: 12 }).await;
 
     assert_eq!(
-        (booking, journal.borrow().clone()),
+        (booking, journal.entries()),
         (
             Err(BookingError::AlarmFailed),
             vec![
@@ -324,17 +322,17 @@ async fn successful_handler_skips_error_action_and_send_returns_its_response() {
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_action(BookingAlert {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(OpenHotel {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let booking = mediator.send(BookRoom { room: 12 }).await;
 
     assert_eq!(
-        (booking, journal.borrow().clone()),
+        (booking, journal.entries()),
         (Ok(4711), vec!["Zimmer 12 gebucht".to_owned()])
     );
 }
@@ -344,20 +342,20 @@ async fn failing_pre_processor_runs_error_action_and_send_returns_its_error() {
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_pre_processor(RenovationCheck {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .open_request_error_action(BookingAlert {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(OpenHotel {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let booking = mediator.send(BookRoom { room: 12 }).await;
 
     assert_eq!(
-        (booking, journal.borrow().clone()),
+        (booking, journal.entries()),
         (
             Err(BookingError::UnderRenovation),
             vec![
@@ -373,20 +371,20 @@ async fn failing_post_processor_runs_error_action_and_send_returns_its_error() {
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_post_processor(ConfirmationMail {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .open_request_error_action(BookingAlert {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(OpenHotel {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let booking = mediator.send(BookRoom { room: 12 }).await;
 
     assert_eq!(
-        (booking, journal.borrow().clone()),
+        (booking, journal.entries()),
         (
             Err(BookingError::ConfirmationFailed),
             vec![
@@ -403,20 +401,20 @@ async fn second_error_handler_gets_error_passed_on_by_first_instead_of_original(
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_handler(ClosedWaitingList {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .open_request_error_handler(FrontDesk {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(FullHotel {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let _booking = mediator.send(BookRoom { room: 12 }).await;
 
     assert_eq!(
-        journal.borrow().clone(),
+        journal.entries(),
         vec![
             "Zimmer 12 ausgebucht".to_owned(),
             "Warteliste für Zimmer 12 geschlossen".to_owned(),
@@ -430,17 +428,17 @@ async fn successful_handler_skips_error_handler_and_send_returns_its_response() 
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_handler(WaitingList {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(OpenHotel {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let booking = mediator.send(BookRoom { room: 12 }).await;
 
     assert_eq!(
-        (booking, journal.borrow().clone()),
+        (booking, journal.entries()),
         (Ok(4711), vec!["Zimmer 12 gebucht".to_owned()])
     );
 }
@@ -450,20 +448,20 @@ async fn same_error_action_type_registered_twice_runs_once_per_send() {
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_action(BookingAlert {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .open_request_error_action(BookingAlert {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(FullHotel {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let _booking = mediator.send(BookRoom { room: 12 }).await;
 
     assert_eq!(
-        journal.borrow().clone(),
+        journal.entries(),
         vec![
             "Zimmer 12 ausgebucht".to_owned(),
             "Alarm: Buchung für Zimmer 12 gescheitert: FullyBooked".to_owned()
@@ -476,20 +474,20 @@ async fn same_error_handler_type_registered_twice_runs_once_per_send() {
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_error_handler(OverbookingCheck {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .open_request_error_handler(OverbookingCheck {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(FullHotel {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let _booking = mediator.send(BookRoom { room: 12 }).await;
 
     assert_eq!(
-        journal.borrow().clone(),
+        journal.entries(),
         vec![
             "Zimmer 12 ausgebucht".to_owned(),
             "Überbuchung für Zimmer 12 abgelehnt".to_owned()
@@ -502,13 +500,13 @@ async fn error_action_for_one_request_type_runs_only_for_that_type() {
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .request_error_action::<BookRoom>(BookingAlert {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(FullHotel {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .register(Handler::instance(NoRefunds {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
@@ -516,7 +514,7 @@ async fn error_action_for_one_request_type_runs_only_for_that_type() {
     let cancellation = mediator.send(CancelBooking { booking: 4711 }).await;
 
     assert_eq!(
-        (cancellation, journal.borrow().clone()),
+        (cancellation, journal.entries()),
         (
             Err(BookingError::NotRefundable),
             vec![
@@ -533,13 +531,13 @@ async fn error_handler_for_one_request_type_runs_only_for_that_type() {
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .request_error_handler::<BookRoom>(OverbookingCheck {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(FullHotel {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .register(Handler::instance(NoRefunds {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
@@ -547,7 +545,7 @@ async fn error_handler_for_one_request_type_runs_only_for_that_type() {
     let cancellation = mediator.send(CancelBooking { booking: 4711 }).await;
 
     assert_eq!(
-        (cancellation, journal.borrow().clone()),
+        (cancellation, journal.entries()),
         (
             Err(BookingError::NotRefundable),
             vec![

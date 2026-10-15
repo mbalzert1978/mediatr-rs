@@ -1,7 +1,5 @@
 //! Tests für den Abschnitt „Stream-Request — Stream-Behaviors“ in `TESTLIST.md`.
 
-use std::rc::Rc;
-
 use futures_util::StreamExt;
 use mediatr_rs::{Handler, Mediator, Sender, StreamSender};
 
@@ -20,14 +18,14 @@ async fn two_open_stream_behaviors_wrap_handler_first_registered_outside_items_u
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_stream_behavior(Concierge {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .open_stream_behavior(NightPorter {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register_stream(Handler::instance(FrontOffice {
             guests: vec!["Anna".to_owned(), "Ben".to_owned()],
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
@@ -37,7 +35,7 @@ async fn two_open_stream_behaviors_wrap_handler_first_registered_outside_items_u
         .await;
 
     assert_eq!(
-        (arrivals, journal.borrow().clone()),
+        (arrivals, journal.entries()),
         (
             vec![
                 Ok("Anna am Tag 5".to_owned()),
@@ -53,14 +51,14 @@ async fn two_stream_behaviors_for_one_type_wrap_handler_in_registration_order_it
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .stream_behavior::<ListArrivals>(Concierge {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .stream_behavior::<ListArrivals>(NightPorter {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register_stream(Handler::instance(FrontOffice {
             guests: vec!["Clara".to_owned()],
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
@@ -70,7 +68,7 @@ async fn two_stream_behaviors_for_one_type_wrap_handler_in_registration_order_it
         .await;
 
     assert_eq!(
-        (arrivals, journal.borrow().clone()),
+        (arrivals, journal.entries()),
         (
             vec![Ok("Clara am Tag 2".to_owned())],
             concierge_and_night_porter_around("Anreisen für Tag 2 nachgeschlagen")
@@ -88,10 +86,10 @@ async fn stream_behavior_for_one_type_joins_general_ones_in_registration_order_o
         .open_stream_behavior(night_porter(&journal))
         .register_stream(Handler::instance(FrontOffice {
             guests: Vec::new(),
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .register_stream(Handler::instance(DepartureBoard {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
@@ -99,14 +97,16 @@ async fn stream_behavior_for_one_type_joins_general_ones_in_registration_order_o
         .create_stream(ListArrivals { day: 3 })
         .collect()
         .await;
-    let arrivals_journal = journal.take();
+    let arrivals_journal = journal.entries();
     let _departures: Vec<_> = mediator
         .create_stream(ListDepartures { day: 3 })
         .collect()
         .await;
 
+    let departures_journal = journal.entries().split_off(arrivals_journal.len());
+
     assert_eq!(
-        (arrivals_journal, journal.take()),
+        (arrivals_journal, departures_journal),
         (
             concierge_bellboy_and_night_porter_around("Anreisen für Tag 3 nachgeschlagen"),
             concierge_and_night_porter_around("Abreisen für Tag 3 nachgeschlagen")
@@ -149,14 +149,14 @@ async fn unread_stream_runs_no_stream_behavior() {
         .open_stream_behavior(concierge(&journal))
         .register_stream(Handler::instance(FrontOffice {
             guests: vec!["Anna".to_owned()],
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let arrivals = mediator.create_stream(ListArrivals { day: 4 });
     drop(arrivals);
 
-    assert_eq!(journal.borrow().clone(), Vec::<String>::new());
+    assert_eq!(journal.entries(), Vec::<String>::new());
 }
 
 #[tokio::test]
@@ -166,7 +166,7 @@ async fn stream_behavior_not_reading_next_stream_keeps_stream_handler_from_runni
         .stream_behavior::<ListArrivals>(ClosedDesk)
         .register_stream(Handler::instance(FrontOffice {
             guests: vec!["Anna".to_owned()],
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
@@ -176,7 +176,7 @@ async fn stream_behavior_not_reading_next_stream_keeps_stream_handler_from_runni
         .await;
 
     assert_eq!(
-        (arrivals, journal.borrow().clone()),
+        (arrivals, journal.entries()),
         (Vec::new(), Vec::<String>::new())
     );
 }
@@ -189,7 +189,7 @@ async fn same_stream_behavior_type_registered_twice_runs_once_per_stream() {
         .open_stream_behavior(concierge(&journal))
         .register_stream(Handler::instance(FrontOffice {
             guests: Vec::new(),
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
@@ -199,7 +199,7 @@ async fn same_stream_behavior_type_registered_twice_runs_once_per_stream() {
         .await;
 
     assert_eq!(
-        journal.borrow().clone(),
+        journal.entries(),
         vec![
             "Concierge vorher".to_owned(),
             "Anreisen für Tag 7 nachgeschlagen".to_owned(),
@@ -213,11 +213,11 @@ async fn behavior_for_all_request_types_does_not_wrap_stream() {
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_behavior(DoorLog {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register_stream(Handler::instance(FrontOffice {
             guests: Vec::new(),
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
@@ -227,7 +227,7 @@ async fn behavior_for_all_request_types_does_not_wrap_stream() {
         .await;
 
     assert_eq!(
-        journal.borrow().clone(),
+        journal.entries(),
         vec!["Anreisen für Tag 8 nachgeschlagen".to_owned()]
     );
 }
@@ -238,14 +238,14 @@ async fn stream_behavior_for_all_stream_request_types_does_not_wrap_send() {
     let mediator = Mediator::builder()
         .open_stream_behavior(concierge(&journal))
         .register(Handler::instance(CheckInDesk {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let check_in = mediator.send(CheckIn { room: 5 }).await;
 
     assert_eq!(
-        (check_in, journal.borrow().clone()),
+        (check_in, journal.entries()),
         (Ok(()), vec!["Check-in Zimmer 5".to_owned()])
     );
 }
@@ -255,11 +255,11 @@ async fn behavior_for_one_request_type_does_not_wrap_stream() {
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .behavior::<CheckIn>(DoorLog {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register_stream(Handler::instance(FrontOffice {
             guests: Vec::new(),
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
@@ -269,7 +269,7 @@ async fn behavior_for_one_request_type_does_not_wrap_stream() {
         .await;
 
     assert_eq!(
-        journal.borrow().clone(),
+        journal.entries(),
         vec!["Anreisen für Tag 9 nachgeschlagen".to_owned()]
     );
 }
@@ -280,14 +280,14 @@ async fn stream_behavior_for_one_stream_request_type_does_not_wrap_send() {
     let mediator = Mediator::builder()
         .stream_behavior::<ListArrivals>(concierge(&journal))
         .register(Handler::instance(CheckInDesk {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let check_in = mediator.send(CheckIn { room: 6 }).await;
 
     assert_eq!(
-        (check_in, journal.borrow().clone()),
+        (check_in, journal.entries()),
         (Ok(()), vec!["Check-in Zimmer 6".to_owned()])
     );
 }

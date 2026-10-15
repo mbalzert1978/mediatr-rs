@@ -1,4 +1,3 @@
-use std::rc::Rc;
 use std::task::Poll;
 
 use futures_core::Stream;
@@ -33,7 +32,6 @@ impl StreamRequestHandler<ListArrivals> for FrontOffice {
     ) -> impl Stream<Item = Result<String, SendError>> + use<> {
         let day = request.day;
         self.journal
-            .borrow_mut()
             .push(format!("Anreisen für Tag {day} nachgeschlagen"));
         futures_util::stream::iter(
             self.guests
@@ -50,10 +48,10 @@ fn journaled<F: FnOnce() -> S, S: Stream>(
     who: &'static str,
     inner: F,
 ) -> impl Stream<Item = S::Item> + use<F, S> {
-    journal.borrow_mut().push(format!("{who} vorher"));
-    let journal = Rc::clone(journal);
+    journal.push(format!("{who} vorher"));
+    let journal = journal.clone();
     inner().chain(futures_util::stream::poll_fn(move |_| {
-        journal.borrow_mut().push(format!("{who} nachher"));
+        journal.push(format!("{who} nachher"));
         Poll::Ready(None)
     }))
 }
@@ -122,7 +120,6 @@ impl StreamRequestHandler<ListDepartures> for DepartureBoard {
         request: ListDepartures,
     ) -> impl Stream<Item = Result<String, SendError>> + use<> {
         self.journal
-            .borrow_mut()
             .push(format!("Abreisen für Tag {} nachgeschlagen", request.day));
         futures_util::stream::empty()
     }
@@ -161,21 +158,21 @@ pub fn concierge_bellboy_and_night_porter_around(handled: &str) -> Vec<String> {
 /// Concierge, der in `journal` schreibt.
 pub fn concierge(journal: &Journal) -> Concierge {
     Concierge {
-        journal: Rc::clone(journal),
+        journal: journal.clone(),
     }
 }
 
 /// Page, der in `journal` schreibt.
 pub fn bellboy(journal: &Journal) -> Bellboy {
     Bellboy {
-        journal: Rc::clone(journal),
+        journal: journal.clone(),
     }
 }
 
 /// Nachtportier, der in `journal` schreibt.
 pub fn night_porter(journal: &Journal) -> NightPorter {
     NightPorter {
-        journal: Rc::clone(journal),
+        journal: journal.clone(),
     }
 }
 
@@ -215,9 +212,9 @@ pub struct DoorLog {
 
 impl<R: Request> PipelineBehavior<R> for DoorLog {
     async fn handle(&self, request: R, next: Next<R>) -> Result<R::Response, R::Error> {
-        self.journal.borrow_mut().push("Tür auf".to_owned());
+        self.journal.push("Tür auf");
         let response = next.run(request).await;
-        self.journal.borrow_mut().push("Tür zu".to_owned());
+        self.journal.push("Tür zu");
         response
     }
 }
@@ -240,7 +237,6 @@ pub struct CheckInDesk {
 impl RequestHandler<CheckIn> for CheckInDesk {
     async fn handle(&self, request: CheckIn) -> Result<(), SendError> {
         self.journal
-            .borrow_mut()
             .push(format!("Check-in Zimmer {}", request.room));
         Ok(())
     }

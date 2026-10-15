@@ -23,9 +23,7 @@ pub struct Stockroom {
 
 impl NotificationHandler<ParcelArrived> for Stockroom {
     async fn handle(&self, event: &ParcelArrived) -> Result<(), SendError> {
-        self.journal
-            .borrow_mut()
-            .push(format!("eingelagert {}", event.tracking));
+        self.journal.push(format!("eingelagert {}", event.tracking));
         Ok(())
     }
 }
@@ -38,7 +36,6 @@ pub struct Recipient {
 impl NotificationHandler<ParcelArrived> for Recipient {
     async fn handle(&self, event: &ParcelArrived) -> Result<(), SendError> {
         self.journal
-            .borrow_mut()
             .push(format!("Empfänger benachrichtigt {}", event.tracking));
         Ok(())
     }
@@ -91,7 +88,6 @@ pub struct CourierPlanner {
 impl NotificationHandler<DeliveryDue> for CourierPlanner {
     async fn handle(&self, event: &DeliveryDue) -> Result<(), SendError> {
         self.journal
-            .borrow_mut()
             .push(format!("Kurier geplant {}", event.tracking));
         Ok(())
     }
@@ -104,9 +100,7 @@ pub struct DoorNotice {
 
 impl NotificationHandler<DeliveryDue> for DoorNotice {
     async fn handle(&self, event: &DeliveryDue) -> Result<(), SendError> {
-        self.journal
-            .borrow_mut()
-            .push(format!("Tür-Hinweis {}", event.tracking));
+        self.journal.push(format!("Tür-Hinweis {}", event.tracking));
         Ok(())
     }
 }
@@ -159,7 +153,7 @@ impl NotificationHandler<ParcelArrived> for ArrivalClerk {
                 tracking: event.tracking,
             })
             .await?;
-        self.journal.borrow_mut().push(place);
+        self.journal.push(place);
         Ok(())
     }
 }
@@ -193,11 +187,9 @@ pub struct Unloading {
 impl NotificationHandler<ParcelArrived> for Unloading {
     async fn handle(&self, event: &ParcelArrived) -> Result<(), SendError> {
         self.journal
-            .borrow_mut()
             .push(format!("Entladen beginnt {}", event.tracking));
         tokio::task::yield_now().await;
         self.journal
-            .borrow_mut()
             .push(format!("Entladen fertig {}", event.tracking));
         Ok(())
     }
@@ -211,11 +203,9 @@ pub struct Scanning {
 impl NotificationHandler<ParcelArrived> for Scanning {
     async fn handle(&self, event: &ParcelArrived) -> Result<(), SendError> {
         self.journal
-            .borrow_mut()
             .push(format!("Scannen beginnt {}", event.tracking));
         tokio::task::yield_now().await;
         self.journal
-            .borrow_mut()
             .push(format!("Scannen fertig {}", event.tracking));
         Ok(())
     }
@@ -260,9 +250,7 @@ pub struct Weighing {
 
 impl NotificationHandler<ParcelInspected> for Weighing {
     async fn handle(&self, event: &ParcelInspected) -> Result<(), InspectionError> {
-        self.journal
-            .borrow_mut()
-            .push(format!("gewogen {}", event.tracking));
+        self.journal.push(format!("gewogen {}", event.tracking));
         Ok(())
     }
 }

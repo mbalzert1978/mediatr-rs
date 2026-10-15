@@ -1,7 +1,5 @@
 //! Tests für den Abschnitt „Stream-Request — Stream anfordern“ in `TESTLIST.md`.
 
-use std::rc::Rc;
-
 use futures_util::StreamExt;
 use mediatr_rs::{Handler, Mediator, SendError, Sender, StreamSender};
 
@@ -92,12 +90,12 @@ async fn unread_stream_does_not_run_stream_handler() {
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .register_stream(Handler::instance(FrontOffice {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let arrivals = mediator.create_stream(ListArrivals { day: 5 });
     drop(arrivals);
 
-    assert_eq!(journal.borrow().clone(), Vec::<String>::new());
+    assert_eq!(journal.entries(), Vec::<String>::new());
 }

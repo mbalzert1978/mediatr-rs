@@ -40,14 +40,14 @@ async fn two_behaviors_wrap_handler_first_registered_outermost() {
         .open_behavior(audit)
         .open_behavior(stopwatch)
         .register(Handler::instance(StockLedger {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let stock = mediator.send(LookupStock { sku: 4 }).await;
 
     assert_eq!(
-        (stock, journal.borrow().clone()),
+        (stock, journal.entries()),
         (Ok(12), audited_and_timed("Bestand gelesen für 4"))
     );
 }
@@ -60,14 +60,14 @@ async fn two_behaviors_wrap_unit_response_handler_first_registered_outermost() {
         .open_behavior(audit)
         .open_behavior(stopwatch)
         .register(Handler::instance(ReceiptBook {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let booked = mediator.send(BookReceipt { sku: 4 }).await;
 
     assert_eq!(
-        (booked, journal.borrow().clone()),
+        (booked, journal.entries()),
         (Ok(()), audited_and_timed("Eingang gebucht für 4"))
     );
 }
@@ -80,10 +80,10 @@ async fn two_behaviors_wrap_handlers_of_every_request_type_first_registered_oute
         .open_behavior(audit)
         .open_behavior(stopwatch)
         .register(Handler::instance(StockLedger {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .register(Handler::instance(ReceiptBook {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
@@ -91,7 +91,7 @@ async fn two_behaviors_wrap_handlers_of_every_request_type_first_registered_oute
     let booked = mediator.send(BookReceipt { sku: 9 }).await;
 
     assert_eq!(
-        (stock, booked, journal.borrow().clone()),
+        (stock, booked, journal.entries()),
         (
             Ok(12),
             Ok(()),
@@ -111,14 +111,14 @@ async fn behavior_between_two_open_behaviors_wraps_only_its_requests_in_registra
     let mediator = Mediator::builder()
         .open_behavior(audit)
         .behavior::<LookupStock>(ShelfLock {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .open_behavior(stopwatch)
         .register(Handler::instance(StockLedger {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .register(Handler::instance(ReceiptBook {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
@@ -126,7 +126,7 @@ async fn behavior_between_two_open_behaviors_wraps_only_its_requests_in_registra
     let booked = mediator.send(BookReceipt { sku: 9 }).await;
 
     assert_eq!(
-        (stock, booked, journal.borrow().clone()),
+        (stock, booked, journal.entries()),
         (
             Ok(12),
             Ok(()),
@@ -153,14 +153,14 @@ async fn two_behaviors_registered_three_times_alternately_run_once_in_first_regi
         .open_behavior(third_audit)
         .open_behavior(third_stopwatch)
         .register(Handler::instance(StockLedger {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let stock = mediator.send(LookupStock { sku: 4 }).await;
 
     assert_eq!(
-        (stock, journal.borrow().clone()),
+        (stock, journal.entries()),
         (Ok(12), audited_and_timed("Bestand gelesen für 4"))
     );
 }
@@ -170,20 +170,20 @@ async fn same_behavior_registered_twice_for_one_request_type_runs_once() {
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .behavior::<LookupStock>(ShelfLock {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .behavior::<LookupStock>(ShelfLock {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(StockLedger {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let stock = mediator.send(LookupStock { sku: 4 }).await;
 
     assert_eq!(
-        (stock, journal.borrow().clone()),
+        (stock, journal.entries()),
         (
             Ok(12),
             ["Regal gesperrt", "Bestand gelesen für 4", "Regal frei"]
@@ -198,20 +198,20 @@ async fn same_behavior_registered_for_all_and_for_one_request_type_runs_twice_fo
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_behavior(AuditTrail {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .behavior::<LookupStock>(AuditTrail {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(StockLedger {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let stock = mediator.send(LookupStock { sku: 4 }).await;
 
     assert_eq!(
-        (stock, journal.borrow().clone()),
+        (stock, journal.entries()),
         (
             Ok(12),
             [
@@ -232,20 +232,20 @@ async fn same_behavior_registered_for_one_request_type_then_for_all_runs_twice_f
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .behavior::<LookupStock>(AuditTrail {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .open_behavior(AuditTrail {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(StockLedger {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let stock = mediator.send(LookupStock { sku: 4 }).await;
 
     assert_eq!(
-        (stock, journal.borrow().clone()),
+        (stock, journal.entries()),
         (
             Ok(12),
             [
@@ -266,20 +266,20 @@ async fn same_behavior_registered_for_all_and_for_one_request_type_runs_once_for
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_behavior(AuditTrail {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .behavior::<LookupStock>(AuditTrail {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(ReceiptBook {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let booked = mediator.send(BookReceipt { sku: 9 }).await;
 
     assert_eq!(
-        (booked, journal.borrow().clone()),
+        (booked, journal.entries()),
         (
             Ok(()),
             ["Prüfung beginnt", "Eingang gebucht für 9", "Prüfung endet"]
@@ -294,20 +294,20 @@ async fn unit_response_behavior_then_open_behavior_wrap_handler_first_registered
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .behavior::<BookReceipt>(LoadingDock {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .open_behavior(AuditTrail {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(ReceiptBook {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let booked = mediator.send(BookReceipt { sku: 9 }).await;
 
     assert_eq!(
-        (booked, journal.borrow().clone()),
+        (booked, journal.entries()),
         (
             Ok(()),
             [
@@ -340,14 +340,14 @@ async fn twelve_behaviors_wrap_handler_first_registered_outermost() {
         .open_behavior(checkpoint::<10>(&journal))
         .open_behavior(checkpoint::<11>(&journal))
         .register(Handler::instance(StockLedger {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let stock = mediator.send(LookupStock { sku: 4 }).await;
 
     assert_eq!(
-        (stock, journal.borrow().clone()),
+        (stock, journal.entries()),
         (Ok(12), passed_checkpoints(12, "Bestand gelesen für 4"))
     );
 }
@@ -360,13 +360,13 @@ async fn behaviors_with_when_all_publisher_wrap_send_and_publish_starts_handlers
         .open_behavior(audit)
         .open_behavior(stopwatch)
         .register(Handler::instance(StockLedger {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .subscribe(Handler::instance(ShelfLabeling {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .subscribe(Handler::instance(ReorderCheck {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
@@ -374,7 +374,7 @@ async fn behaviors_with_when_all_publisher_wrap_send_and_publish_starts_handlers
     let counted = mediator.publish(StockCounted { sku: 4 }).await;
 
     assert_eq!(
-        (stock, counted, journal.borrow().clone()),
+        (stock, counted, journal.entries()),
         (
             Ok(12),
             Ok(()),
@@ -391,16 +391,16 @@ async fn behaviors_with_when_all_publisher_wrap_send_and_publish_starts_handlers
 async fn transient_handler_wrapped_by_behavior_is_built_once_per_send_and_wrapped_once() {
     let journal = Journal::default();
     let builds = Rc::new(Cell::new(0_u32));
-    let ledger_journal = Rc::clone(&journal);
+    let ledger_journal = journal.clone();
     let ledger_builds = Rc::clone(&builds);
     let mediator = Mediator::builder()
         .open_behavior(AuditTrail {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::transient(move |_sender| {
             ledger_builds.set(ledger_builds.get().saturating_add(1));
             StockLedger {
-                journal: Rc::clone(&ledger_journal),
+                journal: ledger_journal.clone(),
             }
         }))
         .build();
@@ -408,7 +408,7 @@ async fn transient_handler_wrapped_by_behavior_is_built_once_per_send_and_wrappe
     let stock = mediator.send(LookupStock { sku: 4 }).await;
 
     assert_eq!(
-        (stock, builds.get(), journal.borrow().clone()),
+        (stock, builds.get(), journal.entries()),
         (
             Ok(12),
             1,
@@ -425,13 +425,13 @@ async fn behavior_answering_without_next_returns_its_response_and_handler_does_n
     let mediator = Mediator::builder()
         .behavior::<LookupStock>(StockCache { cached: 7 })
         .register(Handler::instance(StockLedger {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let stock = mediator.send(LookupStock { sku: 4 }).await;
 
-    assert_eq!((stock, journal.borrow().len()), (Ok(7), 0));
+    assert_eq!((stock, journal.entries().len()), (Ok(7), 0));
 }
 
 #[tokio::test(start_paused = true)]
@@ -442,14 +442,14 @@ async fn behavior_deadline_shorter_than_handler_returns_err_and_handler_does_not
             limit: Duration::from_secs(5),
         })
         .register(Handler::instance(RemoteWarehouse {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let stock = mediator.send(LookupStock { sku: 4 }).await;
 
     assert_eq!(
-        (stock, journal.borrow().clone()),
+        (stock, journal.entries()),
         (
             Err(StockError::Timeout),
             vec!["Außenlager sucht 4".to_owned()]
@@ -466,14 +466,14 @@ async fn behavior_deadline_shorter_than_unit_response_handler_returns_err_and_ha
             limit: Duration::from_secs(5),
         })
         .register(Handler::instance(RemoteReceiving {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let booked = mediator.send(BookReceipt { sku: 9 }).await;
 
     assert_eq!(
-        (booked, journal.borrow().clone()),
+        (booked, journal.entries()),
         (
             Err(StockError::Timeout),
             vec!["Außenlager bucht 9".to_owned()]

@@ -43,7 +43,6 @@ pub struct FullHotel {
 impl RequestHandler<BookRoom> for FullHotel {
     async fn handle(&self, request: BookRoom) -> Result<u64, BookingError> {
         self.journal
-            .borrow_mut()
             .push(format!("Zimmer {} ausgebucht", request.room));
         Err(BookingError::FullyBooked)
     }
@@ -56,7 +55,7 @@ pub struct BookingAlert {
 
 impl RequestErrorAction<BookRoom> for BookingAlert {
     async fn execute(&self, request: &BookRoom, error: &BookingError) -> Result<(), BookingError> {
-        self.journal.borrow_mut().push(format!(
+        self.journal.push(format!(
             "Alarm: Buchung für Zimmer {} gescheitert: {error:?}",
             request.room
         ));
@@ -71,7 +70,7 @@ pub struct GuestNotice {
 
 impl RequestErrorAction<BookRoom> for GuestNotice {
     async fn execute(&self, request: &BookRoom, _error: &BookingError) -> Result<(), BookingError> {
-        self.journal.borrow_mut().push(format!(
+        self.journal.push(format!(
             "Gast informiert: Zimmer {} nicht verfügbar",
             request.room
         ));
@@ -87,7 +86,6 @@ pub struct WaitingList {
 impl RequestErrorHandler<BookRoom> for WaitingList {
     async fn handle(&self, request: &BookRoom, _error: BookingError) -> Result<u64, BookingError> {
         self.journal
-            .borrow_mut()
             .push(format!("Zimmer {} auf der Warteliste", request.room));
         Ok(9000)
     }
@@ -101,7 +99,6 @@ pub struct PartnerHotel {
 impl RequestErrorHandler<BookRoom> for PartnerHotel {
     async fn handle(&self, request: &BookRoom, _error: BookingError) -> Result<u64, BookingError> {
         self.journal
-            .borrow_mut()
             .push(format!("Zimmer {} im Partnerhotel gebucht", request.room));
         Ok(7000)
     }
@@ -115,7 +112,6 @@ pub struct OverbookingCheck {
 impl RequestErrorHandler<BookRoom> for OverbookingCheck {
     async fn handle(&self, request: &BookRoom, error: BookingError) -> Result<u64, BookingError> {
         self.journal
-            .borrow_mut()
             .push(format!("Überbuchung für Zimmer {} abgelehnt", request.room));
         Err(error)
     }
@@ -128,7 +124,7 @@ pub struct ClosedWaitingList {
 
 impl RequestErrorHandler<BookRoom> for ClosedWaitingList {
     async fn handle(&self, request: &BookRoom, _error: BookingError) -> Result<u64, BookingError> {
-        self.journal.borrow_mut().push(format!(
+        self.journal.push(format!(
             "Warteliste für Zimmer {} geschlossen",
             request.room
         ));
@@ -144,7 +140,6 @@ pub struct PaymentGate {
 impl PipelineBehavior<BookRoom> for PaymentGate {
     async fn handle(&self, request: BookRoom, _next: Next<BookRoom>) -> Result<u64, BookingError> {
         self.journal
-            .borrow_mut()
             .push(format!("Zahlung für Zimmer {} abgelehnt", request.room));
         Err(BookingError::PaymentDeclined)
     }
@@ -158,7 +153,6 @@ pub struct BrokenAlarm {
 impl RequestErrorAction<BookRoom> for BrokenAlarm {
     async fn execute(&self, request: &BookRoom, _error: &BookingError) -> Result<(), BookingError> {
         self.journal
-            .borrow_mut()
             .push(format!("Alarm für Zimmer {} ausgefallen", request.room));
         Err(BookingError::AlarmFailed)
     }
@@ -172,7 +166,6 @@ pub struct OpenHotel {
 impl RequestHandler<BookRoom> for OpenHotel {
     async fn handle(&self, request: BookRoom) -> Result<u64, BookingError> {
         self.journal
-            .borrow_mut()
             .push(format!("Zimmer {} gebucht", request.room));
         Ok(4711)
     }
@@ -186,7 +179,6 @@ pub struct RenovationCheck {
 impl RequestPreProcessor<BookRoom> for RenovationCheck {
     async fn process(&self, request: &BookRoom) -> Result<(), BookingError> {
         self.journal
-            .borrow_mut()
             .push(format!("Zimmer {} wird renoviert", request.room));
         Err(BookingError::UnderRenovation)
     }
@@ -200,7 +192,6 @@ pub struct ConfirmationMail {
 impl RequestPostProcessor<BookRoom> for ConfirmationMail {
     async fn process(&self, _request: &BookRoom, booking: &u64) -> Result<(), BookingError> {
         self.journal
-            .borrow_mut()
             .push(format!("Bestätigung für Buchung {booking} nicht versendet"));
         Err(BookingError::ConfirmationFailed)
     }
@@ -213,7 +204,7 @@ pub struct FrontDesk {
 
 impl RequestErrorHandler<BookRoom> for FrontDesk {
     async fn handle(&self, request: &BookRoom, error: BookingError) -> Result<u64, BookingError> {
-        self.journal.borrow_mut().push(format!(
+        self.journal.push(format!(
             "Rezeption meldet für Zimmer {}: {error:?}",
             request.room
         ));
@@ -239,7 +230,6 @@ pub struct NoRefunds {
 impl RequestHandler<CancelBooking> for NoRefunds {
     async fn handle(&self, request: CancelBooking) -> Result<(), BookingError> {
         self.journal
-            .borrow_mut()
             .push(format!("Storno für Buchung {} abgelehnt", request.booking));
         Err(BookingError::NotRefundable)
     }

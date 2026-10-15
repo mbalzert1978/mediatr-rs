@@ -24,10 +24,10 @@ async fn custom_publisher_runs_both_handlers_in_its_own_order() {
     let journal = Journal::default();
     let mediator = MediatorBuilder::<NewestFirst>::default()
         .subscribe(Handler::instance(Stockroom {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .subscribe(Handler::instance(Recipient {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
@@ -37,7 +37,7 @@ async fn custom_publisher_runs_both_handlers_in_its_own_order() {
         .unwrap();
 
     assert_eq!(
-        *journal.borrow(),
+        journal.entries(),
         ["Empfänger benachrichtigt 7", "eingelagert 7"]
     );
 }
@@ -48,10 +48,10 @@ async fn custom_publisher_transient_handler_publishes_through_received_mediator_
     let mediator = MediatorBuilder::<NewestFirst>::default()
         .subscribe(Handler::transient(|publisher| Dispatcher { publisher }))
         .subscribe(Handler::instance(CourierPlanner {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .subscribe(Handler::instance(DoorNotice {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
@@ -60,7 +60,7 @@ async fn custom_publisher_transient_handler_publishes_through_received_mediator_
         .await
         .unwrap();
 
-    assert_eq!(*journal.borrow(), ["Tür-Hinweis 7", "Kurier geplant 7"]);
+    assert_eq!(journal.entries(), ["Tür-Hinweis 7", "Kurier geplant 7"]);
 }
 
 #[tokio::test]
@@ -70,10 +70,10 @@ async fn custom_publisher_singleton_handler_publishes_through_received_weak_medi
     let mediator = MediatorBuilder::<NewestFirst>::default()
         .subscribe(Handler::singleton(|publisher| DispatchCenter { publisher }))
         .subscribe(Handler::instance(CourierPlanner {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .subscribe(Handler::instance(DoorNotice {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
@@ -82,7 +82,7 @@ async fn custom_publisher_singleton_handler_publishes_through_received_weak_medi
         .await
         .unwrap();
 
-    assert_eq!(*journal.borrow(), ["Tür-Hinweis 7", "Kurier geplant 7"]);
+    assert_eq!(journal.entries(), ["Tür-Hinweis 7", "Kurier geplant 7"]);
 }
 
 #[tokio::test]
@@ -95,10 +95,10 @@ async fn custom_publisher_without_clone_mediator_and_weak_mediator_clone_reaches
             },
         ))
         .subscribe(Handler::instance(CourierPlanner {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .subscribe(Handler::instance(DoorNotice {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
@@ -108,7 +108,7 @@ async fn custom_publisher_without_clone_mediator_and_weak_mediator_clone_reaches
         .await
         .unwrap();
 
-    assert_eq!(*journal.borrow(), ["Tür-Hinweis 7", "Kurier geplant 7"]);
+    assert_eq!(journal.entries(), ["Tür-Hinweis 7", "Kurier geplant 7"]);
 }
 
 #[tokio::test]
@@ -145,10 +145,10 @@ async fn custom_publisher_without_clone_builder_clone_builds_mediators_reaching_
     let journal = Journal::default();
     let builder = MediatorBuilder::<NewestFirst>::default()
         .subscribe(Handler::instance(CourierPlanner {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .subscribe(Handler::instance(DoorNotice {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }));
     let copy = builder.clone();
 
@@ -163,7 +163,7 @@ async fn custom_publisher_without_clone_builder_clone_builds_mediators_reaching_
         .unwrap();
 
     assert_eq!(
-        *journal.borrow(),
+        journal.entries(),
         [
             "Tür-Hinweis 7",
             "Kurier geplant 7",
@@ -187,19 +187,19 @@ async fn custom_publisher_send_returns_handler_response() {
 #[tokio::test]
 async fn custom_publisher_singleton_handler_sends_through_received_weak_mediator() {
     let journal = Journal::default();
-    let clerk_journal = Rc::clone(&journal);
+    let clerk_journal = journal.clone();
     let mediator = MediatorBuilder::<NewestFirst>::default()
         .register(Handler::instance(TrackingDesk))
         .subscribe(Handler::singleton(move |sender| ArrivalClerk {
             sender,
-            journal: Rc::clone(&clerk_journal),
+            journal: clerk_journal.clone(),
         }))
         .build();
 
     let published = mediator.publish(ParcelArrived { tracking: 7 }).await;
 
     assert_eq!(
-        (published, journal.borrow().clone()),
+        (published, journal.entries()),
         (Ok(()), vec!["Paket 7 liegt im Lager".to_owned()])
     );
 }
@@ -215,14 +215,14 @@ async fn custom_publisher_singleton_handler_publishes_through_weak_mediator_and_
             },
         ))
         .subscribe(Handler::instance(CourierPlanner {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let published = mediator.publish(ParcelArrived { tracking: 7 }).await;
 
     assert_eq!(
-        (published, journal.borrow().clone()),
+        (published, journal.entries()),
         (
             Ok(()),
             vec!["Kurier geplant 7".to_owned(), "Kurier geplant 8".to_owned()]
@@ -262,10 +262,10 @@ async fn when_all_publisher_starts_second_waiting_handler_before_first_finished(
     let journal = Journal::default();
     let mediator = MediatorBuilder::<WhenAllPublisher>::default()
         .subscribe(Handler::instance(Unloading {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .subscribe(Handler::instance(Scanning {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
@@ -274,8 +274,8 @@ async fn when_all_publisher_starts_second_waiting_handler_before_first_finished(
         .await
         .unwrap();
 
-    let journal = journal.borrow();
-    let position = |entry: &str| journal.iter().position(|logged| logged == entry);
+    let entries = journal.entries();
+    let position = |entry: &str| entries.iter().position(|logged| logged == entry);
     assert!(matches!(
         (position("Scannen beginnt 7"), position("Entladen fertig 7")),
         (Some(scanning), Some(unloaded)) if scanning < unloaded
@@ -288,14 +288,14 @@ async fn when_all_publisher_runs_second_handler_after_first_fails_and_returns_fi
     let mediator = MediatorBuilder::<WhenAllPublisher>::default()
         .subscribe(Handler::instance(DamageCheck))
         .subscribe(Handler::instance(Weighing {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let published = mediator.publish(ParcelInspected { tracking: 7 }).await;
 
     assert_eq!(
-        (published, journal.borrow().clone()),
+        (published, journal.entries()),
         (
             Err(InspectionError::Damaged(7)),
             vec!["gewogen 7".to_owned()]
@@ -308,19 +308,19 @@ async fn when_all_publisher_runs_each_of_three_handlers_once_and_returns_ok() {
     let journal = Journal::default();
     let mediator = MediatorBuilder::<WhenAllPublisher>::default()
         .subscribe(Handler::instance(Stockroom {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .subscribe(Handler::instance(Recipient {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .subscribe(Handler::instance(Scanning {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let published = mediator.publish(ParcelArrived { tracking: 7 }).await;
 
-    let mut entries = journal.borrow().clone();
+    let mut entries = journal.entries();
     entries.sort();
     assert_eq!(
         (published, entries),
@@ -353,7 +353,7 @@ async fn when_all_publisher_only_second_handler_fails_runs_first_and_returns_sec
     let journal = Journal::default();
     let mediator = MediatorBuilder::<WhenAllPublisher>::default()
         .subscribe(Handler::instance(Weighing {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .subscribe(Handler::instance(DamageCheck))
         .build();
@@ -361,7 +361,7 @@ async fn when_all_publisher_only_second_handler_fails_runs_first_and_returns_sec
     let published = mediator.publish(ParcelInspected { tracking: 7 }).await;
 
     assert_eq!(
-        (published, journal.borrow().clone()),
+        (published, journal.entries()),
         (
             Err(InspectionError::Damaged(7)),
             vec!["gewogen 7".to_owned()]
@@ -386,10 +386,10 @@ async fn when_all_publisher_equally_waiting_handlers_finish_in_registration_orde
     let journal = Journal::default();
     let mediator = MediatorBuilder::<WhenAllPublisher>::default()
         .subscribe(Handler::instance(Unloading {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .subscribe(Handler::instance(Scanning {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
@@ -399,7 +399,7 @@ async fn when_all_publisher_equally_waiting_handlers_finish_in_registration_orde
         .unwrap();
 
     let finished: Vec<_> = journal
-        .borrow()
+        .entries()
         .iter()
         .filter(|entry| entry.contains("fertig"))
         .cloned()

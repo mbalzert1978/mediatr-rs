@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use mediatr_rs::{
     Next, PipelineBehavior, Request, RequestHandler, RequestPostProcessor, RequestPreProcessor,
     SendError,
@@ -40,7 +38,6 @@ pub struct PriceList {
 impl RequestHandler<QuotePrice> for PriceList {
     async fn handle(&self, request: QuotePrice) -> Result<u32, PriceError> {
         self.journal
-            .borrow_mut()
             .push(format!("Preis berechnet für {}", request.sku));
         Ok(1999)
     }
@@ -54,7 +51,6 @@ pub struct InquiryLog {
 impl RequestPreProcessor<QuotePrice> for InquiryLog {
     async fn process(&self, request: &QuotePrice) -> Result<(), PriceError> {
         self.journal
-            .borrow_mut()
             .push(format!("Anfrage für {} eingegangen", request.sku));
         Ok(())
     }
@@ -68,7 +64,6 @@ pub struct QuoteArchive {
 impl RequestPostProcessor<QuotePrice> for QuoteArchive {
     async fn process(&self, request: &QuotePrice, response: &u32) -> Result<(), PriceError> {
         self.journal
-            .borrow_mut()
             .push(format!("Preis {response} für {} archiviert", request.sku));
         Ok(())
     }
@@ -82,13 +77,13 @@ pub struct PriceCheck<const N: usize> {
 /// Prüfschritt Nummer `N`, der in `journal` schreibt.
 pub fn price_check<const N: usize>(journal: &Journal) -> PriceCheck<N> {
     PriceCheck {
-        journal: Rc::clone(journal),
+        journal: journal.clone(),
     }
 }
 
 impl<const N: usize> RequestPreProcessor<QuotePrice> for PriceCheck<N> {
     async fn process(&self, _request: &QuotePrice) -> Result<(), PriceError> {
-        self.journal.borrow_mut().push(format!("Prüfung {N}"));
+        self.journal.push(format!("Prüfung {N}"));
         Ok(())
     }
 }
@@ -101,13 +96,13 @@ pub struct PriceExport<const N: usize> {
 /// Export Nummer `N`, der in `journal` schreibt.
 pub fn price_export<const N: usize>(journal: &Journal) -> PriceExport<N> {
     PriceExport {
-        journal: Rc::clone(journal),
+        journal: journal.clone(),
     }
 }
 
 impl<const N: usize> RequestPostProcessor<QuotePrice> for PriceExport<N> {
     async fn process(&self, _request: &QuotePrice, _response: &u32) -> Result<(), PriceError> {
-        self.journal.borrow_mut().push(format!("Export {N}"));
+        self.journal.push(format!("Export {N}"));
         Ok(())
     }
 }
@@ -138,7 +133,6 @@ pub struct ShippingTable {
 impl RequestHandler<QuoteShipping> for ShippingTable {
     async fn handle(&self, request: QuoteShipping) -> Result<u32, SendError> {
         self.journal
-            .borrow_mut()
             .push(format!("Versand berechnet für {}", request.sku));
         Ok(490)
     }
@@ -152,15 +146,13 @@ pub struct InboxStamp {
 /// Eingangsstempel, der in `journal` schreibt.
 pub fn inbox_stamp(journal: &Journal) -> InboxStamp {
     InboxStamp {
-        journal: Rc::clone(journal),
+        journal: journal.clone(),
     }
 }
 
 impl<R: Request> RequestPreProcessor<R> for InboxStamp {
     async fn process(&self, _request: &R) -> Result<(), R::Error> {
-        self.journal
-            .borrow_mut()
-            .push("Eingang gestempelt".to_owned());
+        self.journal.push("Eingang gestempelt");
         Ok(())
     }
 }
@@ -173,15 +165,13 @@ pub struct OutboxStamp {
 /// Ausgangsstempel, der in `journal` schreibt.
 pub fn outbox_stamp(journal: &Journal) -> OutboxStamp {
     OutboxStamp {
-        journal: Rc::clone(journal),
+        journal: journal.clone(),
     }
 }
 
 impl<R: Request> RequestPostProcessor<R> for OutboxStamp {
     async fn process(&self, _request: &R, _response: &R::Response) -> Result<(), R::Error> {
-        self.journal
-            .borrow_mut()
-            .push("Ausgang gestempelt".to_owned());
+        self.journal.push("Ausgang gestempelt");
         Ok(())
     }
 }
@@ -194,15 +184,15 @@ pub struct Timer {
 /// Zeitmessung, die in `journal` schreibt.
 pub fn timer(journal: &Journal) -> Timer {
     Timer {
-        journal: Rc::clone(journal),
+        journal: journal.clone(),
     }
 }
 
 impl<R: Request> PipelineBehavior<R> for Timer {
     async fn handle(&self, request: R, next: Next<R>) -> Result<R::Response, R::Error> {
-        self.journal.borrow_mut().push("Zeit startet".to_owned());
+        self.journal.push("Zeit startet");
         let response = next.run(request).await;
-        self.journal.borrow_mut().push("Zeit stoppt".to_owned());
+        self.journal.push("Zeit stoppt");
         response
     }
 }
@@ -215,17 +205,15 @@ pub struct PriceLock {
 /// Preissperre, die in `journal` schreibt.
 pub fn price_lock(journal: &Journal) -> PriceLock {
     PriceLock {
-        journal: Rc::clone(journal),
+        journal: journal.clone(),
     }
 }
 
 impl PipelineBehavior<QuotePrice> for PriceLock {
     async fn handle(&self, request: QuotePrice, next: Next<QuotePrice>) -> Result<u32, PriceError> {
-        self.journal.borrow_mut().push("Preis gesperrt".to_owned());
+        self.journal.push("Preis gesperrt");
         let price = next.run(request).await;
-        self.journal
-            .borrow_mut()
-            .push("Preis freigegeben".to_owned());
+        self.journal.push("Preis freigegeben");
         price
     }
 }
@@ -268,7 +256,6 @@ pub struct RetiredItems {
 impl RequestHandler<QuotePrice> for RetiredItems {
     async fn handle(&self, request: QuotePrice) -> Result<u32, PriceError> {
         self.journal
-            .borrow_mut()
             .push(format!("Artikel {} ausgelaufen", request.sku));
         Err(PriceError::Discontinued)
     }
@@ -286,7 +273,6 @@ impl RequestPreProcessor<QuotePrice> for RetiredFilter {
             return Ok(());
         }
         self.journal
-            .borrow_mut()
             .push(format!("Anfrage für {} abgelehnt", request.sku));
         Err(PriceError::Discontinued)
     }
@@ -304,7 +290,6 @@ impl RequestPostProcessor<QuotePrice> for PriceCeiling {
             return Ok(());
         }
         self.journal
-            .borrow_mut()
             .push(format!("Preis {response} über Obergrenze {}", self.max));
         Err(PriceError::AboveCeiling)
     }

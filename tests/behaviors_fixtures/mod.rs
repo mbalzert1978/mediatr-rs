@@ -72,7 +72,6 @@ pub struct StockLedger {
 impl RequestHandler<LookupStock> for StockLedger {
     async fn handle(&self, request: LookupStock) -> Result<u32, StockError> {
         self.journal
-            .borrow_mut()
             .push(format!("Bestand gelesen für {}", request.sku));
         Ok(12)
     }
@@ -85,9 +84,9 @@ pub struct AuditTrail {
 
 impl<R: Request> PipelineBehavior<R> for AuditTrail {
     async fn handle(&self, request: R, next: Next<R>) -> Result<R::Response, R::Error> {
-        self.journal.borrow_mut().push("Prüfung beginnt".to_owned());
+        self.journal.push("Prüfung beginnt");
         let response = next.run(request).await;
-        self.journal.borrow_mut().push("Prüfung endet".to_owned());
+        self.journal.push("Prüfung endet");
         response
     }
 }
@@ -99,9 +98,9 @@ pub struct Stopwatch {
 
 impl<R: Request> PipelineBehavior<R> for Stopwatch {
     async fn handle(&self, request: R, next: Next<R>) -> Result<R::Response, R::Error> {
-        self.journal.borrow_mut().push("Messung startet".to_owned());
+        self.journal.push("Messung startet");
         let response = next.run(request).await;
-        self.journal.borrow_mut().push("Messung stoppt".to_owned());
+        self.journal.push("Messung stoppt");
         response
     }
 }
@@ -110,10 +109,10 @@ impl<R: Request> PipelineBehavior<R> for Stopwatch {
 pub fn audit_and_stopwatch(journal: &Journal) -> (AuditTrail, Stopwatch) {
     (
         AuditTrail {
-            journal: Rc::clone(journal),
+            journal: journal.clone(),
         },
         Stopwatch {
-            journal: Rc::clone(journal),
+            journal: journal.clone(),
         },
     )
 }
@@ -149,7 +148,6 @@ pub struct ReceiptBook {
 impl RequestHandler<BookReceipt> for ReceiptBook {
     async fn handle(&self, request: BookReceipt) -> Result<(), StockError> {
         self.journal
-            .borrow_mut()
             .push(format!("Eingang gebucht für {}", request.sku));
         Ok(())
     }
@@ -166,9 +164,9 @@ impl PipelineBehavior<LookupStock> for ShelfLock {
         request: LookupStock,
         next: Next<LookupStock>,
     ) -> Result<u32, StockError> {
-        self.journal.borrow_mut().push("Regal gesperrt".to_owned());
+        self.journal.push("Regal gesperrt");
         let stock = next.run(request).await;
-        self.journal.borrow_mut().push("Regal frei".to_owned());
+        self.journal.push("Regal frei");
         stock
     }
 }
@@ -199,9 +197,9 @@ impl PipelineBehavior<BookReceipt> for LoadingDock {
         request: BookReceipt,
         next: Next<BookReceipt>,
     ) -> Result<(), StockError> {
-        self.journal.borrow_mut().push("Rampe belegt".to_owned());
+        self.journal.push("Rampe belegt");
         let booked = next.run(request).await;
-        self.journal.borrow_mut().push("Rampe frei".to_owned());
+        self.journal.push("Rampe frei");
         booked
     }
 }
@@ -214,7 +212,7 @@ pub struct Checkpoint<const N: usize> {
 /// Prüfstation Nummer `N`, die in `journal` schreibt.
 pub fn checkpoint<const N: usize>(journal: &Journal) -> Checkpoint<N> {
     Checkpoint {
-        journal: Rc::clone(journal),
+        journal: journal.clone(),
     }
 }
 
@@ -224,13 +222,9 @@ impl<const N: usize> PipelineBehavior<LookupStock> for Checkpoint<N> {
         request: LookupStock,
         next: Next<LookupStock>,
     ) -> Result<u32, StockError> {
-        self.journal
-            .borrow_mut()
-            .push(format!("Station {N} betreten"));
+        self.journal.push(format!("Station {N} betreten"));
         let stock = next.run(request).await;
-        self.journal
-            .borrow_mut()
-            .push(format!("Station {N} verlassen"));
+        self.journal.push(format!("Station {N} verlassen"));
         stock
     }
 }
@@ -258,13 +252,9 @@ pub struct ShelfLabeling {
 
 impl NotificationHandler<StockCounted> for ShelfLabeling {
     async fn handle(&self, event: &StockCounted) -> Result<(), SendError> {
-        self.journal
-            .borrow_mut()
-            .push(format!("Etikett beginnt {}", event.sku));
+        self.journal.push(format!("Etikett beginnt {}", event.sku));
         tokio::task::yield_now().await;
-        self.journal
-            .borrow_mut()
-            .push(format!("Etikett fertig {}", event.sku));
+        self.journal.push(format!("Etikett fertig {}", event.sku));
         Ok(())
     }
 }
@@ -277,11 +267,9 @@ pub struct ReorderCheck {
 impl NotificationHandler<StockCounted> for ReorderCheck {
     async fn handle(&self, event: &StockCounted) -> Result<(), SendError> {
         self.journal
-            .borrow_mut()
             .push(format!("Nachbestellung beginnt {}", event.sku));
         tokio::task::yield_now().await;
         self.journal
-            .borrow_mut()
             .push(format!("Nachbestellung fertig {}", event.sku));
         Ok(())
     }
@@ -320,11 +308,9 @@ pub struct RemoteWarehouse {
 impl RequestHandler<LookupStock> for RemoteWarehouse {
     async fn handle(&self, request: LookupStock) -> Result<u32, StockError> {
         self.journal
-            .borrow_mut()
             .push(format!("Außenlager sucht {}", request.sku));
         tokio::time::sleep(Duration::from_hours(1)).await;
         self.journal
-            .borrow_mut()
             .push(format!("Außenlager fand {}", request.sku));
         Ok(12)
     }
@@ -351,11 +337,9 @@ pub struct RemoteReceiving {
 impl RequestHandler<BookReceipt> for RemoteReceiving {
     async fn handle(&self, request: BookReceipt) -> Result<(), StockError> {
         self.journal
-            .borrow_mut()
             .push(format!("Außenlager bucht {}", request.sku));
         tokio::time::sleep(Duration::from_hours(1)).await;
         self.journal
-            .borrow_mut()
             .push(format!("Außenlager buchte {}", request.sku));
         Ok(())
     }

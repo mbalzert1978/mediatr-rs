@@ -39,7 +39,6 @@ pub struct Warehouse {
 impl NotificationHandler<OrderPlaced> for Warehouse {
     async fn handle(&self, event: &OrderPlaced) -> Result<(), SendError> {
         self.journal
-            .borrow_mut()
             .push(format!("Ware reserviert für {}", event.order_id));
         Ok(())
     }
@@ -53,7 +52,6 @@ pub struct Billing {
 impl NotificationHandler<OrderPlaced> for Billing {
     async fn handle(&self, event: &OrderPlaced) -> Result<(), SendError> {
         self.journal
-            .borrow_mut()
             .push(format!("Rechnung für {}", event.order_id));
         Ok(())
     }
@@ -148,11 +146,9 @@ pub struct Packing {
 impl NotificationHandler<OrderPlaced> for Packing {
     async fn handle(&self, event: &OrderPlaced) -> Result<(), SendError> {
         self.journal
-            .borrow_mut()
             .push(format!("Packen beginnt für {}", event.order_id));
         tokio::task::yield_now().await;
         self.journal
-            .borrow_mut()
             .push(format!("Paket fertig für {}", event.order_id));
         Ok(())
     }

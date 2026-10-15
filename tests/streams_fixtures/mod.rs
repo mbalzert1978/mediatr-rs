@@ -76,7 +76,6 @@ impl StreamRequestHandler<ListArrivals> for FrontOffice {
         request: ListArrivals,
     ) -> impl Stream<Item = Result<String, SendError>> + use<> {
         self.journal
-            .borrow_mut()
             .push(format!("Anreisen für Tag {} nachgeschlagen", request.day));
         futures_util::stream::empty()
     }

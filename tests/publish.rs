@@ -47,10 +47,10 @@ async fn publish_runs_both_handlers_in_registration_order() {
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .subscribe(Handler::instance(Warehouse {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .subscribe(Handler::instance(Billing {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
@@ -60,7 +60,7 @@ async fn publish_runs_both_handlers_in_registration_order() {
         .unwrap();
 
     assert_eq!(
-        *journal.borrow(),
+        journal.entries(),
         ["Ware reserviert für 42", "Rechnung für 42"]
     );
 }
@@ -132,10 +132,10 @@ async fn publish_starts_second_handler_after_first_handler_finished_waiting() {
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .subscribe(Handler::instance(Packing {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .subscribe(Handler::instance(Billing {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
@@ -145,7 +145,7 @@ async fn publish_starts_second_handler_after_first_handler_finished_waiting() {
         .unwrap();
 
     assert_eq!(
-        *journal.borrow(),
+        journal.entries(),
         [
             "Packen beginnt für 42",
             "Paket fertig für 42",
@@ -349,13 +349,13 @@ async fn publish_runs_handler_type_subscribed_transient_then_instance_once_with_
 #[tokio::test]
 async fn publish_runs_two_handler_types_subscribed_transient_in_registration_order() {
     let journal = Journal::default();
-    let (warehouse, billing) = (Rc::clone(&journal), Rc::clone(&journal));
+    let (warehouse, billing) = (journal.clone(), journal.clone());
     let mediator = Mediator::builder()
         .subscribe(Handler::transient(move |_publisher: Mediator| Warehouse {
-            journal: Rc::clone(&warehouse),
+            journal: warehouse.clone(),
         }))
         .subscribe(Handler::transient(move |_publisher: Mediator| Billing {
-            journal: Rc::clone(&billing),
+            journal: billing.clone(),
         }))
         .build();
 
@@ -365,7 +365,7 @@ async fn publish_runs_two_handler_types_subscribed_transient_in_registration_ord
         .unwrap();
 
     assert_eq!(
-        *journal.borrow(),
+        journal.entries(),
         ["Ware reserviert für 42", "Rechnung für 42"]
     );
 }

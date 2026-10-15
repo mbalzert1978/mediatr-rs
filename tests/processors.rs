@@ -1,7 +1,5 @@
 //! Tests für den Abschnitt „Pipeline — Vor- und Nachverarbeiter“ in `TESTLIST.md`.
 
-use std::rc::Rc;
-
 use mediatr_rs::{Handler, Mediator, Sender};
 
 mod common;
@@ -20,17 +18,17 @@ async fn pre_processor_runs_before_handler_with_request_and_send_returns_handler
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_pre_processor(InquiryLog {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(PriceList {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let price = mediator.send(QuotePrice { sku: 7 }).await;
 
     assert_eq!(
-        (price, journal.borrow().clone()),
+        (price, journal.entries()),
         (
             Ok(1999),
             vec![
@@ -47,17 +45,17 @@ async fn post_processor_runs_after_handler_with_request_and_response_and_send_re
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_post_processor(QuoteArchive {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(PriceList {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let price = mediator.send(QuotePrice { sku: 7 }).await;
 
     assert_eq!(
-        (price, journal.borrow().clone()),
+        (price, journal.entries()),
         (
             Ok(1999),
             vec![
@@ -81,14 +79,14 @@ async fn pre_and_post_processors_for_one_and_all_request_types_run_in_registrati
         .request_post_processor::<QuotePrice>(price_export::<3>(&journal))
         .open_request_post_processor(price_export::<4>(&journal))
         .register(Handler::instance(PriceList {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let price = mediator.send(QuotePrice { sku: 7 }).await;
 
     assert_eq!(
-        (price, journal.borrow().clone()),
+        (price, journal.entries()),
         (Ok(1999), checked_and_exported(4, "Preis berechnet für 7"))
     );
 }
@@ -104,19 +102,21 @@ async fn processors_run_outside_behaviors_and_other_request_only_through_general
         .open_request_pre_processor(inbox_stamp(&journal))
         .request_post_processor::<QuotePrice>(price_export::<1>(&journal))
         .register(Handler::instance(PriceList {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .register(Handler::instance(ShippingTable {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let _price = mediator.send(QuotePrice { sku: 7 }).await;
-    let price_journal = journal.take();
+    let price_journal = journal.entries();
     let _shipping = mediator.send(QuoteShipping { sku: 7 }).await;
 
+    let shipping_journal = journal.entries().split_off(price_journal.len());
+
     assert_eq!(
-        (price_journal, journal.take()),
+        (price_journal, shipping_journal),
         (
             price_through_all_stages(),
             shipping_through_general_stages()
@@ -129,17 +129,17 @@ async fn failing_handler_skips_post_processor_and_send_returns_handler_error() {
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_post_processor(QuoteArchive {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(RetiredItems {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let price = mediator.send(QuotePrice { sku: 7 }).await;
 
     assert_eq!(
-        (price, journal.borrow().clone()),
+        (price, journal.entries()),
         (
             Err(PriceError::Discontinued),
             vec!["Artikel 7 ausgelaufen".to_owned()]
@@ -152,20 +152,20 @@ async fn same_pre_processor_type_registered_twice_runs_once_per_send() {
     let journal = Journal::default();
     let mediator = Mediator::builder()
         .open_request_pre_processor(InquiryLog {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .open_request_pre_processor(InquiryLog {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(PriceList {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let _price = mediator.send(QuotePrice { sku: 7 }).await;
 
     assert_eq!(
-        journal.borrow().clone(),
+        journal.entries(),
         vec![
             "Anfrage für 7 eingegangen".to_owned(),
             "Preis berechnet für 7".to_owned()
@@ -179,17 +179,17 @@ async fn failing_pre_processor_skips_handler_and_send_returns_its_error() {
     let mediator = Mediator::builder()
         .open_request_pre_processor(RetiredFilter {
             retired: 7,
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(PriceList {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let price = mediator.send(QuotePrice { sku: 7 }).await;
 
     assert_eq!(
-        (price, journal.borrow().clone()),
+        (price, journal.entries()),
         (
             Err(PriceError::Discontinued),
             vec!["Anfrage für 7 abgelehnt".to_owned()]
@@ -203,17 +203,17 @@ async fn failing_post_processor_replaces_handler_response_with_its_error() {
     let mediator = Mediator::builder()
         .open_request_post_processor(PriceCeiling {
             max: 1000,
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         })
         .register(Handler::instance(PriceList {
-            journal: Rc::clone(&journal),
+            journal: journal.clone(),
         }))
         .build();
 
     let price = mediator.send(QuotePrice { sku: 7 }).await;
 
     assert_eq!(
-        (price, journal.borrow().clone()),
+        (price, journal.entries()),
         (
             Err(PriceError::AboveCeiling),
             vec![
