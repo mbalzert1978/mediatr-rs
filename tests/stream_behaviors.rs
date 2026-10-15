@@ -248,3 +248,27 @@ async fn stream_behavior_for_all_stream_request_types_does_not_wrap_send() {
         (Ok(()), vec!["Check-in Zimmer 5".to_owned()])
     );
 }
+
+#[tokio::test]
+async fn behavior_for_one_request_type_does_not_wrap_stream() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .behavior::<CheckIn>(DoorLog {
+            journal: Rc::clone(&journal),
+        })
+        .register_stream(Handler::instance(FrontOffice {
+            guests: Vec::new(),
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let _arrivals: Vec<_> = mediator
+        .create_stream(ListArrivals { day: 9 })
+        .collect()
+        .await;
+
+    assert_eq!(
+        journal.borrow().clone(),
+        vec!["Anreisen für Tag 9 nachgeschlagen".to_owned()]
+    );
+}

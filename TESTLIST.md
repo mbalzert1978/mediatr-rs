@@ -222,7 +222,7 @@ Quelle: MediatR `test/MediatR.Tests/StreamPipelineTests.cs`, `Pipeline/Streams/S
 - [x] Stream-Behavior nach dem ersten Handler registriert → kompiliert nicht · `stream_behavior_registered_after_first_handler_does_not_compile`
 - [x] Ein Behavior für alle Request-Typen ist registriert, ein Stream wird gelesen → der Stream läuft nicht durch das Behavior · `behavior_for_all_request_types_does_not_wrap_stream`
 - [x] Ein Stream-Behavior für alle Stream-Request-Typen ist registriert, ein Request wird gesendet → `send` läuft nicht durch das Stream-Behavior · `stream_behavior_for_all_stream_request_types_does_not_wrap_send`
-- [ ] Ein Behavior nur für einen Request-Typ ist registriert, ein Stream wird gelesen → der Stream läuft nicht durch das Behavior
+- [x] Ein Behavior nur für einen Request-Typ ist registriert, ein Stream wird gelesen → der Stream läuft nicht durch das Behavior · `behavior_for_one_request_type_does_not_wrap_stream`
 - [ ] Ein Stream-Behavior nur für einen Stream-Request-Typ ist registriert, ein Request wird gesendet → `send` läuft nicht durch das Stream-Behavior
 - [x] Stream angefordert, aber nie gelesen → kein Stream-Behavior läuft · `unread_stream_runs_no_stream_behavior`
 - [x] Ein Stream-Behavior ruft den nächsten Schritt auf, liest dessen Stream aber nicht → der Stream-Handler läuft nicht · `stream_behavior_not_reading_next_stream_keeps_stream_handler_from_running`
