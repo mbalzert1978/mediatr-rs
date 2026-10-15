@@ -98,3 +98,17 @@ impl RequestErrorHandler<BookRoom> for PartnerHotel {
         Ok(7000)
     }
 }
+
+/// Prüft bei jeder gescheiterten Buchung, ob sich überbuchen lässt; das geht nie, darum reicht sie den Fehler weiter.
+pub struct OverbookingCheck {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl RequestErrorHandler<BookRoom> for OverbookingCheck {
+    async fn handle(&self, request: &BookRoom, error: BookingError) -> Result<u64, BookingError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Überbuchung für Zimmer {} abgelehnt", request.room));
+        Err(error)
+    }
+}

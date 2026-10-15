@@ -8,7 +8,8 @@ use mediatr_rs::{Handler, Mediator, Sender};
 mod error_handlers_fixtures;
 
 use error_handlers_fixtures::{
-    BookRoom, BookingAlert, BookingError, FullHotel, GuestNotice, PartnerHotel, WaitingList,
+    BookRoom, BookingAlert, BookingError, FullHotel, GuestNotice, OverbookingCheck, PartnerHotel,
+    WaitingList,
 };
 
 #[tokio::test]
@@ -115,6 +116,32 @@ async fn first_error_handler_replacement_is_returned_and_second_error_handler_do
             vec![
                 "Zimmer 12 ausgebucht".to_owned(),
                 "Zimmer 12 auf der Warteliste".to_owned()
+            ]
+        )
+    );
+}
+
+#[tokio::test]
+async fn error_handler_without_replacement_lets_send_return_original_error() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .open_request_error_handler(OverbookingCheck {
+            journal: Rc::clone(&journal),
+        })
+        .register(Handler::instance(FullHotel {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let booking = mediator.send(BookRoom { room: 12 }).await;
+
+    assert_eq!(
+        (booking, journal.borrow().clone()),
+        (
+            Err(BookingError::FullyBooked),
+            vec![
+                "Zimmer 12 ausgebucht".to_owned(),
+                "Überbuchung für Zimmer 12 abgelehnt".to_owned()
             ]
         )
     );
