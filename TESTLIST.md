@@ -36,7 +36,7 @@ Quelle: MediatR `Mediator(IServiceProvider)` speichert keine Handler; es holt si
 Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSingleton`, `AddScoped`, `AddTransient`, `TryAddEnumerable` als `unique_by`); MediatR `test/MediatR.Tests/MicrosoftExtensionsDI/TypeResolutionTests.cs` (`ShouldNotThrowWithMissingEnumerables`). Der Container registriert und baut Dienste; vom Mediator weiß er nichts. `ValidateScopes` ist immer an.
 
 - [x] Dienst mit `instance` registriert → jede Abfrage beim Provider liefert dasselbe Objekt · `instance_returns_same_object_on_every_get`
-- [x] Dienst nicht registriert → die Abfrage beim Provider liefert `None` · `get_without_registration_returns_none`
+- [x] Dienst nicht registriert → die Abfrage beim Provider liefert `Err(GetError::NoService)` · `get_without_registration_returns_no_service`
 - [x] Zweimal `instance` für denselben Typ → die Abfrage liefert den zuletzt registrierten Dienst · `instance_twice_returns_last_registered_service`
 - [x] Dienst mit `transient` registriert → die Bauanleitung läuft bei jeder Abfrage beim Provider neu · `transient_runs_recipe_on_every_get`
 - [x] Dienst mit `singleton` registriert → die Bauanleitung läuft einmal, bei der ersten Abfrage beim Provider · `singleton_runs_recipe_once_on_first_get`
@@ -44,7 +44,7 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] Dienst mit `singleton` registriert → ein neuer Scope liefert dasselbe Objekt wie der Provider · `singleton_returns_same_object_in_new_scope`
 - [x] Bauanleitung fragt den Provider nach einem anderen registrierten Dienst → der gebaute Dienst enthält diesen Dienst · `recipe_gets_other_service_from_provider`
 - [x] Bauanleitung von `singleton` fragt nach einem `scoped`-Dienst, erste Abfrage kommt aus einem Scope → das Singleton enthält den `scoped`-Dienst des Providers, nicht den des Scopes · `singleton_built_from_scope_gets_scoped_service_of_provider`
-- [x] Bauanleitung fragt den Provider nach ihrem eigenen Typ → diese Abfrage liefert `None`, kein Panic und keine Endlosschleife · `recipe_asking_for_own_type_gets_none`
+- [x] Bauanleitung fragt den Provider nach ihrem eigenen Typ → diese Abfrage liefert keinen Dienst, kein Panic und keine Endlosschleife · `recipe_asking_for_own_type_gets_none`
 - [x] Zwei Bauanleitungen fragen einander ab (A braucht B, B braucht A) → die innere Abfrage nach A liefert keinen Dienst, kein Panic und keine Endlosschleife · `mutually_dependent_recipes_get_nothing_for_inner_query`
 - [x] Bauanleitung von `singleton` fragt nach ihrem eigenen Typ → diese Abfrage liefert keinen Dienst, kein Panic und keine Endlosschleife · `singleton_recipe_asking_for_own_type_gets_nothing`
 - [x] Bauanleitung von `scoped` fragt, abgefragt in einem Scope, nach ihrem eigenen Typ → diese Abfrage liefert keinen Dienst, kein Panic und keine Endlosschleife · `scoped_recipe_asking_for_own_type_in_scope_gets_nothing`

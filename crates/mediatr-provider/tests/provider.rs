@@ -4,7 +4,7 @@ use std::panic::{self, AssertUnwindSafe};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Barrier, Mutex, PoisonError};
 
-use mediatr_provider::{Provider, Registration};
+use mediatr_provider::{GetError, Provider, Registration};
 
 mod provider_fixtures;
 
@@ -28,12 +28,10 @@ fn instance_returns_same_object_on_every_get() {
 }
 
 #[test]
-fn get_without_registration_returns_none() {
+fn get_without_registration_returns_no_service() {
     let provider = Provider::builder().build();
 
-    let service = provider.get::<Config>();
-
-    assert!(service.is_none());
+    assert!(matches!(provider.get::<Config>(), Err(GetError::NoService)));
 }
 
 #[test]
@@ -403,8 +401,8 @@ fn scoped_recipe_asking_for_own_type_in_scope_gets_nothing() {
 fn recipe_asking_twice_for_own_type_gets_nothing_both_times() {
     let provider = Provider::builder()
         .register(Registration::transient(|provider| Folder {
-            parent: provider.get::<Folder>(),
-            template: provider.get::<Folder>(),
+            parent: provider.get::<Folder>().ok(),
+            template: provider.get::<Folder>().ok(),
         }))
         .build();
 
@@ -462,10 +460,10 @@ fn mutually_dependent_recipes_get_nothing_from_inner_all() {
 fn mutually_dependent_recipes_get_nothing_for_inner_query() {
     let provider = Provider::builder()
         .register(Registration::transient(|provider| Team {
-            lead: provider.get::<Employee>(),
+            lead: provider.get::<Employee>().ok(),
         }))
         .register(Registration::transient(|provider| Employee {
-            team: provider.get::<Team>(),
+            team: provider.get::<Team>().ok(),
         }))
         .build();
 
@@ -486,7 +484,7 @@ fn recipe_runs_again_after_caught_panic() {
 
     let connection = provider.get::<Connection>();
 
-    assert!(connection.is_some());
+    assert!(connection.is_ok());
 }
 
 #[test]
@@ -501,7 +499,7 @@ fn singleton_recipe_runs_again_after_caught_panic() {
 
     let connection = provider.get::<Connection>();
 
-    assert!(connection.is_some());
+    assert!(connection.is_ok());
 }
 
 #[test]
@@ -517,7 +515,7 @@ fn scoped_recipe_runs_again_after_caught_panic() {
 
     let connection = scope.get::<Connection>();
 
-    assert!(connection.is_some());
+    assert!(connection.is_ok());
 }
 
 #[test]
@@ -526,7 +524,7 @@ fn recipe_runs_again_after_caught_panic_in_dependency() {
     let provider = Provider::builder()
         .register(Registration::transient(recipe))
         .register(Registration::transient(|provider| Repository {
-            connection: provider.get::<Connection>(),
+            connection: provider.get::<Connection>().ok(),
         }))
         .build();
     let failed = panic::catch_unwind(AssertUnwindSafe(|| provider.get::<Repository>()));
@@ -611,7 +609,7 @@ fn unique_instance_twice_from_same_source_type_get_returns_first() {
         .get::<Document>()
         .map(|document| document.0.clone());
 
-    assert_eq!(title.as_deref(), Some("Rechnung 1"));
+    assert_eq!(title.as_deref(), Ok("Rechnung 1"));
 }
 
 #[test]
@@ -638,7 +636,7 @@ fn unique_instance_from_same_source_type_for_two_service_types_registers_both() 
 
     assert_eq!(
         (document.as_deref(), entry.as_deref()),
-        (Some("Rechnung 1"), Some("Rechnung 2"))
+        (Ok("Rechnung 1"), Ok("Rechnung 2"))
     );
 }
 
@@ -712,7 +710,7 @@ fn mapped_registration_get_returns_converted_service() {
         .get::<Document>()
         .map(|document| document.0.clone());
 
-    assert_eq!(title.as_deref(), Some("Rechnung 1"));
+    assert_eq!(title.as_deref(), Ok("Rechnung 1"));
 }
 
 #[test]
@@ -822,7 +820,7 @@ fn provider_moved_to_other_thread_returns_registered_service() {
         .join()
         .unwrap();
 
-    assert_eq!(name, Some("Ada"));
+    assert_eq!(name, Ok("Ada"));
 }
 
 #[test]
@@ -837,11 +835,11 @@ fn second_thread_gets_transient_service_while_first_thread_builds_it() {
         gate.wait_started();
         let second = scope.spawn(|| provider.get::<Config>()).join();
         gate.release();
-        first.join().unwrap();
+        first.join().unwrap().unwrap();
         second.unwrap()
     });
 
-    assert!(second.is_some());
+    assert!(second.is_ok());
 }
 
 #[test]

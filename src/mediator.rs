@@ -97,11 +97,13 @@ impl<S, P: Behaviors<R>, R: Request + 'static> Sender<R> for Mediator<S, P> {
         let handler = self
             .provider
             .get::<RequestHandlerWrapper<R>>()
-            .ok_or(SendError::NoHandler)?;
+            // Über den Mediator kommt nur `NoService` an.
+            .map_err(|_| SendError::NoHandler)?;
         let active = self.provider.get::<Vec<Slot>>().unwrap_or_default();
-        let behaviors = self.provider.get::<P>().map_or_else(Vec::new, |behaviors| {
-            Behaviors::<R>::wrap(&*behaviors, &active)
-        });
+        let behaviors = self.provider.get::<P>().map_or_else(
+            |_| Vec::new(),
+            |behaviors| Behaviors::<R>::wrap(&*behaviors, &active),
+        );
         Next::new(handler, behaviors).run(request).await
     }
 }
@@ -138,14 +140,16 @@ impl<S: NotificationPublisher, P, N: Notification + 'static> Publisher<N> for We
 impl<S, P: StreamBehaviors<R>, R: StreamRequest + 'static> StreamSender<R> for Mediator<S, P> {
     fn create_stream(&self, request: R) -> impl Stream<Item = StreamResult<R>> {
         let active = self.provider.get::<Vec<Slot>>().unwrap_or_default();
-        let behaviors = self.provider.get::<P>().map_or_else(Vec::new, |behaviors| {
-            StreamBehaviors::<R>::wrap(&*behaviors, &active)
-        });
+        let behaviors = self.provider.get::<P>().map_or_else(
+            |_| Vec::new(),
+            |behaviors| StreamBehaviors::<R>::wrap(&*behaviors, &active),
+        );
         // dyn: der Stream der Pipeline und `Once` sind verschiedene Typen und brauchen einen gemeinsamen.
         let stream: LocalBoxStream<StreamResult<R>> =
             match self.provider.get::<StreamRequestHandlerWrapper<R>>() {
-                Some(handler) => Box::pin(StreamNext::new(handler, behaviors).run(request)),
-                None => Box::pin(Once(Some(Err(R::Error::from(SendError::NoHandler))))),
+                Ok(handler) => Box::pin(StreamNext::new(handler, behaviors).run(request)),
+                // Über den Mediator kommt nur `NoService` an.
+                Err(_) => Box::pin(Once(Some(Err(R::Error::from(SendError::NoHandler))))),
             };
         stream
     }

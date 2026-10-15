@@ -57,7 +57,7 @@ pub struct Settings {
 /// Bauanleitung für `Settings`, die beim Provider nach übergeordneten `Settings` fragt.
 pub fn settings_recipe(provider: &Provider) -> Settings {
     Settings {
-        parent: provider.get::<Settings>(),
+        parent: provider.get::<Settings>().ok(),
     }
 }
 

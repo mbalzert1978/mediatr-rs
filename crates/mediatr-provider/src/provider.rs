@@ -8,6 +8,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
 use std::thread::{self, ThreadId};
 
+use crate::error::GetError;
 use registration::Recipe;
 
 pub use builder::ProviderBuilder;
@@ -57,20 +58,25 @@ impl Provider {
         ProviderBuilder::default()
     }
 
-    /// Liefert den zuletzt registrierten Dienst vom Typ `T`; `None`, wenn er fehlt oder seine Bauanleitung gerade läuft.
-    #[must_use]
-    pub fn get<T: 'static>(&self) -> Option<Arc<T>> {
+    /// Liefert den zuletzt registrierten Dienst vom Typ `T`; `Err(GetError::NoService)`, wenn er fehlt oder seine Bauanleitung gerade läuft.
+    ///
+    /// # Errors
+    ///
+    /// Liefert [`GetError::NoService`], wenn kein Dienst vom Typ `T` registriert ist
+    /// oder seine Bauanleitung gerade läuft.
+    pub fn get<T: 'static>(&self) -> Result<Arc<T>, GetError> {
         let id = TypeId::of::<T>();
         let (index, recipe) = self
             .shared
             .services
-            .get(&id)?
-            .iter()
-            .enumerate()
-            .next_back()?;
-        let recipe = recipe.downcast_ref::<Recipe<T>>()?;
-        let _building = Building::enter(&self.shared.building, id)?;
-        Some(recipe(self, (id, index)))
+            .get(&id)
+            .and_then(|recipes| recipes.iter().enumerate().next_back())
+            .ok_or(GetError::NoService)?;
+        let recipe = recipe
+            .downcast_ref::<Recipe<T>>()
+            .ok_or(GetError::NoService)?;
+        let _building = Building::enter(&self.shared.building, id).ok_or(GetError::NoService)?;
+        Ok(recipe(self, (id, index)))
     }
 
     /// Liefert alle Dienste vom Typ `T`, in der Reihenfolge ihrer Registrierung; keinen, wenn eine Bauanleitung von `T` gerade läuft.
