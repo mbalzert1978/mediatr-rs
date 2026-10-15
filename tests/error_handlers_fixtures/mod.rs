@@ -161,3 +161,17 @@ impl RequestErrorAction<BookRoom> for BrokenAlarm {
         Err(BookingError::AlarmFailed)
     }
 }
+
+/// Ein Hotel mit freien Zimmern: Es schreibt jede Buchung ins Protokoll und liefert die Buchungsnummer.
+pub struct OpenHotel {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl RequestHandler<BookRoom> for OpenHotel {
+    async fn handle(&self, request: BookRoom) -> Result<u64, BookingError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Zimmer {} gebucht", request.room));
+        Ok(4711)
+    }
+}
