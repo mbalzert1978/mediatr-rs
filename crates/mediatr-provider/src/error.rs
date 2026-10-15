@@ -13,6 +13,8 @@ pub enum GetError {
     Cycle,
     /// Ein `scoped`-Dienst wurde beim Provider selbst abgefragt statt in einem Scope, auch aus der Bauanleitung eines Singletons.
     ScopedFromRoot,
+    /// Eine laufende Bauanleitung hat einen Dienst abgefragt, der nicht registriert ist, und den Fehler weitergegeben.
+    NoDependency,
 }
 
 impl fmt::Display for GetError {
@@ -22,6 +24,9 @@ impl fmt::Display for GetError {
             Self::Cycle => f.write_str("die Bauanleitung dieses Typs läuft schon"),
             Self::ScopedFromRoot => {
                 f.write_str("scoped-Dienst beim Provider selbst abgefragt statt in einem Scope")
+            }
+            Self::NoDependency => {
+                f.write_str("die Bauanleitung hat einen nicht registrierten Dienst abgefragt")
             }
         }
     }

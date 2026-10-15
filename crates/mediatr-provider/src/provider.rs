@@ -64,7 +64,8 @@ impl Provider {
     ///
     /// Liefert [`GetError::NoService`], wenn kein Dienst vom Typ `T` registriert ist,
     /// [`GetError::Cycle`], wenn seine Bauanleitung auf diesem Thread gerade läuft,
-    /// und [`GetError::ScopedFromRoot`], wenn ein `scoped`-Dienst beim Provider selbst abgefragt wird.
+    /// [`GetError::ScopedFromRoot`], wenn ein `scoped`-Dienst beim Provider selbst abgefragt wird,
+    /// und [`GetError::NoDependency`], wenn seine Bauanleitung einen nicht registrierten Dienst abfragt und den Fehler weitergibt.
     pub fn get<T: 'static>(&self) -> Result<Arc<T>, GetError> {
         let id = TypeId::of::<T>();
         let (index, recipe) = self
@@ -77,7 +78,10 @@ impl Provider {
             .downcast_ref::<Recipe<T>>()
             .ok_or(GetError::NoService)?;
         let _building = Building::enter(&self.shared.building, id).ok_or(GetError::Cycle)?;
-        recipe(self, (id, index))
+        recipe(self, (id, index)).map_err(|error| match error {
+            GetError::NoService => GetError::NoDependency,
+            other => other,
+        })
     }
 
     /// Liefert alle Dienste vom Typ `T`, in der Reihenfolge ihrer Registrierung, eine leere Liste, wenn keiner registriert ist; sonst den [`GetError`], der sagt, warum nicht.

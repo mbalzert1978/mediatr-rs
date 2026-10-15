@@ -25,7 +25,7 @@ impl<H: Send + Sync + 'static, S: 'static, P: 'static> Handler<H, S, P> {
     #[must_use]
     pub fn transient(make: impl Fn(Mediator<S, P>) -> H + Send + Sync + 'static) -> Self {
         Self::new(Registration::transient(move |provider| {
-            make(Mediator::new(provider.clone()))
+            Ok(make(Mediator::new(provider.clone())))
         }))
     }
 

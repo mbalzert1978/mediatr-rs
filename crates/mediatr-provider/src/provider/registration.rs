@@ -33,9 +33,13 @@ impl<T: Send + Sync + 'static> Registration<T> {
     }
 
     /// Dienst aus `recipe`; jede Abfrage baut ihn damit neu.
+    ///
+    /// Liefert `recipe` einen Fehler, liefert die Abfrage ihn weiter; aus `Err(GetError::NoService)` wird dabei `Err(GetError::NoDependency)`.
     #[must_use]
-    pub fn transient(recipe: impl Fn(&Provider) -> T + Send + Sync + 'static) -> Self {
-        Self::new(move |provider, _| Ok(Arc::new(recipe(provider))))
+    pub fn transient(
+        recipe: impl Fn(&Provider) -> Result<T, GetError> + Send + Sync + 'static,
+    ) -> Self {
+        Self::new(move |provider, _| Ok(Arc::new(recipe(provider)?)))
     }
 
     /// Dienst aus `recipe`; die erste Abfrage baut ihn mit dem Provider statt mit dem Scope, jede weitere liefert dasselbe Objekt.

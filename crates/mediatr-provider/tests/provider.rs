@@ -78,7 +78,9 @@ fn all_without_registration_returns_empty_list() {
 fn transient_all_runs_recipe_on_every_call() {
     let (calls, recipe) = counting_recipe();
     let provider = Provider::builder()
-        .register(Registration::transient(recipe))
+        .register(Registration::transient(move |provider| {
+            Ok(recipe(provider))
+        }))
         .build();
 
     drop(provider.all::<Config>());
@@ -119,7 +121,9 @@ fn scoped_all_returns_same_object_as_get_within_scope() {
 fn transient_runs_recipe_on_every_get() {
     let (calls, recipe) = counting_recipe();
     let provider = Provider::builder()
-        .register(Registration::transient(recipe))
+        .register(Registration::transient(move |provider| {
+            Ok(recipe(provider))
+        }))
         .build();
 
     provider.get::<Config>().unwrap();
@@ -175,7 +179,10 @@ fn recipe_gets_other_service_from_provider() {
     let provider = Provider::builder()
         .register(Registration::instance(Name("Welt")))
         .register(Registration::transient(|provider| {
-            Greeting(format!("Hallo {}", provider.get::<Name>().unwrap().0))
+            Ok(Greeting(format!(
+                "Hallo {}",
+                provider.get::<Name>().unwrap().0
+            )))
         }))
         .build();
 
@@ -325,7 +332,9 @@ fn scoped_holding_weak_scope_is_released_with_scope() {
 #[test]
 fn recipe_asking_for_own_type_gets_cycle() {
     let provider = Provider::builder()
-        .register(Registration::transient(settings_recipe))
+        .register(Registration::transient(|provider| {
+            Ok(settings_recipe(provider))
+        }))
         .build();
 
     let settings = provider.get::<Settings>().unwrap();
@@ -336,9 +345,13 @@ fn recipe_asking_for_own_type_gets_cycle() {
 #[test]
 fn first_of_two_recipes_asking_for_own_type_through_all_gets_nothing() {
     let provider = Provider::builder()
-        .register(Registration::transient(settings_recipe))
-        .register(Registration::transient(|_| Settings {
-            parent: Err(GetError::NoService),
+        .register(Registration::transient(|provider| {
+            Ok(settings_recipe(provider))
+        }))
+        .register(Registration::transient(|_| {
+            Ok(Settings {
+                parent: Err(GetError::NoService),
+            })
         }))
         .build();
 
@@ -372,9 +385,11 @@ fn scoped_recipe_asking_for_own_type_in_scope_gets_nothing() {
 #[test]
 fn recipe_asking_twice_for_own_type_gets_nothing_both_times() {
     let provider = Provider::builder()
-        .register(Registration::transient(|provider| Folder {
-            parent: provider.get::<Folder>().ok(),
-            template: provider.get::<Folder>().ok(),
+        .register(Registration::transient(|provider| {
+            Ok(Folder {
+                parent: provider.get::<Folder>().ok(),
+                template: provider.get::<Folder>().ok(),
+            })
         }))
         .build();
 
@@ -386,8 +401,10 @@ fn recipe_asking_twice_for_own_type_gets_nothing_both_times() {
 #[test]
 fn recipe_asking_all_for_own_type_gets_cycle() {
     let provider = Provider::builder()
-        .register(Registration::transient(|provider| MenuItem {
-            siblings: provider.all::<MenuItem>(),
+        .register(Registration::transient(|provider| {
+            Ok(MenuItem {
+                siblings: provider.all::<MenuItem>(),
+            })
         }))
         .build();
 
@@ -401,8 +418,10 @@ fn recipe_asking_all_for_own_type_gets_cycle() {
 #[test]
 fn recipe_asking_all_for_own_type_through_get_gets_nothing() {
     let provider = Provider::builder()
-        .register(Registration::transient(|provider| MenuItem {
-            siblings: provider.all::<MenuItem>(),
+        .register(Registration::transient(|provider| {
+            Ok(MenuItem {
+                siblings: provider.all::<MenuItem>(),
+            })
         }))
         .build();
 
@@ -414,11 +433,15 @@ fn recipe_asking_all_for_own_type_through_get_gets_nothing() {
 #[test]
 fn mutually_dependent_recipes_get_nothing_from_inner_all() {
     let provider = Provider::builder()
-        .register(Registration::transient(|provider| Course {
-            students: provider.all::<Student>(),
+        .register(Registration::transient(|provider| {
+            Ok(Course {
+                students: provider.all::<Student>(),
+            })
         }))
-        .register(Registration::transient(|provider| Student {
-            courses: provider.all::<Course>(),
+        .register(Registration::transient(|provider| {
+            Ok(Student {
+                courses: provider.all::<Course>(),
+            })
         }))
         .build();
 
@@ -433,11 +456,15 @@ fn mutually_dependent_recipes_get_nothing_from_inner_all() {
 #[test]
 fn mutually_dependent_recipes_get_nothing_for_inner_query() {
     let provider = Provider::builder()
-        .register(Registration::transient(|provider| Team {
-            lead: provider.get::<Employee>().ok(),
+        .register(Registration::transient(|provider| {
+            Ok(Team {
+                lead: provider.get::<Employee>().ok(),
+            })
         }))
-        .register(Registration::transient(|provider| Employee {
-            team: provider.get::<Team>().ok(),
+        .register(Registration::transient(|provider| {
+            Ok(Employee {
+                team: provider.get::<Team>().ok(),
+            })
         }))
         .build();
 
@@ -450,7 +477,9 @@ fn mutually_dependent_recipes_get_nothing_for_inner_query() {
 fn recipe_runs_again_after_caught_panic() {
     let (server_up, recipe) = connection_recipe();
     let provider = Provider::builder()
-        .register(Registration::transient(recipe))
+        .register(Registration::transient(move |provider| {
+            Ok(recipe(provider))
+        }))
         .build();
     let failed = panic::catch_unwind(AssertUnwindSafe(|| provider.get::<Connection>()));
     assert!(failed.is_err());
@@ -496,9 +525,13 @@ fn scoped_recipe_runs_again_after_caught_panic() {
 fn recipe_runs_again_after_caught_panic_in_dependency() {
     let (server_up, recipe) = connection_recipe();
     let provider = Provider::builder()
-        .register(Registration::transient(recipe))
-        .register(Registration::transient(|provider| Repository {
-            connection: provider.get::<Connection>().ok(),
+        .register(Registration::transient(move |provider| {
+            Ok(recipe(provider))
+        }))
+        .register(Registration::transient(|provider| {
+            Ok(Repository {
+                connection: provider.get::<Connection>().ok(),
+            })
         }))
         .build();
     let failed = panic::catch_unwind(AssertUnwindSafe(|| provider.get::<Repository>()));
@@ -760,9 +793,9 @@ fn unique_transient_twice_from_same_source_type_all_builds_only_first() {
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner)
                 .push(heading);
-            Document::from(Invoice {
+            Ok(Document::from(Invoice {
                 heading: heading.to_owned(),
-            })
+            }))
         })
         .unique_by::<Invoice>()
     };
@@ -807,7 +840,9 @@ fn provider_moved_to_other_thread_returns_registered_service() {
 fn second_thread_gets_transient_service_while_first_thread_builds_it() {
     let (gate, recipe) = gated_recipe();
     let provider = Provider::builder()
-        .register(Registration::transient(recipe))
+        .register(Registration::transient(move |provider| {
+            Ok(recipe(provider))
+        }))
         .build();
 
     let second = std::thread::scope(|scope| {
@@ -894,8 +929,10 @@ fn singleton_recipe_asking_for_scoped_service_gets_scoped_from_root() {
 fn transient_recipe_in_scope_gets_scoped_service_of_scope() {
     let provider = Provider::builder()
         .register(Registration::scoped(|_| Session))
-        .register(Registration::transient(|provider| Report {
-            session: provider.get::<Session>(),
+        .register(Registration::transient(|provider| {
+            Ok(Report {
+                session: provider.get::<Session>(),
+            })
         }))
         .build();
     let scope = provider.scope();
@@ -915,4 +952,17 @@ fn scoped_all_from_provider_itself_gets_scoped_from_root() {
     let sessions = provider.all::<Session>();
 
     assert!(matches!(sessions, Err(GetError::ScopedFromRoot)));
+}
+
+#[test]
+fn recipe_asking_for_unregistered_service_gets_no_dependency() {
+    let provider = Provider::builder()
+        .register(Registration::transient(|provider| {
+            Ok(Greeting(format!("Hallo {}", provider.get::<Name>()?.0)))
+        }))
+        .build();
+
+    let greeting = provider.get::<Greeting>();
+
+    assert!(matches!(greeting, Err(GetError::NoDependency)));
 }
