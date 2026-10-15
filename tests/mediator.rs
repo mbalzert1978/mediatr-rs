@@ -1,9 +1,7 @@
 //! Tests für den Abschnitt „Mediator — Fassade und DI“ in `TESTLIST.md`.
 
-use std::cell::OnceCell;
-use std::rc::Rc;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::{Arc, mpsc};
 
 use mediatr_rs::{Handler, Mediator, RequestHandler, SendError, Sender, WeakMediator};
 
@@ -146,20 +144,19 @@ async fn singleton_handler_sending_after_mediator_dropped_gets_mediator_dropped(
         customer_id: 7,
         amount: 100,
     };
-    let handed_out = Rc::new(OnceCell::new());
-    let keep = Rc::clone(&handed_out);
+    let (keep, handed_out) = mpsc::channel();
     let mediator = Mediator::builder()
         .register(Handler::instance(CustomerDirectory {
             customers: vec![ada()],
         }))
         .register(Handler::singleton(move |sender: WeakMediator| {
-            keep.get_or_init(|| sender.clone());
+            keep.send(sender.clone()).unwrap();
             PlaceOrderHandler { sender }
         }))
         .build();
     mediator.send(order()).await.unwrap();
     let orders = PlaceOrderHandler {
-        sender: handed_out.get().unwrap().clone(),
+        sender: handed_out.try_recv().unwrap(),
     };
     drop(mediator);
 

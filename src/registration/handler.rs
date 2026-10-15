@@ -14,7 +14,7 @@ pub struct Handler<H, S = ForeachAwaitPublisher, P = ()> {
     types: PhantomData<(S, P)>,
 }
 
-impl<H: 'static, S: 'static, P: 'static> Handler<H, S, P> {
+impl<H: Send + Sync + 'static, S: 'static, P: 'static> Handler<H, S, P> {
     /// Handler `handler`; jede Nachricht erreicht dasselbe Objekt.
     #[must_use]
     pub fn instance(handler: H) -> Self {
@@ -23,7 +23,7 @@ impl<H: 'static, S: 'static, P: 'static> Handler<H, S, P> {
 
     /// Handler aus `make`; jede Nachricht baut ihn damit neu und gibt ihm den [`Mediator`] als [`Sender`](crate::Sender) und [`Publisher`](crate::Publisher).
     #[must_use]
-    pub fn transient(make: impl Fn(Mediator<S, P>) -> H + 'static) -> Self {
+    pub fn transient(make: impl Fn(Mediator<S, P>) -> H + Send + Sync + 'static) -> Self {
         Self::new(Registration::transient(move |provider| {
             make(Mediator::new(provider.clone()))
         }))
@@ -33,7 +33,7 @@ impl<H: 'static, S: 'static, P: 'static> Handler<H, S, P> {
     ///
     /// Der Handler bekommt einen [`WeakMediator`] als [`Sender`](crate::Sender) und [`Publisher`](crate::Publisher), damit er den Mediator nicht selbst am Leben hält.
     #[must_use]
-    pub fn singleton(make: impl Fn(WeakMediator<S, P>) -> H + 'static) -> Self {
+    pub fn singleton(make: impl Fn(WeakMediator<S, P>) -> H + Send + Sync + 'static) -> Self {
         Self::new(Registration::singleton(move |provider| {
             make(WeakMediator {
                 provider: provider.downgrade(),

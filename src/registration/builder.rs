@@ -2,7 +2,7 @@
 
 use std::fmt;
 use std::marker::PhantomData;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use mediatr_provider::{Provider, ProviderBuilder, Registration};
 
@@ -82,7 +82,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     /// [`Sender::send`](crate::Sender::send) verlangt, dass `behavior` [`PipelineBehavior`] für den Request-Typ ist.
     /// Ist ein Behavior vom Typ `B` schon registriert, läuft nur das erste, an seinem Platz.
     #[must_use]
-    pub fn open_behavior<B: 'static>(
+    pub fn open_behavior<B: Send + Sync + 'static>(
         self,
         behavior: B,
     ) -> MediatorBuilder<S, (P, OpenBehavior<B>)> {
@@ -93,7 +93,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     #[must_use]
     pub fn behavior<R: Request + 'static>(
         self,
-        behavior: impl PipelineBehavior<R> + 'static,
+        behavior: impl PipelineBehavior<R> + Send + Sync + 'static,
     ) -> MediatorBuilder<S, (P, Closed)> {
         self.closed::<R>(behavior, Stage::Around)
     }
@@ -102,7 +102,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     ///
     /// [`Sender::send`](crate::Sender::send) verlangt, dass `pre_processor` [`RequestPreProcessor`](crate::RequestPreProcessor) für den Request-Typ ist.
     #[must_use]
-    pub fn open_request_pre_processor<B: 'static>(
+    pub fn open_request_pre_processor<B: Send + Sync + 'static>(
         self,
         pre_processor: B,
     ) -> MediatorBuilder<S, (P, OpenBehavior<RequestPreProcessorBehavior<B>>)> {
@@ -114,7 +114,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     /// [`Sender::send`](crate::Sender::send) verlangt, dass `post_processor` [`RequestPostProcessor`](crate::RequestPostProcessor) für den Request-Typ ist
     /// und der Request [`Clone`] ist, denn der Handler verbraucht ihn.
     #[must_use]
-    pub fn open_request_post_processor<B: 'static>(
+    pub fn open_request_post_processor<B: Send + Sync + 'static>(
         self,
         post_processor: B,
     ) -> MediatorBuilder<S, (P, OpenBehavior<RequestPostProcessorBehavior<B>>)> {
@@ -125,7 +125,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     #[must_use]
     pub fn request_pre_processor<R: Request + 'static>(
         self,
-        pre_processor: impl RequestPreProcessor<R> + 'static,
+        pre_processor: impl RequestPreProcessor<R> + Send + Sync + 'static,
     ) -> MediatorBuilder<S, (P, Closed)> {
         self.closed::<R>(RequestPreProcessorBehavior(pre_processor), Stage::Before)
     }
@@ -134,7 +134,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     #[must_use]
     pub fn request_post_processor<R: Request + Clone + 'static>(
         self,
-        post_processor: impl RequestPostProcessor<R> + 'static,
+        post_processor: impl RequestPostProcessor<R> + Send + Sync + 'static,
     ) -> MediatorBuilder<S, (P, Closed)> {
         self.closed::<R>(RequestPostProcessorBehavior(post_processor), Stage::After)
     }
@@ -144,7 +144,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     /// [`Sender::send`](crate::Sender::send) verlangt, dass `error_action` [`RequestErrorAction`](crate::RequestErrorAction) für den Request-Typ ist
     /// und der Request [`Clone`] ist, denn der Handler verbraucht ihn.
     #[must_use]
-    pub fn open_request_error_action<B: 'static>(
+    pub fn open_request_error_action<B: Send + Sync + 'static>(
         self,
         error_action: B,
     ) -> MediatorBuilder<S, (P, OpenBehavior<RequestErrorActionProcessorBehavior<B>>)> {
@@ -158,7 +158,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     #[must_use]
     pub fn request_error_action<R: Request + Clone + 'static>(
         self,
-        error_action: impl RequestErrorAction<R> + 'static,
+        error_action: impl RequestErrorAction<R> + Send + Sync + 'static,
     ) -> MediatorBuilder<S, (P, Closed)> {
         self.closed::<R>(
             RequestErrorActionProcessorBehavior(error_action),
@@ -171,7 +171,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     /// [`Sender::send`](crate::Sender::send) verlangt, dass `error_handler` [`RequestErrorHandler`](crate::RequestErrorHandler) für den Request-Typ ist
     /// und der Request [`Clone`] ist, denn der Handler verbraucht ihn.
     #[must_use]
-    pub fn open_request_error_handler<B: 'static>(
+    pub fn open_request_error_handler<B: Send + Sync + 'static>(
         self,
         error_handler: B,
     ) -> MediatorBuilder<S, (P, OpenBehavior<RequestErrorProcessorBehavior<B>>)> {
@@ -185,7 +185,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     #[must_use]
     pub fn request_error_handler<R: Request + Clone + 'static>(
         self,
-        error_handler: impl RequestErrorHandler<R> + 'static,
+        error_handler: impl RequestErrorHandler<R> + Send + Sync + 'static,
     ) -> MediatorBuilder<S, (P, Closed)> {
         self.closed::<R>(
             RequestErrorProcessorBehavior(error_handler),
@@ -198,14 +198,14 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     /// [`StreamSender::create_stream`](crate::StreamSender::create_stream) verlangt, dass `behavior` [`StreamPipelineBehavior`](crate::StreamPipelineBehavior) für den Stream-Request-Typ ist.
     /// Ist ein Stream-Behavior vom Typ `B` schon registriert, läuft nur das erste, an seinem Platz.
     #[must_use]
-    pub fn open_stream_behavior<B: 'static>(
+    pub fn open_stream_behavior<B: Send + Sync + 'static>(
         self,
         behavior: B,
     ) -> MediatorBuilder<S, (P, OpenStreamBehavior<B>)> {
         self.with_behavior(|slot| {
             (
                 OpenStreamBehavior {
-                    behavior: Rc::new(behavior),
+                    behavior: Arc::new(behavior),
                     slot,
                 },
                 Registration::instance(slot).unique_by::<B>(),
@@ -217,11 +217,11 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     #[must_use]
     pub fn stream_behavior<R: StreamRequest + 'static>(
         self,
-        behavior: impl StreamPipelineBehavior<R> + 'static,
+        behavior: impl StreamPipelineBehavior<R> + Send + Sync + 'static,
     ) -> MediatorBuilder<S, (P, ClosedStream)> {
         self.with_behavior(|slot| {
             let unique = unique_for::<R, _>(slot, &behavior);
-            let wrapper: StreamBehaviorWrapper<R> = wrap_stream_behavior(Rc::new(behavior));
+            let wrapper: StreamBehaviorWrapper<R> = wrap_stream_behavior(Arc::new(behavior));
             (
                 ClosedStream {
                     provider: Provider::builder()
@@ -235,7 +235,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     }
 
     /// Builder, dessen Kette zusätzlich mit `behavior` für alle Request-Typen auf der Stufe `stage` endet.
-    fn open<B: 'static>(
+    fn open<B: Send + Sync + 'static>(
         self,
         behavior: B,
         stage: Stage,
@@ -243,7 +243,7 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
         self.with_behavior(|slot| {
             (
                 OpenBehavior {
-                    behavior: Rc::new(behavior),
+                    behavior: Arc::new(behavior),
                     slot,
                     stage,
                 },
@@ -255,12 +255,12 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
     /// Builder, dessen Kette zusätzlich mit `behavior` nur für Requests vom Typ `R` auf der Stufe `stage` endet.
     fn closed<R: Request + 'static>(
         self,
-        behavior: impl PipelineBehavior<R> + 'static,
+        behavior: impl PipelineBehavior<R> + Send + Sync + 'static,
         stage: Stage,
     ) -> MediatorBuilder<S, (P, Closed)> {
         self.with_behavior(|slot| {
             let unique = unique_for::<R, _>(slot, &behavior);
-            let wrapper: BehaviorWrapper<R> = wrap_behavior(Rc::new(behavior));
+            let wrapper: BehaviorWrapper<R> = wrap_behavior(Arc::new(behavior));
             (
                 Closed {
                     provider: Provider::builder()
@@ -296,7 +296,7 @@ impl<S, P, F> MediatorBuilder<S, P, F> {
     pub fn register<R, H>(self, handler: Handler<H, S, P>) -> MediatorBuilder<S, P, WithHandlers>
     where
         R: Request + 'static,
-        H: RequestHandler<R> + 'static,
+        H: RequestHandler<R> + Send + Sync + 'static,
     {
         self.with_registration(handler.registration.map(wrap_request_handler))
     }
@@ -309,7 +309,7 @@ impl<S, P, F> MediatorBuilder<S, P, F> {
     ) -> MediatorBuilder<S, P, WithHandlers>
     where
         R: StreamRequest + 'static,
-        H: StreamRequestHandler<R> + 'static,
+        H: StreamRequestHandler<R> + Send + Sync + 'static,
     {
         self.with_registration(handler.registration.map(wrap_stream_request_handler))
     }
@@ -319,7 +319,7 @@ impl<S, P, F> MediatorBuilder<S, P, F> {
     pub fn subscribe<N, H>(self, handler: Handler<H, S, P>) -> MediatorBuilder<S, P, WithHandlers>
     where
         N: Notification + 'static,
-        H: NotificationHandler<N> + 'static,
+        H: NotificationHandler<N> + Send + Sync + 'static,
     {
         self.with_registration(
             handler
@@ -333,7 +333,7 @@ impl<S, P, F> MediatorBuilder<S, P, F> {
     #[must_use]
     pub fn build(self) -> Mediator<S, P>
     where
-        P: 'static,
+        P: Send + Sync + 'static,
     {
         Mediator::new(
             self.provider
@@ -349,7 +349,7 @@ impl<S, P, F> MediatorBuilder<S, P, F> {
     }
 
     /// Builder, dessen Provider zusätzlich `registration` kennt.
-    fn with_registration<T: 'static>(
+    fn with_registration<T: Send + Sync + 'static>(
         self,
         registration: Registration<T>,
     ) -> MediatorBuilder<S, P, WithHandlers> {

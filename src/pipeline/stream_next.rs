@@ -1,7 +1,7 @@
 //! Der Rest der Stream-Pipeline hinter einem Stream-Behavior.
 
 use std::fmt;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use futures_core::Stream;
 
@@ -12,16 +12,16 @@ use crate::wrappers::{StreamBehaviorWrapper, StreamRequestHandlerWrapper};
 
 /// Der Rest der Stream-Pipeline hinter einem Stream-Behavior; [`StreamNext::run`] schickt einen Stream-Request hinein.
 pub struct StreamNext<R: StreamRequest> {
-    handler: Rc<StreamRequestHandlerWrapper<R>>,
+    handler: Arc<StreamRequestHandlerWrapper<R>>,
     /// Die noch ausstehenden Stream-Behaviors, das innerste zuerst; `run` nimmt das letzte, also äußerste.
-    behaviors: Vec<Rc<StreamBehaviorWrapper<R>>>,
+    behaviors: Vec<Arc<StreamBehaviorWrapper<R>>>,
 }
 
 impl<R: StreamRequest> StreamNext<R> {
     /// Stream-Pipeline aus `behaviors`, in der Reihenfolge ihrer Registrierung, und `handler`; das zuerst registrierte liegt außen.
     pub(crate) fn new(
-        handler: Rc<StreamRequestHandlerWrapper<R>>,
-        behaviors: Vec<Rc<StreamBehaviorWrapper<R>>>,
+        handler: Arc<StreamRequestHandlerWrapper<R>>,
+        behaviors: Vec<Arc<StreamBehaviorWrapper<R>>>,
     ) -> Self {
         Self {
             handler,
@@ -38,11 +38,11 @@ impl<R: StreamRequest> StreamNext<R> {
     }
 }
 
-// Von Hand statt `derive`: `derive(Clone)` verlangte `R: Clone`, obwohl nur die `Rc`-Felder geklont werden.
+// Von Hand statt `derive`: `derive(Clone)` verlangte `R: Clone`, obwohl nur die `Arc`-Felder geklont werden.
 impl<R: StreamRequest> Clone for StreamNext<R> {
     fn clone(&self) -> Self {
         Self {
-            handler: Rc::clone(&self.handler),
+            handler: Arc::clone(&self.handler),
             behaviors: self.behaviors.clone(),
         }
     }

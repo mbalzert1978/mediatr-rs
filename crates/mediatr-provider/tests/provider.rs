@@ -1,8 +1,6 @@
 //! Tests für den Abschnitt „Provider-Crate `mediatr-provider`“ in `TESTLIST.md`.
 
-use std::cell::RefCell;
 use std::panic::{self, AssertUnwindSafe};
-use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 
@@ -26,7 +24,7 @@ fn instance_returns_same_object_on_every_get() {
     let first = provider.get::<Config>().unwrap();
     let second = provider.get::<Config>().unwrap();
 
-    assert!(Rc::ptr_eq(&first, &second));
+    assert!(Arc::ptr_eq(&first, &second));
 }
 
 #[test]
@@ -95,7 +93,7 @@ fn singleton_all_returns_same_object_as_get() {
     let single = provider.get::<Config>().unwrap();
     let all = provider.all::<Config>();
 
-    assert!(matches!(all.as_slice(), [config] if Rc::ptr_eq(config, &single)));
+    assert!(matches!(all.as_slice(), [config] if Arc::ptr_eq(config, &single)));
 }
 
 #[test]
@@ -110,8 +108,8 @@ fn scoped_all_returns_same_object_as_get_within_scope() {
     let same_scope = first.all::<Config>();
     let other_scope = second.all::<Config>();
 
-    assert!(matches!(same_scope.as_slice(), [config] if Rc::ptr_eq(config, &single)));
-    assert!(matches!(other_scope.as_slice(), [config] if !Rc::ptr_eq(config, &single)));
+    assert!(matches!(same_scope.as_slice(), [config] if Arc::ptr_eq(config, &single)));
+    assert!(matches!(other_scope.as_slice(), [config] if !Arc::ptr_eq(config, &single)));
 }
 
 #[test]
@@ -166,7 +164,7 @@ fn singleton_returns_same_object_in_new_scope() {
     let first = provider.get::<Config>().unwrap();
     let second = provider.scope().get::<Config>().unwrap();
 
-    assert!(Rc::ptr_eq(&first, &second));
+    assert!(Arc::ptr_eq(&first, &second));
 }
 
 #[test]
@@ -238,7 +236,7 @@ fn upgraded_weak_provider_returns_same_singleton() {
 
     let upgraded = weak.upgrade().unwrap();
 
-    assert!(Rc::ptr_eq(
+    assert!(Arc::ptr_eq(
         &provider.get::<Config>().unwrap(),
         &upgraded.get::<Config>().unwrap()
     ));
@@ -299,7 +297,7 @@ fn upgraded_weak_scope_returns_same_scoped_service() {
 
     let upgraded = weak.upgrade().unwrap();
 
-    assert!(Rc::ptr_eq(
+    assert!(Arc::ptr_eq(
         &scope.get::<Config>().unwrap(),
         &upgraded.get::<Config>().unwrap()
     ));
@@ -706,7 +704,7 @@ fn mapped_registration_get_returns_converted_service() {
             Registration::instance(Invoice {
                 heading: "Rechnung 1".to_owned(),
             })
-            .map(|invoice: Rc<Invoice>| Document(invoice.heading.clone())),
+            .map(|invoice: Arc<Invoice>| Document(invoice.heading.clone())),
         )
         .build();
 
@@ -725,14 +723,14 @@ fn unique_then_mapped_registration_twice_all_returns_first() {
                 heading: "Rechnung 1".to_owned(),
             })
             .unique_by::<Invoice>()
-            .map(|invoice: Rc<Invoice>| Document(invoice.heading.clone())),
+            .map(|invoice: Arc<Invoice>| Document(invoice.heading.clone())),
         )
         .register(
             Registration::instance(Invoice {
                 heading: "Rechnung 2".to_owned(),
             })
             .unique_by::<Invoice>()
-            .map(|invoice: Rc<Invoice>| Document(invoice.heading.clone())),
+            .map(|invoice: Arc<Invoice>| Document(invoice.heading.clone())),
         )
         .build();
 
@@ -747,16 +745,18 @@ fn unique_then_mapped_registration_twice_all_returns_first() {
 
 #[test]
 fn mapped_singleton_passes_same_object_to_f_on_every_get() {
-    let seen = Rc::new(RefCell::new(Vec::new()));
+    let seen = Arc::new(Mutex::new(Vec::new()));
     let provider = Provider::builder()
         .register(
             Registration::singleton(|_| Invoice {
                 heading: "Rechnung 1".to_owned(),
             })
             .map({
-                let seen = Rc::clone(&seen);
-                move |invoice: Rc<Invoice>| {
-                    seen.borrow_mut().push(Rc::clone(&invoice));
+                let seen = Arc::clone(&seen);
+                move |invoice: Arc<Invoice>| {
+                    seen.lock()
+                        .unwrap_or_else(PoisonError::into_inner)
+                        .push(Arc::clone(&invoice));
                     Document(invoice.heading.clone())
                 }
             }),
@@ -767,8 +767,8 @@ fn mapped_singleton_passes_same_object_to_f_on_every_get() {
     provider.get::<Document>().unwrap();
 
     assert!(matches!(
-        seen.borrow().as_slice(),
-        [first, second] if Rc::ptr_eq(first, second)
+        seen.lock().unwrap_or_else(PoisonError::into_inner).as_slice(),
+        [first, second] if Arc::ptr_eq(first, second)
     ));
 }
 
@@ -810,4 +810,17 @@ fn registration_debug_names_service_type() {
     let output = format!("{registration:?}");
 
     assert!(output.contains("Invoice"), "{output}");
+}
+
+#[test]
+fn provider_moved_to_other_thread_returns_registered_service() {
+    let provider = Provider::builder()
+        .register(Registration::instance(Name("Ada")))
+        .build();
+
+    let name = std::thread::spawn(move || provider.get::<Name>().map(|name| name.0))
+        .join()
+        .unwrap();
+
+    assert_eq!(name, Some("Ada"));
 }

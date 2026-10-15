@@ -2,7 +2,7 @@
 
 use std::cmp::Reverse;
 use std::fmt;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::Request;
 use crate::pipeline::Stage;
@@ -11,16 +11,16 @@ use crate::wrappers::{BehaviorWrapper, RequestHandlerWrapper};
 
 /// Der Rest der Pipeline hinter einem Behavior; [`Next::run`] schickt einen Request hinein.
 pub struct Next<R: Request> {
-    handler: Rc<RequestHandlerWrapper<R>>,
+    handler: Arc<RequestHandlerWrapper<R>>,
     /// Die noch ausstehenden Behaviors, das innerste zuerst; `run` nimmt das letzte, also äußerste.
-    behaviors: Vec<(Stage, Rc<BehaviorWrapper<R>>)>,
+    behaviors: Vec<(Stage, Arc<BehaviorWrapper<R>>)>,
 }
 
 impl<R: Request> Next<R> {
     /// Pipeline aus `behaviors`, in der Reihenfolge ihrer Registrierung, und `handler`; jedes liegt, wo seine [`Stage`] sagt.
     pub(crate) fn new(
-        handler: Rc<RequestHandlerWrapper<R>>,
-        mut behaviors: Vec<(Stage, Rc<BehaviorWrapper<R>>)>,
+        handler: Arc<RequestHandlerWrapper<R>>,
+        mut behaviors: Vec<(Stage, Arc<BehaviorWrapper<R>>)>,
     ) -> Self {
         // Innerste Stufe zuerst; die Sortierung ist stabil, in jeder Stufe bleibt die Registrierungsreihenfolge.
         behaviors.sort_by_key(|(stage, _)| Reverse(*stage));
@@ -49,11 +49,11 @@ impl<R: Request> Next<R> {
     }
 }
 
-// Von Hand statt `derive`: `derive(Clone)` verlangte `R: Clone`, obwohl nur die `Rc`-Felder geklont werden.
+// Von Hand statt `derive`: `derive(Clone)` verlangte `R: Clone`, obwohl nur die `Arc`-Felder geklont werden.
 impl<R: Request> Clone for Next<R> {
     fn clone(&self) -> Self {
         Self {
-            handler: Rc::clone(&self.handler),
+            handler: Arc::clone(&self.handler),
             behaviors: self.behaviors.clone(),
         }
     }

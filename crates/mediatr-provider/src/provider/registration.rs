@@ -1,17 +1,21 @@
 //! Wie ein Dienst entsteht.
 
 use std::any::{Any, TypeId, type_name};
-use std::cell::OnceCell;
 use std::fmt;
-use std::rc::Rc;
+use std::sync::Arc;
+#[expect(
+    clippy::disallowed_types,
+    reason = "lokaler Wert einer Bauanleitung, kein globaler Zustand"
+)]
+use std::sync::OnceLock;
 
-use super::Slot;
+use super::{Slot, lock};
 use crate::Provider;
 
 /// Liefert bei jedem Aufruf einen Dienst vom Typ `T`: neu gebaut mit dem übergebenen Provider, einmal angelegt und in der Bauanleitung gemerkt (`instance`, `singleton`), oder im Scope des übergebenen Providers auf dem übergebenen Platz gemerkt (`scoped`).
 // dyn: `get` kennt nur `T`, nicht den Typ der Bauanleitung. Bauanleitungen verschiedener
 // Typen (aus `Registration::instance`, `transient`, `singleton`, `scoped`, `map`) liegen deshalb hinter einem gemeinsamen Typ je `T`.
-pub(super) type Recipe<T> = Box<dyn Fn(&Provider, Slot) -> Rc<T>>;
+pub(super) type Recipe<T> = Box<dyn Fn(&Provider, Slot) -> Arc<T> + Send + Sync>;
 
 /// Wie ein Dienst vom Typ `T` entsteht; [`ProviderBuilder::register`](crate::ProviderBuilder::register) nimmt ihn auf.
 pub struct Registration<T> {
@@ -20,32 +24,36 @@ pub struct Registration<T> {
     pub(super) key: Option<TypeId>,
 }
 
-impl<T: 'static> Registration<T> {
+impl<T: Send + Sync + 'static> Registration<T> {
     /// Dienst `service`; jede Abfrage liefert dasselbe Objekt.
     #[must_use]
     pub fn instance(service: T) -> Self {
-        let service = Rc::new(service);
-        Self::new(move |_, _| Rc::clone(&service))
+        let service = Arc::new(service);
+        Self::new(move |_, _| Arc::clone(&service))
     }
 
     /// Dienst aus `recipe`; jede Abfrage baut ihn damit neu.
     #[must_use]
-    pub fn transient(recipe: impl Fn(&Provider) -> T + 'static) -> Self {
-        Self::new(move |provider, _| Rc::new(recipe(provider)))
+    pub fn transient(recipe: impl Fn(&Provider) -> T + Send + Sync + 'static) -> Self {
+        Self::new(move |provider, _| Arc::new(recipe(provider)))
     }
 
     /// Dienst aus `recipe`; die erste Abfrage baut ihn mit dem Provider statt mit dem Scope, jede weitere liefert dasselbe Objekt.
     #[must_use]
-    pub fn singleton(recipe: impl Fn(&Provider) -> T + 'static) -> Self {
-        let service = OnceCell::new();
+    #[expect(
+        clippy::disallowed_types,
+        reason = "lokaler Wert einer Bauanleitung, kein globaler Zustand"
+    )]
+    pub fn singleton(recipe: impl Fn(&Provider) -> T + Send + Sync + 'static) -> Self {
+        let service = OnceLock::new();
         Self::new(move |provider, _| {
-            Rc::clone(service.get_or_init(|| Rc::new(recipe(&provider.root()))))
+            Arc::clone(service.get_or_init(|| Arc::new(recipe(&provider.root()))))
         })
     }
 
     /// Dienst aus `recipe`; die erste Abfrage in einem Scope baut ihn, jede weitere im selben Scope liefert dasselbe Objekt.
     #[must_use]
-    pub fn scoped(recipe: impl Fn(&Provider) -> T + 'static) -> Self {
+    pub fn scoped(recipe: impl Fn(&Provider) -> T + Send + Sync + 'static) -> Self {
         Self::new(move |provider, slot| scoped_service(provider, slot, &recipe))
     }
 
@@ -62,15 +70,18 @@ impl<T: 'static> Registration<T> {
     ///
     /// Ein Schlüsseltyp aus [`Registration::unique_by`] bleibt.
     #[must_use]
-    pub fn map<U: 'static>(self, f: impl Fn(Rc<T>) -> U + 'static) -> Registration<U> {
+    pub fn map<U: Send + Sync + 'static>(
+        self,
+        f: impl Fn(Arc<T>) -> U + Send + Sync + 'static,
+    ) -> Registration<U> {
         let Self { recipe, key } = self;
         Registration {
             key,
-            ..Registration::new(move |provider, slot| Rc::new(f(recipe(provider, slot))))
+            ..Registration::new(move |provider, slot| Arc::new(f(recipe(provider, slot))))
         }
     }
 
-    fn new(recipe: impl Fn(&Provider, Slot) -> Rc<T> + 'static) -> Self {
+    fn new(recipe: impl Fn(&Provider, Slot) -> Arc<T> + Send + Sync + 'static) -> Self {
         Self {
             recipe: Box::new(recipe),
             key: None,
@@ -88,22 +99,17 @@ impl<T> fmt::Debug for Registration<T> {
 }
 
 /// Liefert den Dienst auf Platz `slot` im Scope von `provider`; fehlt er dort, baut `recipe` ihn, und der Scope merkt ihn sich.
-fn scoped_service<T: 'static>(
+fn scoped_service<T: Send + Sync + 'static>(
     provider: &Provider,
     slot: Slot,
     recipe: impl Fn(&Provider) -> T,
-) -> Rc<T> {
-    let cached = provider
-        .built
-        .borrow()
+) -> Arc<T> {
+    let cached = lock(&provider.built)
         .get(&slot)
-        .and_then(|service| Rc::clone(service).downcast().ok());
+        .and_then(|service| Arc::clone(service).downcast().ok());
     cached.unwrap_or_else(|| {
-        let service = Rc::new(recipe(provider));
-        provider
-            .built
-            .borrow_mut()
-            .insert(slot, Rc::clone(&service) as Rc<dyn Any>);
+        let service = Arc::new(recipe(provider));
+        lock(&provider.built).insert(slot, Arc::clone(&service) as Arc<dyn Any + Send + Sync>);
         service
     })
 }

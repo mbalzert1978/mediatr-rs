@@ -1,4 +1,3 @@
-use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
@@ -15,7 +14,7 @@ pub struct Session(pub u32);
 
 /// Schreibt für die ganze Anwendung mit; hält die Sitzung, die es beim Bau bekam.
 pub struct AuditLog {
-    pub session: Rc<Session>,
+    pub session: Arc<Session>,
 }
 
 /// Meldet über den geteilten Schalter, ob der Dienst noch lebt, der ihn hält: Sein `Drop` setzt ihn auf `false`.
@@ -46,13 +45,13 @@ pub struct UnitOfWork {
 
 /// Ein Bericht, der seine Aufgaben über den Scheduler plant.
 pub struct Report {
-    pub _scheduler: Rc<Scheduler>,
+    pub _scheduler: Arc<Scheduler>,
     pub _alive: Alive,
 }
 
 /// Einstellungen, die sich beim Bau auf übergeordnete Einstellungen stützen, falls es welche gibt.
 pub struct Settings {
-    pub parent: Option<Rc<Settings>>,
+    pub parent: Option<Arc<Settings>>,
 }
 
 /// Bauanleitung für `Settings`, die beim Provider nach übergeordneten `Settings` fragt.
@@ -64,33 +63,33 @@ pub fn settings_recipe(provider: &Provider) -> Settings {
 
 /// Ein Ordner mit übergeordnetem Ordner und Vorlage, falls es sie gibt.
 pub struct Folder {
-    pub parent: Option<Rc<Folder>>,
-    pub template: Option<Rc<Folder>>,
+    pub parent: Option<Arc<Folder>>,
+    pub template: Option<Arc<Folder>>,
 }
 
 /// Ein Menüeintrag, der beim Bau alle Einträge seines Menüs sammelt.
 pub struct MenuItem {
-    pub siblings: Vec<Rc<MenuItem>>,
+    pub siblings: Vec<Arc<MenuItem>>,
 }
 
 /// Ein Kurs mit allen Studierenden, die beim Bau bekannt sind.
 pub struct Course {
-    pub students: Vec<Rc<Student>>,
+    pub students: Vec<Arc<Student>>,
 }
 
 /// Eine Studentin mit allen Kursen, die beim Bau bekannt sind.
 pub struct Student {
-    pub courses: Vec<Rc<Course>>,
+    pub courses: Vec<Arc<Course>>,
 }
 
 /// Ein Team mit seiner Leitung, falls es eine gibt.
 pub struct Team {
-    pub lead: Option<Rc<Employee>>,
+    pub lead: Option<Arc<Employee>>,
 }
 
 /// Eine Mitarbeiterin mit ihrem Team, falls es eins gibt.
 pub struct Employee {
-    pub team: Option<Rc<Team>>,
+    pub team: Option<Arc<Team>>,
 }
 
 /// Eine Verbindung zu einem Server, der nicht immer erreichbar ist.
@@ -98,7 +97,7 @@ pub struct Connection;
 
 /// Liest Daten über eine Verbindung, falls es eine gibt.
 pub struct Repository {
-    pub connection: Option<Rc<Connection>>,
+    pub connection: Option<Arc<Connection>>,
 }
 
 /// Liefert den Schalter für den Server (anfangs aus) und eine Bauanleitung für `Connection`, die mit einem Panic abbricht, solange er aus ist.

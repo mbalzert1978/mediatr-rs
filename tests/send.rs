@@ -1,9 +1,7 @@
 //! Tests für den Abschnitt „Request/Handler — `send`“ in `TESTLIST.md`.
 
-use std::cell::OnceCell;
-use std::rc::Rc;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, mpsc};
 
 use mediatr_rs::{Handler, Mediator, SendError, Sender, WeakMediator};
 
@@ -131,16 +129,15 @@ async fn send_error_propagates_as_boxed_error() {
 
 #[tokio::test]
 async fn mediator_dropped_error_propagates_as_boxed_error() {
-    let handed_out = Rc::new(OnceCell::new());
-    let keep = Rc::clone(&handed_out);
+    let (keep, handed_out) = mpsc::channel();
     let mediator = Mediator::builder()
         .register(Handler::singleton(move |sender: WeakMediator| {
-            keep.get_or_init(|| sender.clone());
+            keep.send(sender.clone()).unwrap();
             PingHandler
         }))
         .build();
     mediator.send(Ping("Ping".to_owned())).await.unwrap();
-    let sender = handed_out.get().unwrap().clone();
+    let sender = handed_out.try_recv().unwrap();
     drop(mediator);
 
     let result: Result<Pong, Box<dyn std::error::Error>> =

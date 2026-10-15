@@ -1,28 +1,28 @@
 //! Ein Behavior hinter einem Trait-Objekt.
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use super::LocalBoxFuture;
 use crate::request::HandlerResult;
 use crate::{Next, PipelineBehavior, Request};
 
-/// Ein Behavior für `R` als `Box<dyn Fn …>`: Die Closure hält das konkrete Behavior in einem `Rc`, nimmt einen `R` und den Rest der Pipeline und liefert später die Antwort oder den Fehler.
+/// Ein Behavior für `R` als `Box<dyn Fn …>`: Die Closure hält das konkrete Behavior in einem `Arc`, nimmt einen `R` und den Rest der Pipeline und liefert später die Antwort oder den Fehler.
 // dyn: wie bei `LocalBoxFuture`, je `R`.
 pub(crate) type BehaviorWrapper<R> =
-    Box<dyn Fn(R, Next<R>) -> LocalBoxFuture<'static, HandlerResult<R>>>;
+    Box<dyn Fn(R, Next<R>) -> LocalBoxFuture<'static, HandlerResult<R>> + Send + Sync>;
 
 /// Verpackt `behavior` als [`BehaviorWrapper`].
-pub(crate) fn wrap_behavior<R, B>(behavior: Rc<B>) -> BehaviorWrapper<R>
+pub(crate) fn wrap_behavior<R, B>(behavior: Arc<B>) -> BehaviorWrapper<R>
 where
     R: Request + 'static,
-    B: PipelineBehavior<R> + 'static,
+    B: PipelineBehavior<R> + Send + Sync + 'static,
 {
-    Box::new(move |request, next| Box::pin(wrap(Rc::clone(&behavior), request, next)))
+    Box::new(move |request, next| Box::pin(wrap(Arc::clone(&behavior), request, next)))
 }
 
-/// Ruft `behavior` auf; die Future hält einen eigenen `Rc` auf das Behavior, damit sie ohne Leihe auskommt.
+/// Ruft `behavior` auf; die Future hält einen eigenen `Arc` auf das Behavior, damit sie ohne Leihe auskommt.
 async fn wrap<R: Request, B: PipelineBehavior<R>>(
-    behavior: Rc<B>,
+    behavior: Arc<B>,
     request: R,
     next: Next<R>,
 ) -> HandlerResult<R> {

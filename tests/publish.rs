@@ -1,10 +1,8 @@
 //! Tests für den Abschnitt „Notification — `publish`“ in `TESTLIST.md`.
 
-use std::cell::OnceCell;
 use std::error::Error;
-use std::rc::Rc;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Arc, mpsc};
 
 use mediatr_rs::{Handler, Mediator, Publisher, RequestHandler, SendError, Sender, WeakMediator};
 
@@ -182,11 +180,10 @@ async fn handler_publishes_to_fake_publisher() {
 
 #[tokio::test]
 async fn singleton_handler_publishing_after_mediator_dropped_gets_mediator_dropped() {
-    let handed_out = Rc::new(OnceCell::new());
-    let keep = Rc::clone(&handed_out);
+    let (keep, handed_out) = mpsc::channel();
     let mediator = Mediator::builder()
         .register(Handler::singleton(move |publisher: WeakMediator| {
-            keep.get_or_init(|| publisher.clone());
+            keep.send(publisher.clone()).unwrap();
             CheckoutHandler { publisher }
         }))
         .subscribe(Handler::instance(ShippingDesk {
@@ -195,7 +192,7 @@ async fn singleton_handler_publishing_after_mediator_dropped_gets_mediator_dropp
         .build();
     mediator.send(Checkout { order_id: 41 }).await.unwrap();
     let checkout = CheckoutHandler {
-        publisher: handed_out.get().unwrap().clone(),
+        publisher: handed_out.try_recv().unwrap(),
     };
     drop(mediator);
 
