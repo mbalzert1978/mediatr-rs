@@ -379,7 +379,7 @@ fn first_of_two_recipes_asking_for_own_type_through_all_gets_none() {
 }
 
 #[test]
-fn singleton_recipe_asking_for_own_type_gets_none() {
+fn singleton_recipe_asking_for_own_type_gets_nothing() {
     let provider = Provider::builder()
         .register(Registration::singleton(settings_recipe))
         .build();
