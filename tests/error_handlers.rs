@@ -8,8 +8,9 @@ use mediatr_rs::{Handler, Mediator, Sender};
 mod error_handlers_fixtures;
 
 use error_handlers_fixtures::{
-    BookRoom, BookingAlert, BookingError, BrokenAlarm, ClosedWaitingList, FullHotel, GuestNotice,
-    OpenHotel, OverbookingCheck, PartnerHotel, PaymentGate, RenovationCheck, WaitingList,
+    BookRoom, BookingAlert, BookingError, BrokenAlarm, ClosedWaitingList, ConfirmationMail,
+    FullHotel, GuestNotice, OpenHotel, OverbookingCheck, PartnerHotel, PaymentGate,
+    RenovationCheck, WaitingList,
 };
 
 #[tokio::test]
@@ -361,6 +362,36 @@ async fn failing_pre_processor_runs_error_action_and_send_returns_its_error() {
             vec![
                 "Zimmer 12 wird renoviert".to_owned(),
                 "Alarm: Buchung für Zimmer 12 gescheitert: UnderRenovation".to_owned()
+            ]
+        )
+    );
+}
+
+#[tokio::test]
+async fn failing_post_processor_runs_error_action_and_send_returns_its_error() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .open_request_post_processor(ConfirmationMail {
+            journal: Rc::clone(&journal),
+        })
+        .open_request_error_action(BookingAlert {
+            journal: Rc::clone(&journal),
+        })
+        .register(Handler::instance(OpenHotel {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let booking = mediator.send(BookRoom { room: 12 }).await;
+
+    assert_eq!(
+        (booking, journal.borrow().clone()),
+        (
+            Err(BookingError::ConfirmationFailed),
+            vec![
+                "Zimmer 12 gebucht".to_owned(),
+                "Bestätigung für Buchung 4711 nicht versendet".to_owned(),
+                "Alarm: Buchung für Zimmer 12 gescheitert: ConfirmationFailed".to_owned()
             ]
         )
     );

@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use mediatr_rs::{
     Next, PipelineBehavior, Request, RequestErrorAction, RequestErrorHandler, RequestHandler,
-    RequestPreProcessor, SendError,
+    RequestPostProcessor, RequestPreProcessor, SendError,
 };
 
 /// Bucht das Hotelzimmer mit dieser Nummer und liefert die Buchungsnummer.
@@ -20,6 +20,7 @@ pub enum BookingError {
     PaymentDeclined,
     AlarmFailed,
     UnderRenovation,
+    ConfirmationFailed,
     Undeliverable(SendError),
 }
 
@@ -188,5 +189,19 @@ impl RequestPreProcessor<BookRoom> for RenovationCheck {
             .borrow_mut()
             .push(format!("Zimmer {} wird renoviert", request.room));
         Err(BookingError::UnderRenovation)
+    }
+}
+
+/// Schickt nach jeder Buchung eine Bestätigung; der Versand scheitert immer, das schreibt sie ins Protokoll.
+pub struct ConfirmationMail {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl RequestPostProcessor<BookRoom> for ConfirmationMail {
+    async fn process(&self, _request: &BookRoom, booking: &u64) -> Result<(), BookingError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Bestätigung für Buchung {booking} nicht versendet"));
+        Err(BookingError::ConfirmationFailed)
     }
 }
