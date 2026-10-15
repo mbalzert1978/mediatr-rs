@@ -33,7 +33,7 @@ Quelle: MediatR `Mediator(IServiceProvider)` speichert keine Handler; es holt si
 
 ## Provider-Crate `mediatr-provider`
 
-Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSingleton`, `AddScoped`, `AddTransient`, `TryAddEnumerable` als `unique_by`); MediatR `test/MediatR.Tests/MicrosoftExtensionsDI/TypeResolutionTests.cs` (`ShouldNotThrowWithMissingEnumerables`). Der Container registriert und baut Dienste; vom Mediator weiß er nichts.
+Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSingleton`, `AddScoped`, `AddTransient`, `TryAddEnumerable` als `unique_by`); MediatR `test/MediatR.Tests/MicrosoftExtensionsDI/TypeResolutionTests.cs` (`ShouldNotThrowWithMissingEnumerables`). Der Container registriert und baut Dienste; vom Mediator weiß er nichts. `ValidateScopes` ist immer an.
 
 - [x] Dienst mit `instance` registriert → jede Abfrage beim Provider liefert dasselbe Objekt · `instance_returns_same_object_on_every_get`
 - [x] Dienst nicht registriert → die Abfrage beim Provider liefert `None` · `get_without_registration_returns_none`
@@ -83,6 +83,16 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] `Registration::singleton` mit `map` umgewandelt, zweimal `get` → `f` bekommt beide Male dasselbe Objekt · `mapped_singleton_passes_same_object_to_f_on_every_get`
 - [x] Zweimal `register` mit `Registration::transient` für denselben Typ, beide mit `unique_by` und demselben Schlüsseltyp → `all` baut nur den zuerst registrierten Dienst · `unique_transient_twice_from_same_source_type_all_builds_only_first`
 - [x] `Registration` mit `{:?}` formatiert → die Ausgabe nennt den Diensttyp · `registration_debug_names_service_type`
+- [ ] Provider in einen anderen Thread verschoben → `get` liefert dort den registrierten Dienst
+- [ ] Bauanleitung eines `transient`-Diensts läuft auf einem Thread, ein zweiter Thread fragt währenddessen denselben Typ ab → der zweite bekommt den Dienst
+- [ ] (T11) Zwei Threads fragen gleichzeitig ein `singleton` ab → die Bauanleitung läuft einmal, beide bekommen dasselbe Objekt
+- [ ] (T11) Zwei Threads fragen im selben Scope gleichzeitig denselben `scoped`-Dienst ab → beide bekommen dasselbe Objekt
+- [ ] Dienst mit `scoped` registriert, Abfrage beim Provider selbst statt in einem Scope → die Abfrage liefert `Err(GetError::ScopedFromRoot)`
+- [ ] (T11) Bauanleitung von `singleton` fragt nach einem `scoped`-Dienst, erste Abfrage kommt aus einem Scope → diese Abfrage liefert `Err(GetError::ScopedFromRoot)`
+- [ ] (T11) Bauanleitung von `transient` fragt, abgefragt in einem Scope, nach einem `scoped`-Dienst → sie bekommt den Dienst dieses Scopes
+- [ ] (T11) Dienst mit `scoped` registriert, `all` beim Provider selbst statt in einem Scope → `all` liefert `Err(GetError::ScopedFromRoot)`
+- [ ] Bauanleitung von `transient` fragt nach einem nicht registrierten Dienst und gibt den Fehler mit `?` weiter → die äußere Abfrage liefert `Err(GetError::NoDependency)`
+- [ ] (T11) Bauanleitung gibt das `Err(GetError::Cycle)` einer inneren Abfrage weiter → die äußere Abfrage liefert `Err(GetError::Cycle)`, nicht `NoDependency`
 
 ## Notification — `publish`
 
