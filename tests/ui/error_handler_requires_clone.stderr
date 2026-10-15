@@ -1,0 +1,21 @@
+error[E0277]: the trait bound `ReserveTable: Clone` is not satisfied
+  --> tests/ui/error_handler_requires_clone.rs:40:32
+   |
+40 |     let _table = mediator.send(ReserveTable { guests: 4 });
+   |                           ---- ^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `Clone` is not implemented for `ReserveTable`
+   |                           |
+   |                           required by a bound introduced by this call
+   |
+help: the trait `mediatr_rs::Sender<R>` is implemented for `Mediator<S, P>`
+  --> src/mediator.rs
+   |
+   | impl<S, P: Behaviors<R>, R: Request + 'static> Sender<R> for Mediator<S, P> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: required for `mediatr_rs::pipeline::sealed::RequestErrorProcessorBehavior<Maitre>` to implement `PipelineBehavior<ReserveTable>`
+   = note: required for `((), mediatr_rs::pipeline::sealed::OpenBehavior<mediatr_rs::pipeline::sealed::RequestErrorProcessorBehavior<Maitre>>)` to implement `mediatr_rs::pipeline::sealed::Behaviors<ReserveTable>`
+   = note: required for `Mediator<ForeachAwaitPublisher, ((), mediatr_rs::pipeline::sealed::OpenBehavior<mediatr_rs::pipeline::sealed::RequestErrorProcessorBehavior<Maitre>>)>` to implement `mediatr_rs::Sender<ReserveTable>`
+help: consider annotating `ReserveTable` with `#[derive(Clone)]`
+   |
+ 8 + #[derive(Clone)]
+ 9 | struct ReserveTable {
+   |

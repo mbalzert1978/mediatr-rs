@@ -40,3 +40,8 @@ fn error_handler_registered_after_first_handler_does_not_compile() {
 fn error_action_registered_after_first_handler_does_not_compile() {
     trybuild::TestCases::new().compile_fail("tests/ui/error_action_after_handler.rs");
 }
+
+#[test]
+fn error_handler_makes_send_for_non_clone_request_not_compile() {
+    trybuild::TestCases::new().compile_fail("tests/ui/error_handler_requires_clone.rs");
+}
