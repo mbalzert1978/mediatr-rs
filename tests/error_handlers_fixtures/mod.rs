@@ -205,3 +205,18 @@ impl RequestPostProcessor<BookRoom> for ConfirmationMail {
         Err(BookingError::ConfirmationFailed)
     }
 }
+
+/// Die Rezeption: Sie schreibt jeden Fehler einer Buchung, den sie bekommt, ins Protokoll und reicht ihn weiter.
+pub struct FrontDesk {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl RequestErrorHandler<BookRoom> for FrontDesk {
+    async fn handle(&self, request: &BookRoom, error: BookingError) -> Result<u64, BookingError> {
+        self.journal.borrow_mut().push(format!(
+            "Rezeption meldet für Zimmer {}: {error:?}",
+            request.room
+        ));
+        Err(error)
+    }
+}

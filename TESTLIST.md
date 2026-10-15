@@ -190,7 +190,7 @@ Quelle: MediatR `test/MediatR.Tests/Pipeline/RequestExceptionHandlerTests.cs`, `
 - [x] Ein Vorverarbeiter scheitert, eine Fehler-Aktion ist registriert → sie läuft, `send` liefert den Fehler des Vorverarbeiters · `failing_pre_processor_runs_error_action_and_send_returns_its_error`
 - [x] Ein Nachverarbeiter scheitert, eine Fehler-Aktion ist registriert → sie läuft, `send` liefert den Fehler des Nachverarbeiters · `failing_post_processor_runs_error_action_and_send_returns_its_error`
 - [ ] Fehler-Aktion nur für einen Request-Typ registriert, ein Request eines anderen Typs scheitert → sie läuft nicht, `send` liefert dessen Fehler
-- [ ] Handler scheitert, zwei Fehler-Handler, der erste reicht einen eigenen Fehler weiter → der zweite bekommt diesen Fehler statt des ursprünglichen
+- [x] Handler scheitert, zwei Fehler-Handler, der erste reicht einen eigenen Fehler weiter → der zweite bekommt diesen Fehler statt des ursprünglichen · `second_error_handler_gets_error_passed_on_by_first_instead_of_original`
 - [ ] Handler hat Erfolg, ein Fehler-Handler ist registriert → er läuft nicht, `send` liefert die Antwort des Handlers
 - [ ] Fehler-Handler nur für einen Request-Typ registriert, ein Request eines anderen Typs scheitert → er läuft nicht, `send` liefert dessen Fehler
 - [ ] Derselbe Fehler-Handler-Typ zweimal registriert → er läuft pro `send` einmal

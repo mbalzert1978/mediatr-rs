@@ -9,7 +9,7 @@ mod error_handlers_fixtures;
 
 use error_handlers_fixtures::{
     BookRoom, BookingAlert, BookingError, BrokenAlarm, ClosedWaitingList, ConfirmationMail,
-    FullHotel, GuestNotice, OpenHotel, OverbookingCheck, PartnerHotel, PaymentGate,
+    FrontDesk, FullHotel, GuestNotice, OpenHotel, OverbookingCheck, PartnerHotel, PaymentGate,
     RenovationCheck, WaitingList,
 };
 
@@ -394,5 +394,32 @@ async fn failing_post_processor_runs_error_action_and_send_returns_its_error() {
                 "Alarm: Buchung für Zimmer 12 gescheitert: ConfirmationFailed".to_owned()
             ]
         )
+    );
+}
+
+#[tokio::test]
+async fn second_error_handler_gets_error_passed_on_by_first_instead_of_original() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .open_request_error_handler(ClosedWaitingList {
+            journal: Rc::clone(&journal),
+        })
+        .open_request_error_handler(FrontDesk {
+            journal: Rc::clone(&journal),
+        })
+        .register(Handler::instance(FullHotel {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let _booking = mediator.send(BookRoom { room: 12 }).await;
+
+    assert_eq!(
+        journal.borrow().clone(),
+        vec![
+            "Zimmer 12 ausgebucht".to_owned(),
+            "Warteliste für Zimmer 12 geschlossen".to_owned(),
+            "Rezeption meldet für Zimmer 12: WaitingListClosed".to_owned()
+        ]
     );
 }
