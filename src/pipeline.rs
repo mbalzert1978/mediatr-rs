@@ -6,6 +6,8 @@ mod next;
 mod post_processor;
 mod pre_processor;
 mod sealed;
+mod stream_behavior;
+mod stream_next;
 
 use std::future::Future;
 
@@ -18,10 +20,12 @@ pub use next::Next;
 pub use post_processor::RequestPostProcessor;
 pub use pre_processor::RequestPreProcessor;
 pub(crate) use sealed::{
-    Behaviors, Closed, OpenBehavior, RequestErrorActionProcessorBehavior,
+    Behaviors, Closed, OpenBehavior, OpenStreamBehavior, RequestErrorActionProcessorBehavior,
     RequestErrorProcessorBehavior, RequestPostProcessorBehavior, RequestPreProcessorBehavior, Slot,
-    Stage,
+    Stage, StreamBehaviors,
 };
+pub use stream_behavior::StreamPipelineBehavior;
+pub use stream_next::StreamNext;
 
 /// Umschließt den Handler von Requests vom Typ `R`: läuft davor und danach und entscheidet, ob es weitergeht.
 ///

@@ -7,8 +7,9 @@ use std::rc::Rc;
 use mediatr_provider::{Provider, ProviderBuilder, Registration};
 
 use crate::pipeline::{
-    Closed, OpenBehavior, RequestErrorActionProcessorBehavior, RequestErrorProcessorBehavior,
-    RequestPostProcessorBehavior, RequestPreProcessorBehavior, Slot, Stage,
+    Closed, OpenBehavior, OpenStreamBehavior, RequestErrorActionProcessorBehavior,
+    RequestErrorProcessorBehavior, RequestPostProcessorBehavior, RequestPreProcessorBehavior, Slot,
+    Stage,
 };
 use crate::wrappers::{
     BehaviorWrapper, wrap_behavior, wrap_notification_handler, wrap_request_handler,
@@ -192,21 +193,42 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
         )
     }
 
+    /// Registriert `behavior` für alle Stream-Request-Typen; es liegt innerhalb der zuvor registrierten Stream-Behaviors.
+    ///
+    /// [`StreamSender::create_stream`](crate::StreamSender::create_stream) verlangt, dass `behavior` [`StreamPipelineBehavior`](crate::StreamPipelineBehavior) für den Stream-Request-Typ ist.
+    /// Ist ein Stream-Behavior vom Typ `B` schon registriert, läuft nur das erste, an seinem Platz.
+    #[must_use]
+    pub fn open_stream_behavior<B: 'static>(
+        self,
+        behavior: B,
+    ) -> MediatorBuilder<S, (P, OpenStreamBehavior<B>)> {
+        self.with_behavior(|slot| {
+            (
+                OpenStreamBehavior {
+                    behavior: Rc::new(behavior),
+                    slot,
+                },
+                Registration::instance(slot).unique_by::<B>(),
+            )
+        })
+    }
+
     /// Builder, dessen Kette zusätzlich mit `behavior` für alle Request-Typen auf der Stufe `stage` endet.
     fn open<B: 'static>(
         self,
         behavior: B,
         stage: Stage,
     ) -> MediatorBuilder<S, (P, OpenBehavior<B>)> {
-        let slot = Slot(self.slots);
-        self.with_behavior(
-            OpenBehavior {
-                behavior: Rc::new(behavior),
-                slot,
-                stage,
-            },
-            Registration::instance(slot).unique_by::<B>(),
-        )
+        self.with_behavior(|slot| {
+            (
+                OpenBehavior {
+                    behavior: Rc::new(behavior),
+                    slot,
+                    stage,
+                },
+                Registration::instance(slot).unique_by::<B>(),
+            )
+        })
     }
 
     /// Builder, dessen Kette zusätzlich mit `behavior` nur für Requests vom Typ `R` auf der Stufe `stage` endet.
@@ -215,23 +237,29 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
         behavior: impl PipelineBehavior<R> + 'static,
         stage: Stage,
     ) -> MediatorBuilder<S, (P, Closed)> {
-        let slot = Slot(self.slots);
-        let unique = unique_for::<R, _>(slot, &behavior);
-        let wrapper: BehaviorWrapper<R> = wrap_behavior(Rc::new(behavior));
-        self.with_behavior(
-            Closed {
-                provider: Provider::builder()
-                    .register(Registration::instance(wrapper))
-                    .build(),
-                slot,
-                stage,
-            },
-            unique,
-        )
+        self.with_behavior(|slot| {
+            let unique = unique_for::<R, _>(slot, &behavior);
+            let wrapper: BehaviorWrapper<R> = wrap_behavior(Rc::new(behavior));
+            (
+                Closed {
+                    provider: Provider::builder()
+                        .register(Registration::instance(wrapper))
+                        .build(),
+                    slot,
+                    stage,
+                },
+                unique,
+            )
+        })
     }
 
-    /// Builder, dessen Kette der Behaviors zusätzlich mit `link` endet; `slot` meldet dessen Platz an.
-    fn with_behavior<L>(self, link: L, slot: Registration<Slot>) -> MediatorBuilder<S, (P, L)> {
+    /// Builder, dessen Kette der Behaviors zusätzlich mit dem Glied endet, das `link` für den nächsten freien Platz baut;
+    /// `link` liefert dazu die Registrierung, die diesen Platz anmeldet.
+    fn with_behavior<L>(
+        self,
+        link: impl FnOnce(Slot) -> (L, Registration<Slot>),
+    ) -> MediatorBuilder<S, (P, L)> {
+        let (link, slot) = link(Slot(self.slots));
         MediatorBuilder {
             provider: self.provider.register(slot),
             behaviors: (self.behaviors, link),

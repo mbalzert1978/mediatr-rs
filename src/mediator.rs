@@ -9,7 +9,7 @@ use futures_core::Stream;
 
 use mediatr_provider::{Provider, WeakProvider};
 
-use crate::pipeline::{Behaviors, Slot};
+use crate::pipeline::{Behaviors, Slot, StreamBehaviors};
 use crate::request::HandlerResult;
 use crate::stream_request::StreamResult;
 use crate::wrappers::{
@@ -17,7 +17,7 @@ use crate::wrappers::{
 };
 use crate::{
     ForeachAwaitPublisher, MediatorBuilder, Next, Notification, NotificationPublisher, Publisher,
-    Request, SendError, Sender, StreamRequest, StreamSender,
+    Request, SendError, Sender, StreamNext, StreamRequest, StreamSender,
 };
 
 /// Stellt Requests und Notifications den Handlern zu, die für ihren Typ registriert sind.
@@ -98,17 +98,16 @@ impl<S, P: Behaviors<R>, R: Request + 'static> Sender<R> for Mediator<S, P> {
             .provider
             .get::<RequestHandlerWrapper<R>>()
             .ok_or(SendError::NoHandler)?;
-        // ponytail: liest die behaltenen Plätze bei jedem `send`; einmal beim Bauen merken, wenn das messbar bremst.
+        // ponytail: liest die behaltenen Plätze bei jeder Nachricht; einmal beim Bauen merken, wenn das messbar bremst.
         let active: Vec<Slot> = self
             .provider
             .all::<Slot>()
             .iter()
             .map(|slot| **slot)
             .collect();
-        let behaviors = self
-            .provider
-            .get::<P>()
-            .map_or_else(Vec::new, |behaviors| behaviors.wrap(&active));
+        let behaviors = self.provider.get::<P>().map_or_else(Vec::new, |behaviors| {
+            Behaviors::<R>::wrap(&*behaviors, &active)
+        });
         Next::new(handler, &behaviors).run(request).await
     }
 }
@@ -142,12 +141,22 @@ impl<S: NotificationPublisher, P, N: Notification + 'static> Publisher<N> for We
     }
 }
 
-impl<S, P, R: StreamRequest + 'static> StreamSender<R> for Mediator<S, P> {
+impl<S, P: StreamBehaviors<R>, R: StreamRequest + 'static> StreamSender<R> for Mediator<S, P> {
     fn create_stream(&self, request: R) -> impl Stream<Item = StreamResult<R>> {
-        // dyn: der Stream des Handlers und `Once` sind verschiedene Typen und brauchen einen gemeinsamen.
+        // ponytail: liest die behaltenen Plätze bei jeder Nachricht; einmal beim Bauen merken, wenn das messbar bremst.
+        let active: Vec<Slot> = self
+            .provider
+            .all::<Slot>()
+            .iter()
+            .map(|slot| **slot)
+            .collect();
+        let behaviors = self.provider.get::<P>().map_or_else(Vec::new, |behaviors| {
+            StreamBehaviors::<R>::wrap(&*behaviors, &active)
+        });
+        // dyn: der Stream der Pipeline und `Once` sind verschiedene Typen und brauchen einen gemeinsamen.
         let stream: LocalBoxStream<StreamResult<R>> =
             match self.provider.get::<StreamRequestHandlerWrapper<R>>() {
-                Some(handler) => handler(request),
+                Some(handler) => Box::pin(StreamNext::new(handler, behaviors).run(request)),
                 None => Box::pin(Once(Some(Err(R::Error::from(SendError::NoHandler))))),
             };
         stream

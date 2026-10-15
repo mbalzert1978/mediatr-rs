@@ -19,7 +19,7 @@ pub use notification::{Notification, NotificationHandler};
 pub use notification_publishers::{ForeachAwaitPublisher, NotificationPublisher, WhenAllPublisher};
 pub use pipeline::{
     Next, PipelineBehavior, RequestErrorAction, RequestErrorHandler, RequestPostProcessor,
-    RequestPreProcessor,
+    RequestPreProcessor, StreamNext, StreamPipelineBehavior,
 };
 pub use publisher::Publisher;
 pub use registration::{Handler, MediatorBuilder, NoHandlers, WithHandlers};

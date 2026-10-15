@@ -3,6 +3,7 @@
 mod behavior;
 mod notification;
 mod request;
+mod stream_behavior;
 mod stream_request;
 
 use std::future::Future;
@@ -13,6 +14,7 @@ use futures_core::Stream;
 pub(crate) use behavior::{BehaviorWrapper, wrap_behavior};
 pub(crate) use notification::{NotificationHandlerWrapper, wrap_notification_handler};
 pub(crate) use request::{RequestHandlerWrapper, wrap_request_handler};
+pub(crate) use stream_behavior::{StreamBehaviorWrapper, wrap_stream_behavior};
 pub(crate) use stream_request::{StreamRequestHandlerWrapper, wrap_stream_request_handler};
 
 /// Eine Future hinter `dyn Future` in einer `Pin<Box<…>>`; sie läuft auf diesem Thread (nicht `Send`) und leiht höchstens `'a` lang.

@@ -215,6 +215,12 @@ Quelle: MediatR `test/MediatR.Tests/CreateStreamTests.cs`; `src/MediatR/Wrappers
 Quelle: MediatR `test/MediatR.Tests/StreamPipelineTests.cs`, `Pipeline/Streams/StreamPipelineBehaviorTests.cs`, `MicrosoftExtensionsDI/StreamPipelineTests.cs`. Das „nachher“ eines Stream-Behaviors läuft erst nach dem letzten Element.
 
 - [ ] Zwei Stream-Behaviors für einen Stream-Request-Typ → die Elemente des Handlers kommen unverändert an; Reihenfolge: erstes vorher, zweites vorher, Handler, zweites nachher, erstes nachher
-- [ ] Zwei Stream-Behaviors für alle Stream-Request-Typen → sie umschließen den Handler, das zuerst registrierte außen; die Elemente kommen unverändert an
+- [x] Zwei Stream-Behaviors für alle Stream-Request-Typen → sie umschließen den Handler, das zuerst registrierte außen; die Elemente kommen unverändert an · `two_open_stream_behaviors_wrap_handler_first_registered_outside_items_unchanged`
 - [ ] Zwei Stream-Behaviors für alle Stream-Request-Typen und ein drittes nur für einen → bei diesem Typ laufen alle drei in Registrierungsreihenfolge um den Handler, bei einem anderen Stream-Request-Typ nur die zwei allgemeinen
 - [ ] Handler liefert drei Elemente, ein Stream-Behavior fügt vorne und hinten je eins an → der Stream liefert genau fünf Elemente in dieser Reihenfolge
+- [ ] Derselbe Stream-Behavior-Typ zweimal registriert → er läuft pro Stream einmal
+- [ ] Stream-Behavior nach dem ersten Handler registriert → kompiliert nicht
+- [ ] Ein Behavior für alle Request-Typen ist registriert, ein Stream wird gelesen → der Stream läuft nicht durch das Behavior
+- [ ] Ein Stream-Behavior für alle Stream-Request-Typen ist registriert, ein Request wird gesendet → `send` läuft nicht durch das Stream-Behavior
+- [ ] Ein Behavior nur für einen Request-Typ ist registriert, ein Stream wird gelesen → der Stream läuft nicht durch das Behavior
+- [ ] Stream angefordert, aber nie gelesen → kein Stream-Behavior läuft

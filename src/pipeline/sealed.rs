@@ -5,9 +5,10 @@ use std::rc::Rc;
 
 use mediatr_provider::Provider;
 
-use crate::PipelineBehavior;
-use crate::Request;
-use crate::wrappers::{BehaviorWrapper, wrap_behavior};
+use crate::wrappers::{
+    BehaviorWrapper, StreamBehaviorWrapper, wrap_behavior, wrap_stream_behavior,
+};
+use crate::{PipelineBehavior, Request, StreamPipelineBehavior, StreamRequest};
 
 /// Die Kette der Behaviors eines Mediators: `()` oder ein Paar aus der Kette davor und einem weiteren Behavior.
 ///
@@ -21,6 +22,20 @@ use crate::wrappers::{BehaviorWrapper, wrap_behavior};
 pub trait Behaviors<R: Request>: 'static {
     /// Die Behaviors der Kette für `R` als [`BehaviorWrapper`] mit ihrer Stufe, deren Platz in `active` steht, in Registrierungsreihenfolge.
     fn wrap(&self, active: &[Slot]) -> Vec<(Stage, Rc<BehaviorWrapper<R>>)>;
+}
+
+/// Die Kette der Behaviors eines Mediators, gelesen für Stream-Requests: nur ihre Stream-Behaviors zählen.
+///
+/// Öffentlich, weil [`StreamSender`](crate::StreamSender) für [`Mediator`](crate::Mediator) es verlangt;
+/// in einem privaten Modul, damit nur diese Crate es implementiert.
+///
+/// # Vertrag
+///
+/// `wrap` liefert je Stream-Behavior der Kette, das Stream-Requests vom Typ `R` umschließt und dessen Platz in `active` steht,
+/// genau einen [`StreamBehaviorWrapper`], in Registrierungsreihenfolge, und löst keine Panic aus.
+pub trait StreamBehaviors<R: StreamRequest>: 'static {
+    /// Die Stream-Behaviors der Kette für `R` als [`StreamBehaviorWrapper`], deren Platz in `active` steht, in Registrierungsreihenfolge.
+    fn wrap(&self, active: &[Slot]) -> Vec<Rc<StreamBehaviorWrapper<R>>>;
 }
 
 /// Wo ein Behavior in der Pipeline liegt.
@@ -47,6 +62,12 @@ pub struct OpenBehavior<B> {
     pub(crate) behavior: Rc<B>,
     pub(crate) slot: Slot,
     pub(crate) stage: Stage,
+}
+
+/// Ein Stream-Behavior für alle Stream-Request-Typen, als Glied der Kette.
+pub struct OpenStreamBehavior<B> {
+    pub(crate) behavior: Rc<B>,
+    pub(crate) slot: Slot,
 }
 
 /// Ein Vorverarbeiter als Behavior: `B` sieht den Request, dann geht dieser weiter.
@@ -82,6 +103,25 @@ impl<B> Clone for OpenBehavior<B> {
             slot: self.slot,
             stage: self.stage,
         }
+    }
+}
+
+// Von Hand statt `derive`: `derive(Clone)` verlangte `B: Clone`, obwohl nur der `Rc` geklont wird.
+impl<B> Clone for OpenStreamBehavior<B> {
+    fn clone(&self) -> Self {
+        Self {
+            behavior: Rc::clone(&self.behavior),
+            slot: self.slot,
+        }
+    }
+}
+
+// Von Hand statt `derive`: `derive(Debug)` verlangte `B: Debug`.
+impl<B> fmt::Debug for OpenStreamBehavior<B> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("OpenStreamBehavior")
+            .field("slot", &self.slot)
+            .finish_non_exhaustive()
     }
 }
 
@@ -129,6 +169,49 @@ impl<R: Request + 'static, P: Behaviors<R>> Behaviors<R> for (P, Closed) {
                     .get::<BehaviorWrapper<R>>()
                     .map(|behavior| (self.1.stage, behavior)),
             );
+        }
+        behaviors
+    }
+}
+
+impl<R: Request + 'static, P: Behaviors<R>, B: 'static> Behaviors<R>
+    for (P, OpenStreamBehavior<B>)
+{
+    fn wrap(&self, active: &[Slot]) -> Vec<(Stage, Rc<BehaviorWrapper<R>>)> {
+        self.0.wrap(active)
+    }
+}
+
+impl<R: StreamRequest> StreamBehaviors<R> for () {
+    fn wrap(&self, _active: &[Slot]) -> Vec<Rc<StreamBehaviorWrapper<R>>> {
+        Vec::new()
+    }
+}
+
+impl<R: StreamRequest, P: StreamBehaviors<R>, B: 'static> StreamBehaviors<R>
+    for (P, OpenBehavior<B>)
+{
+    fn wrap(&self, active: &[Slot]) -> Vec<Rc<StreamBehaviorWrapper<R>>> {
+        self.0.wrap(active)
+    }
+}
+
+impl<R: StreamRequest, P: StreamBehaviors<R>> StreamBehaviors<R> for (P, Closed) {
+    fn wrap(&self, active: &[Slot]) -> Vec<Rc<StreamBehaviorWrapper<R>>> {
+        self.0.wrap(active)
+    }
+}
+
+impl<R, P, B> StreamBehaviors<R> for (P, OpenStreamBehavior<B>)
+where
+    R: StreamRequest + 'static,
+    P: StreamBehaviors<R>,
+    B: StreamPipelineBehavior<R> + 'static,
+{
+    fn wrap(&self, active: &[Slot]) -> Vec<Rc<StreamBehaviorWrapper<R>>> {
+        let mut behaviors = self.0.wrap(active);
+        if active.contains(&self.1.slot) {
+            behaviors.push(Rc::new(wrap_stream_behavior(Rc::clone(&self.1.behavior))));
         }
         behaviors
     }
