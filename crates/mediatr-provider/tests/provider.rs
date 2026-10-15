@@ -390,12 +390,12 @@ fn singleton_recipe_asking_for_own_type_gets_nothing() {
 }
 
 #[test]
-fn scoped_recipe_asking_for_own_type_gets_none() {
+fn scoped_recipe_asking_for_own_type_in_scope_gets_nothing() {
     let provider = Provider::builder()
         .register(Registration::scoped(settings_recipe))
         .build();
 
-    let settings = provider.get::<Settings>().unwrap();
+    let settings = provider.scope().get::<Settings>().unwrap();
 
     assert!(settings.parent.is_none());
 }
