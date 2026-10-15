@@ -1,5 +1,5 @@
-use std::cell::Cell;
-use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use mediatr_rs::{Request, RequestHandler, SendError, Sender, WeakMediator};
 
@@ -116,7 +116,7 @@ impl<S: Sender<GetCustomer>> RequestHandler<PlaceOrder> for PlaceOrderHandler<S>
 /// Nimmt Bestellungen an wie [`PlaceOrderHandler`] und hält dafür die Leitung zum Lager offen; beim Freigeben legt er auf.
 pub struct WarehouseOrderHandler {
     pub orders: PlaceOrderHandler<WeakMediator>,
-    pub line_open: Rc<Cell<bool>>,
+    pub line_open: Arc<AtomicBool>,
 }
 
 impl RequestHandler<PlaceOrder> for WarehouseOrderHandler {
@@ -127,7 +127,7 @@ impl RequestHandler<PlaceOrder> for WarehouseOrderHandler {
 
 impl Drop for WarehouseOrderHandler {
     fn drop(&mut self) {
-        self.line_open.set(false);
+        self.line_open.store(false, Ordering::SeqCst);
     }
 }
 

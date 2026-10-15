@@ -1,8 +1,10 @@
 //! Tests für den Abschnitt „Provider-Crate `mediatr-provider`“ in `TESTLIST.md`.
 
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::panic::{self, AssertUnwindSafe};
 use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::{Arc, Mutex, PoisonError};
 
 use mediatr_provider::{Provider, Registration};
 
@@ -81,7 +83,7 @@ fn transient_all_runs_recipe_on_every_call() {
     drop(provider.all::<Config>());
     drop(provider.all::<Config>());
 
-    assert_eq!(calls.get(), 2);
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
 }
 
 #[test]
@@ -122,7 +124,7 @@ fn transient_runs_recipe_on_every_get() {
     provider.get::<Config>().unwrap();
     provider.get::<Config>().unwrap();
 
-    assert_eq!(calls.get(), 2);
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
 }
 
 #[test]
@@ -131,12 +133,12 @@ fn singleton_runs_recipe_once_on_first_get() {
     let provider = Provider::builder()
         .register(Registration::singleton(recipe))
         .build();
-    assert_eq!(calls.get(), 0);
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
 
     provider.get::<Config>().unwrap();
     provider.get::<Config>().unwrap();
 
-    assert_eq!(calls.get(), 1);
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
 }
 
 #[test]
@@ -152,7 +154,7 @@ fn scoped_runs_recipe_once_per_scope() {
     first.get::<Config>().unwrap();
     second.get::<Config>().unwrap();
 
-    assert_eq!(calls.get(), 2);
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
 }
 
 #[test]
@@ -183,11 +185,10 @@ fn recipe_gets_other_service_from_provider() {
 
 #[test]
 fn singleton_built_from_scope_gets_scoped_service_of_provider() {
-    let opened = Cell::new(0_u32);
+    let opened = AtomicU32::new(0);
     let provider = Provider::builder()
         .register(Registration::scoped(move |_| {
-            opened.set(opened.get().saturating_add(1));
-            Session(opened.get())
+            Session(opened.fetch_add(1, Ordering::SeqCst).saturating_add(1))
         }))
         .register(Registration::singleton(|provider| AuditLog {
             session: provider.get::<Session>().unwrap(),
@@ -225,7 +226,7 @@ fn cloned_scope_returns_same_scoped_service() {
     scope.get::<Config>().unwrap();
     clone.get::<Config>().unwrap();
 
-    assert_eq!(calls.get(), 1);
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
 }
 
 #[test]
@@ -245,37 +246,37 @@ fn upgraded_weak_provider_returns_same_singleton() {
 
 #[test]
 fn both_instances_of_same_type_are_released_with_provider() {
-    let office = Rc::new(Cell::new(true));
-    let lobby = Rc::new(Cell::new(true));
+    let office = Arc::new(AtomicBool::new(true));
+    let lobby = Arc::new(AtomicBool::new(true));
     let provider = Provider::builder()
         .register(Registration::instance(Printer {
-            _alive: Alive(Rc::clone(&office)),
+            _alive: Alive(Arc::clone(&office)),
         }))
         .register(Registration::instance(Printer {
-            _alive: Alive(Rc::clone(&lobby)),
+            _alive: Alive(Arc::clone(&lobby)),
         }))
         .build();
 
     drop(provider);
 
-    assert!(!office.get() && !lobby.get());
+    assert!(!office.load(Ordering::SeqCst) && !lobby.load(Ordering::SeqCst));
 }
 
 #[test]
 fn singleton_holding_weak_provider_is_released_with_provider() {
-    let running = Rc::new(Cell::new(true));
-    let flag = Rc::clone(&running);
+    let running = Arc::new(AtomicBool::new(true));
+    let flag = Arc::clone(&running);
     let provider = Provider::builder()
         .register(Registration::singleton(move |provider| Scheduler {
             _provider: provider.downgrade(),
-            _alive: Alive(Rc::clone(&flag)),
+            _alive: Alive(Arc::clone(&flag)),
         }))
         .build();
     provider.get::<Scheduler>().unwrap();
 
     drop(provider);
 
-    assert!(!running.get());
+    assert!(!running.load(Ordering::SeqCst));
 }
 
 #[test]
@@ -317,12 +318,12 @@ fn upgrade_after_scope_dropped_returns_none() {
 
 #[test]
 fn scoped_holding_weak_scope_is_released_with_scope() {
-    let open = Rc::new(Cell::new(true));
-    let flag = Rc::clone(&open);
+    let open = Arc::new(AtomicBool::new(true));
+    let flag = Arc::clone(&open);
     let provider = Provider::builder()
         .register(Registration::scoped(move |scope| UnitOfWork {
             _scope: scope.downgrade(),
-            _alive: Alive(Rc::clone(&flag)),
+            _alive: Alive(Arc::clone(&flag)),
         }))
         .build();
     let scope = provider.scope();
@@ -330,29 +331,29 @@ fn scoped_holding_weak_scope_is_released_with_scope() {
 
     drop(scope);
 
-    assert!(!open.get());
+    assert!(!open.load(Ordering::SeqCst));
 }
 
 #[test]
 fn scoped_service_and_its_singleton_with_weak_provider_are_released_with_provider() {
-    let running = Rc::new(Cell::new(true));
-    let open = Rc::new(Cell::new(true));
-    let (running_flag, open_flag) = (Rc::clone(&running), Rc::clone(&open));
+    let running = Arc::new(AtomicBool::new(true));
+    let open = Arc::new(AtomicBool::new(true));
+    let (running_flag, open_flag) = (Arc::clone(&running), Arc::clone(&open));
     let provider = Provider::builder()
         .register(Registration::singleton(move |provider| Scheduler {
             _provider: provider.downgrade(),
-            _alive: Alive(Rc::clone(&running_flag)),
+            _alive: Alive(Arc::clone(&running_flag)),
         }))
         .register(Registration::scoped(move |provider| Report {
             _scheduler: provider.get::<Scheduler>().unwrap(),
-            _alive: Alive(Rc::clone(&open_flag)),
+            _alive: Alive(Arc::clone(&open_flag)),
         }))
         .build();
     provider.get::<Report>().unwrap();
 
     drop(provider);
 
-    assert!(!running.get() && !open.get());
+    assert!(!running.load(Ordering::SeqCst) && !open.load(Ordering::SeqCst));
 }
 
 #[test]
@@ -483,7 +484,7 @@ fn recipe_runs_again_after_caught_panic() {
         .build();
     let failed = panic::catch_unwind(AssertUnwindSafe(|| provider.get::<Connection>()));
     assert!(failed.is_err());
-    server_up.set(true);
+    server_up.store(true, Ordering::SeqCst);
 
     let connection = provider.get::<Connection>();
 
@@ -498,7 +499,7 @@ fn singleton_recipe_runs_again_after_caught_panic() {
         .build();
     let failed = panic::catch_unwind(AssertUnwindSafe(|| provider.get::<Connection>()));
     assert!(failed.is_err());
-    server_up.set(true);
+    server_up.store(true, Ordering::SeqCst);
 
     let connection = provider.get::<Connection>();
 
@@ -514,7 +515,7 @@ fn scoped_recipe_runs_again_after_caught_panic() {
         .scope();
     let failed = panic::catch_unwind(AssertUnwindSafe(|| scope.get::<Connection>()));
     assert!(failed.is_err());
-    server_up.set(true);
+    server_up.store(true, Ordering::SeqCst);
 
     let connection = scope.get::<Connection>();
 
@@ -532,7 +533,7 @@ fn recipe_runs_again_after_caught_panic_in_dependency() {
         .build();
     let failed = panic::catch_unwind(AssertUnwindSafe(|| provider.get::<Repository>()));
     assert!(failed.is_err());
-    server_up.set(true);
+    server_up.store(true, Ordering::SeqCst);
 
     let repository = provider.get::<Repository>().unwrap();
 
@@ -773,11 +774,14 @@ fn mapped_singleton_passes_same_object_to_f_on_every_get() {
 
 #[test]
 fn unique_transient_twice_from_same_source_type_all_builds_only_first() {
-    let built = Rc::new(RefCell::new(Vec::new()));
+    let built = Arc::new(Mutex::new(Vec::new()));
     let print = |heading: &'static str| {
-        let built = Rc::clone(&built);
+        let built = Arc::clone(&built);
         Registration::transient(move |_| {
-            built.borrow_mut().push(heading);
+            built
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .push(heading);
             Document::from(Invoice {
                 heading: heading.to_owned(),
             })
@@ -791,7 +795,10 @@ fn unique_transient_twice_from_same_source_type_all_builds_only_first() {
 
     let _documents = provider.all::<Document>();
 
-    assert_eq!(*built.borrow(), ["Rechnung 1"]);
+    assert_eq!(
+        *built.lock().unwrap_or_else(PoisonError::into_inner),
+        ["Rechnung 1"]
+    );
 }
 
 #[test]

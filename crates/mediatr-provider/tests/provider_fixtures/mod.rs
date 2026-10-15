@@ -1,5 +1,6 @@
-use std::cell::Cell;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use mediatr_provider::{Provider, WeakProvider};
 
@@ -18,11 +19,11 @@ pub struct AuditLog {
 }
 
 /// Meldet über den geteilten Schalter, ob der Dienst noch lebt, der ihn hält: Sein `Drop` setzt ihn auf `false`.
-pub struct Alive(pub Rc<Cell<bool>>);
+pub struct Alive(pub Arc<AtomicBool>);
 
 impl Drop for Alive {
     fn drop(&mut self) {
-        self.0.set(false);
+        self.0.store(false, Ordering::SeqCst);
     }
 }
 
@@ -101,22 +102,22 @@ pub struct Repository {
 }
 
 /// Liefert den Schalter für den Server (anfangs aus) und eine Bauanleitung für `Connection`, die mit einem Panic abbricht, solange er aus ist.
-pub fn connection_recipe() -> (Rc<Cell<bool>>, impl Fn(&Provider) -> Connection) {
-    let server_up = Rc::new(Cell::new(false));
-    let reachable = Rc::clone(&server_up);
+pub fn connection_recipe() -> (Arc<AtomicBool>, impl Fn(&Provider) -> Connection) {
+    let server_up = Arc::new(AtomicBool::new(false));
+    let reachable = Arc::clone(&server_up);
     let recipe = move |_: &Provider| {
-        assert!(reachable.get(), "Server nicht erreichbar");
+        assert!(reachable.load(Ordering::SeqCst), "Server nicht erreichbar");
         Connection
     };
     (server_up, recipe)
 }
 
 /// Liefert eine Bauanleitung für `Config` und den Zähler ihrer Läufe.
-pub fn counting_recipe() -> (Rc<Cell<u32>>, impl Fn(&Provider) -> Config) {
-    let calls = Rc::new(Cell::new(0_u32));
-    let counter = Rc::clone(&calls);
+pub fn counting_recipe() -> (Arc<AtomicU32>, impl Fn(&Provider) -> Config) {
+    let calls = Arc::new(AtomicU32::new(0));
+    let counter = Arc::clone(&calls);
     let recipe = move |_: &Provider| {
-        counter.set(counter.get().saturating_add(1));
+        counter.fetch_add(1, Ordering::SeqCst);
         Config
     };
     (calls, recipe)

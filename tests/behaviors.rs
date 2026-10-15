@@ -1,7 +1,7 @@
 //! Tests für den Abschnitt „Pipeline — Behaviors“ in `TESTLIST.md`.
 
-use std::cell::Cell;
-use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
 use mediatr_rs::{Handler, Mediator, MediatorBuilder, Publisher, Sender, WhenAllPublisher};
@@ -19,17 +19,17 @@ use common::Journal;
 
 #[tokio::test]
 async fn behavior_retries_cloned_next_after_handler_error_and_returns_second_response() {
-    let calls = Rc::new(Cell::new(0));
+    let calls = Arc::new(AtomicU32::new(0));
     let mediator = Mediator::builder()
         .open_behavior(RetryOnce)
         .register(Handler::instance(SlowStockLedger {
-            calls: Rc::clone(&calls),
+            calls: Arc::clone(&calls),
         }))
         .build();
 
     let stock = mediator.send(LookupStock { sku: 4 }).await;
 
-    assert_eq!((stock, calls.get()), (Ok(12), 2));
+    assert_eq!((stock, calls.load(Ordering::SeqCst)), (Ok(12), 2));
 }
 
 #[tokio::test]
@@ -390,15 +390,15 @@ async fn behaviors_with_when_all_publisher_wrap_send_and_publish_starts_handlers
 #[tokio::test]
 async fn transient_handler_wrapped_by_behavior_is_built_once_per_send_and_wrapped_once() {
     let journal = Journal::default();
-    let builds = Rc::new(Cell::new(0_u32));
+    let builds = Arc::new(AtomicU32::new(0));
     let ledger_journal = journal.clone();
-    let ledger_builds = Rc::clone(&builds);
+    let ledger_builds = Arc::clone(&builds);
     let mediator = Mediator::builder()
         .open_behavior(AuditTrail {
             journal: journal.clone(),
         })
         .register(Handler::transient(move |_sender| {
-            ledger_builds.set(ledger_builds.get().saturating_add(1));
+            ledger_builds.fetch_add(1, Ordering::SeqCst);
             StockLedger {
                 journal: ledger_journal.clone(),
             }
@@ -408,7 +408,7 @@ async fn transient_handler_wrapped_by_behavior_is_built_once_per_send_and_wrappe
     let stock = mediator.send(LookupStock { sku: 4 }).await;
 
     assert_eq!(
-        (stock, builds.get(), journal.entries()),
+        (stock, builds.load(Ordering::SeqCst), journal.entries()),
         (
             Ok(12),
             1,

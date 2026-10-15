@@ -1,7 +1,8 @@
 //! Tests für den Abschnitt „Notification — Notification-Publisher“ in `TESTLIST.md`.
 
-use std::cell::{OnceCell, RefCell};
+use std::cell::OnceCell;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex, PoisonError};
 
 use mediatr_rs::{
     Handler, MediatorBuilder, NotificationHandler, Publisher, SendError, Sender, WeakMediator,
@@ -113,11 +114,11 @@ async fn custom_publisher_without_clone_mediator_and_weak_mediator_clone_reaches
 
 #[tokio::test]
 async fn custom_publisher_without_debug_mediator_weak_mediator_and_builder_debug_names_publisher() {
-    let weak_output = Rc::new(RefCell::new(String::new()));
-    let seen = Rc::clone(&weak_output);
+    let weak_output = Arc::new(Mutex::new(String::new()));
+    let seen = Arc::clone(&weak_output);
     let builder = MediatorBuilder::<NewestFirst>::default().subscribe(Handler::singleton(
         move |publisher: WeakMediator<NewestFirst>| {
-            *seen.borrow_mut() = format!("{publisher:?}");
+            *seen.lock().unwrap_or_else(PoisonError::into_inner) = format!("{publisher:?}");
             DispatchCenter { publisher }
         },
     ));
@@ -131,7 +132,10 @@ async fn custom_publisher_without_debug_mediator_weak_mediator_and_builder_debug
 
     let outputs = [
         format!("{mediator:?}"),
-        weak_output.borrow().clone(),
+        weak_output
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone(),
         builder_output,
     ];
     assert!(

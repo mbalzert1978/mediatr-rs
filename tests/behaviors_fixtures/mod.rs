@@ -1,5 +1,5 @@
-use std::cell::Cell;
-use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
 use mediatr_rs::{
@@ -33,13 +33,12 @@ impl Request for LookupStock {
 
 /// Führt den Lagerbestand; der Lagerserver antwortet auf die erste Abfrage zu spät.
 pub struct SlowStockLedger {
-    pub calls: Rc<Cell<u32>>,
+    pub calls: Arc<AtomicU32>,
 }
 
 impl RequestHandler<LookupStock> for SlowStockLedger {
     async fn handle(&self, _request: LookupStock) -> Result<u32, StockError> {
-        let call = self.calls.get().saturating_add(1);
-        self.calls.set(call);
+        let call = self.calls.fetch_add(1, Ordering::SeqCst).saturating_add(1);
         if call == 1 {
             return Err(StockError::Timeout);
         }

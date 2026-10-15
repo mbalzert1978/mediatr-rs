@@ -1,7 +1,6 @@
-use std::cell::RefCell;
 use std::error::Error;
 use std::fmt;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex, PoisonError};
 
 use mediatr_rs::{
     Mediator, Notification, NotificationHandler, Publisher, Request, RequestHandler, SendError,
@@ -9,6 +8,28 @@ use mediatr_rs::{
 };
 
 use crate::common::Journal;
+
+/// Die Bestellnummern, die ein Handler der Reihe nach aufgeschrieben hat.
+#[derive(Clone, Default)]
+pub struct Recorded(Arc<Mutex<Vec<u32>>>);
+
+impl Recorded {
+    /// Hängt eine Bestellnummer hinten an.
+    pub fn push(&self, order_id: u32) {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(order_id);
+    }
+
+    /// Gibt eine Kopie aller Bestellnummern der Reihe nach zurück.
+    pub fn entries(&self) -> Vec<u32> {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+}
 
 /// Ereignis: Die Bestellung mit dieser Nummer ist eingegangen.
 pub struct OrderPlaced {
@@ -21,12 +42,12 @@ impl Notification for OrderPlaced {
 
 /// Druckt für jede eingegangene Bestellung ein Versandetikett mit ihrer Nummer.
 pub struct ShippingDesk {
-    pub labels: Rc<RefCell<Vec<u32>>>,
+    pub labels: Recorded,
 }
 
 impl NotificationHandler<OrderPlaced> for ShippingDesk {
     async fn handle(&self, event: &OrderPlaced) -> Result<(), SendError> {
-        self.labels.borrow_mut().push(event.order_id);
+        self.labels.push(event.order_id);
         Ok(())
     }
 }
@@ -100,12 +121,12 @@ impl NotificationHandler<OrderCancelled> for Refund {
 
 /// Schickt dem Kunden für jede stornierte Bestellung eine Mail mit ihrer Nummer.
 pub struct CancellationMail {
-    pub sent: Rc<RefCell<Vec<u32>>>,
+    pub sent: Recorded,
 }
 
 impl NotificationHandler<OrderCancelled> for CancellationMail {
     async fn handle(&self, event: &OrderCancelled) -> Result<(), CancellationError> {
-        self.sent.borrow_mut().push(event.order_id);
+        self.sent.push(event.order_id);
         Ok(())
     }
 }
@@ -113,28 +134,28 @@ impl NotificationHandler<OrderCancelled> for CancellationMail {
 /// Zwei Versandstellen, die ihre Etiketten getrennt sammeln: Daran sieht ein Test, welche von zwei Registrierungen desselben Handler-Typs gelaufen ist.
 #[derive(Clone, Default)]
 pub struct TwoDesks {
-    pub front: Rc<RefCell<Vec<u32>>>,
-    pub back: Rc<RefCell<Vec<u32>>>,
+    pub front: Recorded,
+    pub back: Recorded,
 }
 
 impl TwoDesks {
     /// Die vordere Versandstelle.
     pub fn front(&self) -> ShippingDesk {
         ShippingDesk {
-            labels: Rc::clone(&self.front),
+            labels: self.front.clone(),
         }
     }
 
     /// Die hintere Versandstelle.
     pub fn back(&self) -> ShippingDesk {
         ShippingDesk {
-            labels: Rc::clone(&self.back),
+            labels: self.back.clone(),
         }
     }
 
     /// Die Etiketten der vorderen und der hinteren Versandstelle.
     pub fn labels(&self) -> (Vec<u32>, Vec<u32>) {
-        (self.front.borrow().clone(), self.back.borrow().clone())
+        (self.front.entries(), self.back.entries())
     }
 }
 
@@ -181,12 +202,12 @@ impl<P: Publisher<OrderPlaced>> RequestHandler<Checkout> for CheckoutHandler<P> 
 
 /// Attrappe statt des Mediators: merkt sich die Nummer jeder gemeldeten Bestellung.
 pub struct RecordedOrders {
-    pub order_ids: Rc<RefCell<Vec<u32>>>,
+    pub order_ids: Recorded,
 }
 
 impl Publisher<OrderPlaced> for RecordedOrders {
     async fn publish(&self, event: OrderPlaced) -> Result<(), SendError> {
-        self.order_ids.borrow_mut().push(event.order_id);
+        self.order_ids.push(event.order_id);
         Ok(())
     }
 }
@@ -221,12 +242,12 @@ impl NotificationHandler<OrderPlaced> for FraudCheck {
 
 /// Legt für jeden Betrugsverdacht einen Fall mit der Bestellnummer an.
 pub struct FraudDesk {
-    pub cases: Rc<RefCell<Vec<u32>>>,
+    pub cases: Recorded,
 }
 
 impl NotificationHandler<FraudSuspected> for FraudDesk {
     async fn handle(&self, event: &FraudSuspected) -> Result<(), SendError> {
-        self.cases.borrow_mut().push(event.order_id);
+        self.cases.push(event.order_id);
         Ok(())
     }
 }
@@ -243,12 +264,12 @@ impl Request for BlockCustomer {
 
 /// Führt die Sperrliste und trägt jede Bestellnummer ein, deren Kunde gesperrt wird.
 pub struct Blocklist {
-    pub order_ids: Rc<RefCell<Vec<u32>>>,
+    pub order_ids: Recorded,
 }
 
 impl RequestHandler<BlockCustomer> for Blocklist {
     async fn handle(&self, request: BlockCustomer) -> Result<(), SendError> {
-        self.order_ids.borrow_mut().push(request.order_id);
+        self.order_ids.push(request.order_id);
         Ok(())
     }
 }

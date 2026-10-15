@@ -1,8 +1,10 @@
 //! Tests für den Abschnitt „Notification — `publish`“ in `TESTLIST.md`.
 
-use std::cell::{Cell, OnceCell, RefCell};
+use std::cell::OnceCell;
 use std::error::Error;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use mediatr_rs::{Handler, Mediator, Publisher, RequestHandler, SendError, Sender, WeakMediator};
 
@@ -12,16 +14,16 @@ mod publish_fixtures;
 use common::Journal;
 use publish_fixtures::{
     Billing, Blocklist, CancellationError, CancellationMail, Checkout, CheckoutHandler, FraudCheck,
-    FraudDesk, FraudInvestigator, OrderCancelled, OrderPlaced, Packing, RecordedOrders, Refund,
-    ShippingDesk, TwoDesks, Warehouse,
+    FraudDesk, FraudInvestigator, OrderCancelled, OrderPlaced, Packing, Recorded, RecordedOrders,
+    Refund, ShippingDesk, TwoDesks, Warehouse,
 };
 
 #[tokio::test]
 async fn publish_runs_registered_handler() {
-    let labels = Rc::new(RefCell::new(Vec::new()));
+    let labels = Recorded::default();
     let mediator = Mediator::builder()
         .subscribe(Handler::instance(ShippingDesk {
-            labels: Rc::clone(&labels),
+            labels: labels.clone(),
         }))
         .build();
 
@@ -30,7 +32,7 @@ async fn publish_runs_registered_handler() {
         .await
         .unwrap();
 
-    assert_eq!(*labels.borrow(), [42]);
+    assert_eq!(labels.entries(), [42]);
 }
 
 #[tokio::test]
@@ -67,19 +69,17 @@ async fn publish_runs_both_handlers_in_registration_order() {
 
 #[tokio::test]
 async fn publish_returns_first_handler_error_and_skips_second_handler() {
-    let sent = Rc::new(RefCell::new(Vec::new()));
+    let sent = Recorded::default();
     let mediator = Mediator::builder()
         .subscribe(Handler::instance(Refund))
-        .subscribe(Handler::instance(CancellationMail {
-            sent: Rc::clone(&sent),
-        }))
+        .subscribe(Handler::instance(CancellationMail { sent: sent.clone() }))
         .build();
 
     let result = mediator.publish(OrderCancelled { order_id: 7 }).await;
 
     assert_eq!(
-        (result, sent.borrow().as_slice()),
-        (Err(CancellationError::PaymentProviderDown), [].as_slice())
+        (result, sent.entries()),
+        (Err(CancellationError::PaymentProviderDown), vec![])
     );
 }
 
@@ -101,15 +101,13 @@ async fn publish_runs_handler_type_registered_twice_once_with_first_registration
 
 #[tokio::test]
 async fn publish_reaches_only_handlers_of_its_notification_type() {
-    let labels = Rc::new(RefCell::new(Vec::new()));
-    let sent = Rc::new(RefCell::new(Vec::new()));
+    let labels = Recorded::default();
+    let sent = Recorded::default();
     let mediator = Mediator::builder()
         .subscribe(Handler::instance(ShippingDesk {
-            labels: Rc::clone(&labels),
+            labels: labels.clone(),
         }))
-        .subscribe(Handler::instance(CancellationMail {
-            sent: Rc::clone(&sent),
-        }))
+        .subscribe(Handler::instance(CancellationMail { sent: sent.clone() }))
         .build();
 
     mediator
@@ -121,10 +119,7 @@ async fn publish_reaches_only_handlers_of_its_notification_type() {
         .await
         .unwrap();
 
-    assert_eq!(
-        (labels.borrow().as_slice(), sent.borrow().as_slice()),
-        ([42].as_slice(), [7].as_slice())
-    );
+    assert_eq!((labels.entries(), sent.entries()), (vec![42], vec![7]));
 }
 
 #[tokio::test]
@@ -156,33 +151,33 @@ async fn publish_starts_second_handler_after_first_handler_finished_waiting() {
 
 #[tokio::test]
 async fn request_handler_publishes_through_injected_publisher() {
-    let labels = Rc::new(RefCell::new(Vec::new()));
+    let labels = Recorded::default();
     let mediator = Mediator::builder()
         .register(Handler::transient(|publisher| CheckoutHandler {
             publisher,
         }))
         .subscribe(Handler::instance(ShippingDesk {
-            labels: Rc::clone(&labels),
+            labels: labels.clone(),
         }))
         .build();
 
     mediator.send(Checkout { order_id: 42 }).await.unwrap();
 
-    assert_eq!(*labels.borrow(), [42]);
+    assert_eq!(labels.entries(), [42]);
 }
 
 #[tokio::test]
 async fn handler_publishes_to_fake_publisher() {
-    let order_ids = Rc::new(RefCell::new(Vec::new()));
+    let order_ids = Recorded::default();
     let handler = CheckoutHandler {
         publisher: RecordedOrders {
-            order_ids: Rc::clone(&order_ids),
+            order_ids: order_ids.clone(),
         },
     };
 
     handler.handle(Checkout { order_id: 42 }).await.unwrap();
 
-    assert_eq!(*order_ids.borrow(), [42]);
+    assert_eq!(order_ids.entries(), [42]);
 }
 
 #[tokio::test]
@@ -195,7 +190,7 @@ async fn singleton_handler_publishing_after_mediator_dropped_gets_mediator_dropp
             CheckoutHandler { publisher }
         }))
         .subscribe(Handler::instance(ShippingDesk {
-            labels: Rc::new(RefCell::new(Vec::new())),
+            labels: Recorded::default(),
         }))
         .build();
     mediator.send(Checkout { order_id: 41 }).await.unwrap();
@@ -211,19 +206,19 @@ async fn singleton_handler_publishing_after_mediator_dropped_gets_mediator_dropp
 
 #[tokio::test]
 async fn singleton_handler_publishing_while_mediator_alive_runs_handlers() {
-    let labels = Rc::new(RefCell::new(Vec::new()));
+    let labels = Recorded::default();
     let mediator = Mediator::builder()
         .register(Handler::singleton(|publisher: WeakMediator| {
             CheckoutHandler { publisher }
         }))
         .subscribe(Handler::instance(ShippingDesk {
-            labels: Rc::clone(&labels),
+            labels: labels.clone(),
         }))
         .build();
 
     mediator.send(Checkout { order_id: 42 }).await.unwrap();
 
-    assert_eq!(*labels.borrow(), [42]);
+    assert_eq!(labels.entries(), [42]);
 }
 
 #[tokio::test]
@@ -243,14 +238,14 @@ async fn publish_error_propagates_as_boxed_error() {
 
 #[tokio::test]
 async fn subscribe_transient_builds_handler_on_every_publish() {
-    let builds = Rc::new(Cell::new(0_u32));
-    let counter = Rc::clone(&builds);
-    let labels = Rc::new(RefCell::new(Vec::new()));
+    let builds = Arc::new(AtomicU32::new(0));
+    let counter = Arc::clone(&builds);
+    let labels = Recorded::default();
     let mediator = Mediator::builder()
         .subscribe(Handler::transient(move |_publisher: Mediator| {
-            counter.set(counter.get().saturating_add(1));
+            counter.fetch_add(1, Ordering::SeqCst);
             ShippingDesk {
-                labels: Rc::clone(&labels),
+                labels: labels.clone(),
             }
         }))
         .build();
@@ -264,19 +259,19 @@ async fn subscribe_transient_builds_handler_on_every_publish() {
         .await
         .unwrap();
 
-    assert_eq!(builds.get(), 2);
+    assert_eq!(builds.load(Ordering::SeqCst), 2);
 }
 
 #[tokio::test]
 async fn subscribe_transient_handler_publishes_through_received_mediator() {
-    let cases = Rc::new(RefCell::new(Vec::new()));
+    let cases = Recorded::default();
     let mediator = Mediator::builder()
         .subscribe(Handler::transient(|publisher| FraudCheck {
             publisher,
             blocked: vec![13],
         }))
         .subscribe(Handler::instance(FraudDesk {
-            cases: Rc::clone(&cases),
+            cases: cases.clone(),
         }))
         .build();
 
@@ -285,7 +280,7 @@ async fn subscribe_transient_handler_publishes_through_received_mediator() {
         .await
         .unwrap();
 
-    assert_eq!(*cases.borrow(), [13]);
+    assert_eq!(cases.entries(), [13]);
 }
 
 #[tokio::test]
@@ -372,7 +367,7 @@ async fn publish_runs_two_handler_types_subscribed_transient_in_registration_ord
 
 #[tokio::test]
 async fn nested_publish_and_send_through_received_mediators_run_all_handlers_without_panic() {
-    let blocked = Rc::new(RefCell::new(Vec::new()));
+    let blocked = Recorded::default();
     let mediator = Mediator::builder()
         .subscribe(Handler::transient(|publisher| FraudCheck {
             publisher,
@@ -380,11 +375,11 @@ async fn nested_publish_and_send_through_received_mediators_run_all_handlers_wit
         }))
         .subscribe(Handler::transient(|sender| FraudInvestigator { sender }))
         .register(Handler::instance(Blocklist {
-            order_ids: Rc::clone(&blocked),
+            order_ids: blocked.clone(),
         }))
         .build();
 
     let published = mediator.publish(OrderPlaced { order_id: 13 }).await;
 
-    assert_eq!((published, blocked.borrow().clone()), (Ok(()), vec![13]));
+    assert_eq!((published, blocked.entries()), (Ok(()), vec![13]));
 }

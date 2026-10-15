@@ -1,7 +1,9 @@
 //! Tests für den Abschnitt „Request/Handler — `send`“ in `TESTLIST.md`.
 
-use std::cell::{Cell, OnceCell};
+use std::cell::OnceCell;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use mediatr_rs::{Handler, Mediator, SendError, Sender, WeakMediator};
 
@@ -50,36 +52,36 @@ async fn register_accepts_async_closure() {
 
 #[tokio::test]
 async fn send_runs_handler_for_unit_response() {
-    let called = Rc::new(Cell::new(false));
+    let called = Arc::new(AtomicBool::new(false));
     let mediator = Mediator::builder()
         .register(Handler::instance(VoidPingHandler {
-            called: Rc::clone(&called),
+            called: Arc::clone(&called),
         }))
         .build();
 
     mediator.send(VoidPing).await.unwrap();
 
-    assert!(called.get());
+    assert!(called.load(Ordering::SeqCst));
 }
 
 #[tokio::test]
 async fn send_reaches_only_handler_of_its_request_type() {
-    let called = Rc::new(Cell::new(false));
+    let called = Arc::new(AtomicBool::new(false));
     let mediator = Mediator::builder()
         .register(Handler::instance(PingHandler))
         .register(Handler::instance(VoidPingHandler {
-            called: Rc::clone(&called),
+            called: Arc::clone(&called),
         }))
         .build();
 
     let response = mediator.send(Ping("Ping".to_owned())).await.unwrap();
 
     assert_eq!(response, Pong("Ping Pong".to_owned()));
-    assert!(!called.get());
+    assert!(!called.load(Ordering::SeqCst));
 
     mediator.send(VoidPing).await.unwrap();
 
-    assert!(called.get());
+    assert!(called.load(Ordering::SeqCst));
 }
 
 #[tokio::test]
@@ -152,18 +154,24 @@ async fn mediator_dropped_error_propagates_as_boxed_error() {
 
 #[tokio::test]
 async fn register_twice_does_not_call_first_handler() {
-    let first_called = Rc::new(Cell::new(false));
-    let second_called = Rc::new(Cell::new(false));
+    let first_called = Arc::new(AtomicBool::new(false));
+    let second_called = Arc::new(AtomicBool::new(false));
     let mediator = Mediator::builder()
         .register(Handler::instance(VoidPingHandler {
-            called: Rc::clone(&first_called),
+            called: Arc::clone(&first_called),
         }))
         .register(Handler::instance(VoidPingHandler {
-            called: Rc::clone(&second_called),
+            called: Arc::clone(&second_called),
         }))
         .build();
 
     mediator.send(VoidPing).await.unwrap();
 
-    assert_eq!((first_called.get(), second_called.get()), (false, true));
+    assert_eq!(
+        (
+            first_called.load(Ordering::SeqCst),
+            second_called.load(Ordering::SeqCst)
+        ),
+        (false, true)
+    );
 }

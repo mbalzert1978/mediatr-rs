@@ -1,5 +1,5 @@
-use std::cell::Cell;
-use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use mediatr_rs::{Request, RequestHandler, SendError};
 
@@ -37,12 +37,12 @@ impl Request for VoidPing {
 }
 
 pub struct VoidPingHandler {
-    pub called: Rc<Cell<bool>>,
+    pub called: Arc<AtomicBool>,
 }
 
 impl RequestHandler<VoidPing> for VoidPingHandler {
     async fn handle(&self, _request: VoidPing) -> Result<(), SendError> {
-        self.called.set(true);
+        self.called.store(true, Ordering::SeqCst);
         Ok(())
     }
 }
