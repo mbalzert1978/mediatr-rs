@@ -8,9 +8,9 @@ use mediatr_rs::{Handler, Mediator, Sender};
 mod error_handlers_fixtures;
 
 use error_handlers_fixtures::{
-    BookRoom, BookingAlert, BookingError, BrokenAlarm, ClosedWaitingList, ConfirmationMail,
-    FrontDesk, FullHotel, GuestNotice, OpenHotel, OverbookingCheck, PartnerHotel, PaymentGate,
-    RenovationCheck, WaitingList,
+    BookRoom, BookingAlert, BookingError, BrokenAlarm, CancelBooking, ClosedWaitingList,
+    ConfirmationMail, FrontDesk, FullHotel, GuestNotice, NoRefunds, OpenHotel, OverbookingCheck,
+    PartnerHotel, PaymentGate, RenovationCheck, WaitingList,
 };
 
 #[tokio::test]
@@ -493,5 +493,36 @@ async fn same_error_handler_type_registered_twice_runs_once_per_send() {
             "Zimmer 12 ausgebucht".to_owned(),
             "Überbuchung für Zimmer 12 abgelehnt".to_owned()
         ]
+    );
+}
+
+#[tokio::test]
+async fn error_action_for_one_request_type_runs_only_for_that_type() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .request_error_action::<BookRoom>(BookingAlert {
+            journal: Rc::clone(&journal),
+        })
+        .register(Handler::instance(FullHotel {
+            journal: Rc::clone(&journal),
+        }))
+        .register(Handler::instance(NoRefunds {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let _booking = mediator.send(BookRoom { room: 12 }).await;
+    let cancellation = mediator.send(CancelBooking { booking: 4711 }).await;
+
+    assert_eq!(
+        (cancellation, journal.borrow().clone()),
+        (
+            Err(BookingError::NotRefundable),
+            vec![
+                "Zimmer 12 ausgebucht".to_owned(),
+                "Alarm: Buchung für Zimmer 12 gescheitert: FullyBooked".to_owned(),
+                "Storno für Buchung 4711 abgelehnt".to_owned()
+            ]
+        )
     );
 }

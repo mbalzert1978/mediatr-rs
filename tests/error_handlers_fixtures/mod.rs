@@ -21,6 +21,7 @@ pub enum BookingError {
     AlarmFailed,
     UnderRenovation,
     ConfirmationFailed,
+    NotRefundable,
     Undeliverable(SendError),
 }
 
@@ -218,5 +219,29 @@ impl RequestErrorHandler<BookRoom> for FrontDesk {
             request.room
         ));
         Err(error)
+    }
+}
+
+/// Storniert die Buchung mit dieser Nummer.
+pub struct CancelBooking {
+    pub booking: u64,
+}
+
+impl Request for CancelBooking {
+    type Response = ();
+    type Error = BookingError;
+}
+
+/// Ein Hotel ohne Erstattung: Es schreibt jede Stornierung ins Protokoll und lehnt sie ab.
+pub struct NoRefunds {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl RequestHandler<CancelBooking> for NoRefunds {
+    async fn handle(&self, request: CancelBooking) -> Result<(), BookingError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Storno für Buchung {} abgelehnt", request.booking));
+        Err(BookingError::NotRefundable)
     }
 }
