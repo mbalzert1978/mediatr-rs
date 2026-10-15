@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use futures_core::Stream;
 use futures_util::StreamExt;
 use mediatr_rs::{
@@ -23,7 +26,7 @@ impl StreamRequestHandler<ListArrivals> for GuestBook {
     fn handle(
         &self,
         request: ListArrivals,
-    ) -> impl Stream<Item = Result<String, SendError>> + 'static {
+    ) -> impl Stream<Item = Result<String, SendError>> + use<> {
         let day = request.day;
         futures_util::stream::iter(
             self.guests
@@ -60,5 +63,22 @@ impl<M: StreamSender<ListArrivals>> RequestHandler<CountArrivals> for ArrivalBoa
             .into_iter()
             .collect::<Result<Vec<_>, _>>()
             .map(|guests| guests.len())
+    }
+}
+
+/// Die Rezeption: Sie notiert jedes Nachschlagen der Anreisen im Protokoll und kennt noch keine Gäste.
+pub struct FrontOffice {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl StreamRequestHandler<ListArrivals> for FrontOffice {
+    fn handle(
+        &self,
+        request: ListArrivals,
+    ) -> impl Stream<Item = Result<String, SendError>> + use<> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Anreisen für Tag {} nachgeschlagen", request.day));
+        futures_util::stream::empty()
     }
 }

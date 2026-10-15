@@ -1,11 +1,14 @@
 //! Tests für den Abschnitt „Stream-Request — Stream anfordern“ in `TESTLIST.md`.
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use futures_util::StreamExt;
 use mediatr_rs::{Handler, Mediator, SendError, Sender, StreamSender};
 
 mod streams_fixtures;
 
-use streams_fixtures::{ArrivalBoard, CountArrivals, GuestBook, ListArrivals};
+use streams_fixtures::{ArrivalBoard, CountArrivals, FrontOffice, GuestBook, ListArrivals};
 
 #[tokio::test]
 async fn create_stream_yields_exactly_handler_items_then_ends() {
@@ -81,4 +84,19 @@ async fn register_stream_twice_keeps_last_stream_handler() {
             Ok("Emil am Tag 5".to_owned())
         ]
     );
+}
+
+#[tokio::test]
+async fn unread_stream_does_not_run_stream_handler() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .register_stream(Handler::instance(FrontOffice {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let arrivals = mediator.create_stream(ListArrivals { day: 5 });
+    drop(arrivals);
+
+    assert_eq!(journal.borrow().clone(), Vec::<String>::new());
 }

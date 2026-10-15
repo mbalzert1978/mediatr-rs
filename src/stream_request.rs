@@ -28,5 +28,5 @@ pub(crate) type StreamResult<R> = Result<<R as StreamRequest>::Item, <R as Strea
 /// `handle` liefert für jeden Request genau einen Stream und löst keine Panic aus; der Stream leiht nichts vom Handler.
 pub trait StreamRequestHandler<R: StreamRequest> {
     /// Beantwortet `request` mit einem Stream seiner Elemente.
-    fn handle(&self, request: R) -> impl Stream<Item = StreamResult<R>> + 'static;
+    fn handle(&self, request: R) -> impl Stream<Item = StreamResult<R>> + use<Self, R>;
 }
