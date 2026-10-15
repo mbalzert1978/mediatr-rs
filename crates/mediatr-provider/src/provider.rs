@@ -36,7 +36,7 @@ pub struct Provider {
 #[derive(Debug)]
 struct Shared {
     services: Services,
-    /// Der Speicher des Providers, aus dem alle Scopes stammen; dort liegen die `scoped`-Dienste eines Singletons.
+    /// Der Speicher des Providers, aus dem alle Scopes stammen; daran erkennt der Provider, ob er selbst oder ein Scope abgefragt wird.
     root: Arc<Built>,
     /// Typen, deren Bauanleitung gerade läuft, je mit dem Thread, auf dem sie läuft.
     building: Mutex<HashSet<(ThreadId, TypeId)>>,
@@ -58,7 +58,7 @@ impl Provider {
         ProviderBuilder::default()
     }
 
-    /// Liefert den zuletzt registrierten Dienst vom Typ `T`; `Err(GetError::NoService)`, wenn er fehlt, `Err(GetError::Cycle)`, wenn seine Bauanleitung auf diesem Thread gerade läuft.
+    /// Liefert den zuletzt registrierten Dienst vom Typ `T`; sonst den [`GetError`], der sagt, warum nicht.
     ///
     /// # Errors
     ///
@@ -80,7 +80,7 @@ impl Provider {
         recipe(self, (id, index))
     }
 
-    /// Liefert alle Dienste vom Typ `T`, in der Reihenfolge ihrer Registrierung; eine leere Liste, wenn keiner registriert ist, `Err(GetError::Cycle)`, wenn eine Bauanleitung von `T` auf diesem Thread gerade läuft.
+    /// Liefert alle Dienste vom Typ `T`, in der Reihenfolge ihrer Registrierung, eine leere Liste, wenn keiner registriert ist; sonst den [`GetError`], der sagt, warum nicht.
     ///
     /// # Errors
     ///

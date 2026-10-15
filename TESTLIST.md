@@ -87,7 +87,7 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] (T11) Zwei Threads fragen im selben Scope gleichzeitig denselben `scoped`-Dienst ab → beide bekommen dasselbe Objekt · `two_threads_get_same_scoped_service_in_one_scope`
 - [ ] Zwei `singleton`-Bauanleitungen fragen einander ab, zwei Threads starten sie gleichzeitig → `get` kommt zurück, kein Warten für immer
 - [x] Dienst mit `scoped` registriert, Abfrage beim Provider selbst statt in einem Scope → die Abfrage liefert `Err(GetError::ScopedFromRoot)` · `scoped_service_from_provider_itself_gets_scoped_from_root`
-- [ ] (T11) Bauanleitung von `singleton` fragt nach einem `scoped`-Dienst, erste Abfrage kommt aus einem Scope → diese Abfrage liefert `Err(GetError::ScopedFromRoot)`
+- [x] (T11) Bauanleitung von `singleton` fragt nach einem `scoped`-Dienst, erste Abfrage kommt aus einem Scope → diese Abfrage liefert `Err(GetError::ScopedFromRoot)` · `singleton_recipe_asking_for_scoped_service_gets_scoped_from_root`
 - [ ] (T11) Bauanleitung von `transient` fragt, abgefragt in einem Scope, nach einem `scoped`-Dienst → sie bekommt den Dienst dieses Scopes
 - [ ] (T11) Dienst mit `scoped` registriert, `all` beim Provider selbst statt in einem Scope → `all` liefert `Err(GetError::ScopedFromRoot)`
 - [ ] Bauanleitung von `transient` fragt nach einem nicht registrierten Dienst und gibt den Fehler mit `?` weiter → die äußere Abfrage liefert `Err(GetError::NoDependency)`

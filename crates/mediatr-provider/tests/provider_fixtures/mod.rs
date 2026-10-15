@@ -12,6 +12,11 @@ pub struct Greeting(pub String);
 /// Eine Sitzung, die pro Scope neu entsteht.
 pub struct Session;
 
+/// Schreibt für die ganze Anwendung mit; `session` hält, was die Abfrage nach der Sitzung beim Bau ergab.
+pub struct AuditLog {
+    pub session: Result<Arc<Session>, GetError>,
+}
+
 /// Meldet über den geteilten Schalter, ob der Dienst noch lebt, der ihn hält: Sein `Drop` setzt ihn auf `false`.
 pub struct Alive(pub Arc<AtomicBool>);
 

@@ -9,9 +9,10 @@ use mediatr_provider::{GetError, Provider, Registration};
 mod provider_fixtures;
 
 use provider_fixtures::{
-    Alive, Config, Connection, Course, DeliveryNote, Document, Employee, Folder, Greeting, Invoice,
-    LedgerEntry, MenuItem, Name, Printer, Repository, Scheduler, Session, Settings, Student, Team,
-    UnitOfWork, connection_recipe, counting_recipe, gated_recipe, settings_recipe,
+    Alive, AuditLog, Config, Connection, Course, DeliveryNote, Document, Employee, Folder,
+    Greeting, Invoice, LedgerEntry, MenuItem, Name, Printer, Repository, Scheduler, Session,
+    Settings, Student, Team, UnitOfWork, connection_recipe, counting_recipe, gated_recipe,
+    settings_recipe,
 };
 
 #[test]
@@ -873,4 +874,18 @@ fn scoped_service_from_provider_itself_gets_scoped_from_root() {
     let session = provider.get::<Session>();
 
     assert!(matches!(session, Err(GetError::ScopedFromRoot)));
+}
+
+#[test]
+fn singleton_recipe_asking_for_scoped_service_gets_scoped_from_root() {
+    let provider = Provider::builder()
+        .register(Registration::scoped(|_| Session))
+        .register(Registration::singleton(|provider| AuditLog {
+            session: provider.get::<Session>(),
+        }))
+        .build();
+
+    let log = provider.scope().get::<AuditLog>().unwrap();
+
+    assert!(matches!(log.session, Err(GetError::ScopedFromRoot)));
 }
