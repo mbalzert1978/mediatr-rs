@@ -905,3 +905,14 @@ fn transient_recipe_in_scope_gets_scoped_service_of_scope() {
 
     assert!(matches!(&report.session, Ok(own) if Arc::ptr_eq(own, &session)));
 }
+
+#[test]
+fn scoped_all_from_provider_itself_gets_scoped_from_root() {
+    let provider = Provider::builder()
+        .register(Registration::scoped(|_| Session))
+        .build();
+
+    let sessions = provider.all::<Session>();
+
+    assert!(matches!(sessions, Err(GetError::ScopedFromRoot)));
+}

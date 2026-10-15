@@ -89,7 +89,7 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] Dienst mit `scoped` registriert, Abfrage beim Provider selbst statt in einem Scope → die Abfrage liefert `Err(GetError::ScopedFromRoot)` · `scoped_service_from_provider_itself_gets_scoped_from_root`
 - [x] (T11) Bauanleitung von `singleton` fragt nach einem `scoped`-Dienst, erste Abfrage kommt aus einem Scope → diese Abfrage liefert `Err(GetError::ScopedFromRoot)` · `singleton_recipe_asking_for_scoped_service_gets_scoped_from_root`
 - [x] (T11) Bauanleitung von `transient` fragt, abgefragt in einem Scope, nach einem `scoped`-Dienst → sie bekommt den Dienst dieses Scopes · `transient_recipe_in_scope_gets_scoped_service_of_scope`
-- [ ] (T11) Dienst mit `scoped` registriert, `all` beim Provider selbst statt in einem Scope → `all` liefert `Err(GetError::ScopedFromRoot)`
+- [x] (T11) Dienst mit `scoped` registriert, `all` beim Provider selbst statt in einem Scope → `all` liefert `Err(GetError::ScopedFromRoot)` · `scoped_all_from_provider_itself_gets_scoped_from_root`
 - [ ] Bauanleitung von `transient` fragt nach einem nicht registrierten Dienst und gibt den Fehler mit `?` weiter → die äußere Abfrage liefert `Err(GetError::NoDependency)`
 - [ ] (T11) Bauanleitung gibt das `Err(GetError::Cycle)` einer inneren Abfrage weiter → die äußere Abfrage liefert `Err(GetError::Cycle)`, nicht `NoDependency`
 
