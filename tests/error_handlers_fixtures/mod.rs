@@ -55,3 +55,18 @@ impl RequestErrorAction<BookRoom> for BookingAlert {
         Ok(())
     }
 }
+
+/// Informiert den Gast über jede gescheiterte Buchung und schreibt das ins Protokoll.
+pub struct GuestNotice {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl RequestErrorAction<BookRoom> for GuestNotice {
+    async fn execute(&self, request: &BookRoom, _error: &BookingError) -> Result<(), BookingError> {
+        self.journal.borrow_mut().push(format!(
+            "Gast informiert: Zimmer {} nicht verfügbar",
+            request.room
+        ));
+        Ok(())
+    }
+}

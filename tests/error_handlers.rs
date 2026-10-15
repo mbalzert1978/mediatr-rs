@@ -7,7 +7,7 @@ use mediatr_rs::{Handler, Mediator, Sender};
 
 mod error_handlers_fixtures;
 
-use error_handlers_fixtures::{BookRoom, BookingAlert, BookingError, FullHotel};
+use error_handlers_fixtures::{BookRoom, BookingAlert, BookingError, FullHotel, GuestNotice};
 
 #[tokio::test]
 async fn error_action_runs_on_handler_error_and_send_returns_handler_error() {
@@ -56,5 +56,35 @@ async fn error_action_runs_once_per_send_on_handler_error() {
             "Alarm: Buchung für Zimmer 12 gescheitert: FullyBooked".to_owned(),
             "Alarm: Buchung für Zimmer 14 gescheitert: FullyBooked".to_owned()
         ]
+    );
+}
+
+#[tokio::test]
+async fn two_error_actions_both_run_on_handler_error_and_send_returns_handler_error() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .open_request_error_action(BookingAlert {
+            journal: Rc::clone(&journal),
+        })
+        .open_request_error_action(GuestNotice {
+            journal: Rc::clone(&journal),
+        })
+        .register(Handler::instance(FullHotel {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let booking = mediator.send(BookRoom { room: 12 }).await;
+
+    assert_eq!(
+        (booking, journal.borrow().clone()),
+        (
+            Err(BookingError::FullyBooked),
+            vec![
+                "Zimmer 12 ausgebucht".to_owned(),
+                "Alarm: Buchung für Zimmer 12 gescheitert: FullyBooked".to_owned(),
+                "Gast informiert: Zimmer 12 nicht verfügbar".to_owned()
+            ]
+        )
     );
 }
