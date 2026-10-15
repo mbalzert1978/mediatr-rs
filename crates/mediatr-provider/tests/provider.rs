@@ -441,7 +441,7 @@ fn recipe_asking_all_for_own_type_through_get_gets_nothing() {
 }
 
 #[test]
-fn mutually_dependent_recipes_get_empty_list_from_inner_all() {
+fn mutually_dependent_recipes_get_nothing_from_inner_all() {
     let provider = Provider::builder()
         .register(Registration::transient(|provider| Course {
             students: provider.all::<Student>(),
