@@ -42,6 +42,20 @@ impl StreamRequestHandler<ListArrivals> for FrontOffice {
     }
 }
 
+/// Der Stream, den `inner` liefert; „`who` vorher“ steht im Protokoll, bevor `inner` läuft, „`who` nachher“ nach dem letzten Element.
+fn journaled<F: FnOnce() -> S, S: Stream>(
+    journal: &Rc<RefCell<Vec<String>>>,
+    who: &'static str,
+    inner: F,
+) -> impl Stream<Item = S::Item> + use<F, S> {
+    journal.borrow_mut().push(format!("{who} vorher"));
+    let journal = Rc::clone(journal);
+    inner().chain(futures_util::stream::poll_fn(move |_| {
+        journal.borrow_mut().push(format!("{who} nachher"));
+        Poll::Ready(None)
+    }))
+}
+
 /// Der Concierge begleitet jede Abfrage und schreibt Beginn und Ende ins Protokoll.
 pub struct Concierge {
     pub journal: Rc<RefCell<Vec<String>>>,
@@ -53,15 +67,7 @@ impl<R: StreamRequest + 'static> StreamPipelineBehavior<R> for Concierge {
         request: R,
         next: StreamNext<R>,
     ) -> impl Stream<Item = Result<R::Item, R::Error>> + use<R> {
-        self.journal
-            .borrow_mut()
-            .push("Concierge vorher".to_owned());
-        let journal = Rc::clone(&self.journal);
-        next.run(request)
-            .chain(futures_util::stream::poll_fn(move |_| {
-                journal.borrow_mut().push("Concierge nachher".to_owned());
-                Poll::Ready(None)
-            }))
+        journaled(&self.journal, "Concierge", || next.run(request))
     }
 }
 
@@ -76,15 +82,7 @@ impl<R: StreamRequest + 'static> StreamPipelineBehavior<R> for NightPorter {
         request: R,
         next: StreamNext<R>,
     ) -> impl Stream<Item = Result<R::Item, R::Error>> + use<R> {
-        self.journal
-            .borrow_mut()
-            .push("Nachtportier vorher".to_owned());
-        let journal = Rc::clone(&self.journal);
-        next.run(request)
-            .chain(futures_util::stream::poll_fn(move |_| {
-                journal.borrow_mut().push("Nachtportier nachher".to_owned());
-                Poll::Ready(None)
-            }))
+        journaled(&self.journal, "Nachtportier", || next.run(request))
     }
 }
 
@@ -99,4 +97,82 @@ pub fn concierge_and_night_porter_around(handled: &str) -> Vec<String> {
     ]
     .map(str::to_owned)
     .to_vec()
+}
+
+/// Fragt die Gäste ab, die an diesem Tag abreisen.
+pub struct ListDepartures {
+    pub day: u32,
+}
+
+impl StreamRequest for ListDepartures {
+    type Item = String;
+    type Error = SendError;
+}
+
+/// Die Abreisetafel: Sie notiert jedes Nachschlagen der Abreisen im Protokoll und meldet keine Gäste.
+pub struct DepartureBoard {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl StreamRequestHandler<ListDepartures> for DepartureBoard {
+    fn handle(
+        &self,
+        request: ListDepartures,
+    ) -> impl Stream<Item = Result<String, SendError>> + use<> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Abreisen für Tag {} nachgeschlagen", request.day));
+        futures_util::stream::empty()
+    }
+}
+
+/// Der Page begleitet nur Abfragen der Anreisen und schreibt Beginn und Ende ins Protokoll.
+pub struct Bellboy {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl StreamPipelineBehavior<ListArrivals> for Bellboy {
+    fn handle(
+        &self,
+        request: ListArrivals,
+        next: StreamNext<ListArrivals>,
+    ) -> impl Stream<Item = Result<String, SendError>> + use<> {
+        journaled(&self.journal, "Page", || next.run(request))
+    }
+}
+
+/// Was Concierge, Page und Nachtportier, in dieser Reihenfolge registriert, um den Protokolleintrag `handled` eines Handlers herum schreiben.
+pub fn concierge_bellboy_and_night_porter_around(handled: &str) -> Vec<String> {
+    [
+        "Concierge vorher",
+        "Page vorher",
+        "Nachtportier vorher",
+        handled,
+        "Nachtportier nachher",
+        "Page nachher",
+        "Concierge nachher",
+    ]
+    .map(str::to_owned)
+    .to_vec()
+}
+
+/// Concierge, der in `journal` schreibt.
+pub fn concierge(journal: &Rc<RefCell<Vec<String>>>) -> Concierge {
+    Concierge {
+        journal: Rc::clone(journal),
+    }
+}
+
+/// Page, der in `journal` schreibt.
+pub fn bellboy(journal: &Rc<RefCell<Vec<String>>>) -> Bellboy {
+    Bellboy {
+        journal: Rc::clone(journal),
+    }
+}
+
+/// Nachtportier, der in `journal` schreibt.
+pub fn night_porter(journal: &Rc<RefCell<Vec<String>>>) -> NightPorter {
+    NightPorter {
+        journal: Rc::clone(journal),
+    }
 }
