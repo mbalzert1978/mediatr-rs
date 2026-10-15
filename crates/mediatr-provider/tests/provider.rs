@@ -401,7 +401,7 @@ fn scoped_recipe_asking_for_own_type_in_scope_gets_nothing() {
 }
 
 #[test]
-fn recipe_asking_twice_for_own_type_gets_none_both_times() {
+fn recipe_asking_twice_for_own_type_gets_nothing_both_times() {
     let provider = Provider::builder()
         .register(Registration::transient(|provider| Folder {
             parent: provider.get::<Folder>(),
