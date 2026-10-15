@@ -2,7 +2,7 @@
 
 use std::panic::{self, AssertUnwindSafe};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Barrier, Mutex, PoisonError};
 
 use mediatr_provider::{Provider, Registration};
 
@@ -835,11 +835,33 @@ fn second_thread_gets_transient_service_while_first_thread_builds_it() {
     let second = std::thread::scope(|scope| {
         let first = scope.spawn(|| provider.get::<Config>());
         gate.wait_started();
-        let second = scope.spawn(|| provider.get::<Config>()).join().unwrap();
+        let second = scope.spawn(|| provider.get::<Config>()).join();
         gate.release();
         first.join().unwrap();
-        second
+        second.unwrap()
     });
 
     assert!(second.is_some());
+}
+
+#[test]
+fn two_threads_get_same_singleton_built_once() {
+    let (calls, recipe) = counting_recipe();
+    let provider = Provider::builder()
+        .register(Registration::singleton(recipe))
+        .build();
+    let start = Barrier::new(2);
+
+    let (first, second) = std::thread::scope(|scope| {
+        let get = || {
+            start.wait();
+            provider.get::<Config>().unwrap()
+        };
+        let first = scope.spawn(get);
+        let second = scope.spawn(get);
+        (first.join().unwrap(), second.join().unwrap())
+    });
+
+    assert!(Arc::ptr_eq(&first, &second));
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
 }
