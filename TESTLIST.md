@@ -192,7 +192,7 @@ Quelle: MediatR `test/MediatR.Tests/Pipeline/RequestExceptionHandlerTests.cs`, `
 - [x] Fehler-Aktion nur für einen Request-Typ registriert, Requests dieses und eines anderen Typs scheitern → sie läuft nur für ihren Typ; für den anderen liefert `send` dessen Fehler · `error_action_for_one_request_type_runs_only_for_that_type`
 - [x] Handler scheitert, zwei Fehler-Handler, der erste reicht einen eigenen Fehler weiter → der zweite bekommt diesen Fehler statt des ursprünglichen · `second_error_handler_gets_error_passed_on_by_first_instead_of_original`
 - [x] Handler hat Erfolg, ein Fehler-Handler ist registriert → er läuft nicht, `send` liefert die Antwort des Handlers · `successful_handler_skips_error_handler_and_send_returns_its_response`
-- [ ] Fehler-Handler nur für einen Request-Typ registriert, Requests dieses und eines anderen Typs scheitern → er läuft nur für seinen Typ; für den anderen liefert `send` dessen Fehler
+- [x] Fehler-Handler nur für einen Request-Typ registriert, Requests dieses und eines anderen Typs scheitern → er läuft nur für seinen Typ; für den anderen liefert `send` dessen Fehler · `error_handler_for_one_request_type_runs_only_for_that_type`
 - [x] Derselbe Fehler-Handler-Typ zweimal registriert → er läuft pro `send` einmal · `same_error_handler_type_registered_twice_runs_once_per_send`
 - [x] Derselbe Fehler-Aktions-Typ zweimal registriert → sie läuft pro `send` einmal · `same_error_action_type_registered_twice_runs_once_per_send`
 - [x] Fehler-Handler registriert, Request ohne `Clone` → `send` kompiliert nicht · `error_handler_makes_send_for_non_clone_request_not_compile`

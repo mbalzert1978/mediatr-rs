@@ -526,3 +526,34 @@ async fn error_action_for_one_request_type_runs_only_for_that_type() {
         )
     );
 }
+
+#[tokio::test]
+async fn error_handler_for_one_request_type_runs_only_for_that_type() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .request_error_handler::<BookRoom>(OverbookingCheck {
+            journal: Rc::clone(&journal),
+        })
+        .register(Handler::instance(FullHotel {
+            journal: Rc::clone(&journal),
+        }))
+        .register(Handler::instance(NoRefunds {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let _booking = mediator.send(BookRoom { room: 12 }).await;
+    let cancellation = mediator.send(CancelBooking { booking: 4711 }).await;
+
+    assert_eq!(
+        (cancellation, journal.borrow().clone()),
+        (
+            Err(BookingError::NotRefundable),
+            vec![
+                "Zimmer 12 ausgebucht".to_owned(),
+                "Überbuchung für Zimmer 12 abgelehnt".to_owned(),
+                "Storno für Buchung 4711 abgelehnt".to_owned()
+            ]
+        )
+    );
+}

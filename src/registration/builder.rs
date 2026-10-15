@@ -15,7 +15,8 @@ use crate::wrappers::{
 };
 use crate::{
     ForeachAwaitPublisher, Handler, Mediator, Notification, NotificationHandler, PipelineBehavior,
-    Request, RequestErrorAction, RequestHandler, RequestPostProcessor, RequestPreProcessor,
+    Request, RequestErrorAction, RequestErrorHandler, RequestHandler, RequestPostProcessor,
+    RequestPreProcessor,
 };
 
 /// Sammelt Behaviors und Handler und baut daraus einen [`Mediator`] mit dem Notification-Publisher `S` und der Kette `P` der Behaviors.
@@ -173,6 +174,18 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
         error_handler: B,
     ) -> MediatorBuilder<S, (P, OpenBehavior<RequestErrorProcessorBehavior<B>>)> {
         self.open(
+            RequestErrorProcessorBehavior(error_handler),
+            Stage::ErrorHandler,
+        )
+    }
+
+    /// Registriert `error_handler` nur für Requests vom Typ `R`; er bekommt jeden Fehler, bevor eine Fehler-Aktion ihn sieht.
+    #[must_use]
+    pub fn request_error_handler<R: Request + Clone + 'static>(
+        self,
+        error_handler: impl RequestErrorHandler<R> + 'static,
+    ) -> MediatorBuilder<S, (P, Closed)> {
+        self.closed::<R>(
             RequestErrorProcessorBehavior(error_handler),
             Stage::ErrorHandler,
         )
