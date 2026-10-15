@@ -44,6 +44,11 @@ print_stderr = "deny"
 excessive_nesting = "deny"
 
 [dev-dependencies]
+criterion = { version = "0.8.2", default-features = false, features = ["cargo_bench_support"] }
 futures-util = "0.3.31"
 tokio = { version = "1.53.2", features = ["macros", "rt", "test-util", "time"] }
 trybuild = "1.0.122"
+
+[[bench]]
+name = "mediator"
+harness = false
