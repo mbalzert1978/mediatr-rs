@@ -12,11 +12,12 @@ use crate::pipeline::{
 };
 use crate::wrappers::{
     BehaviorWrapper, wrap_behavior, wrap_notification_handler, wrap_request_handler,
+    wrap_stream_request_handler,
 };
 use crate::{
     ForeachAwaitPublisher, Handler, Mediator, Notification, NotificationHandler, PipelineBehavior,
     Request, RequestErrorAction, RequestErrorHandler, RequestHandler, RequestPostProcessor,
-    RequestPreProcessor,
+    RequestPreProcessor, StreamRequest, StreamRequestHandler,
 };
 
 /// Sammelt Behaviors und Handler und baut daraus einen [`Mediator`] mit dem Notification-Publisher `S` und der Kette `P` der Behaviors.
@@ -249,6 +250,19 @@ impl<S, P, F> MediatorBuilder<S, P, F> {
         H: RequestHandler<R> + 'static,
     {
         self.with_registration(handler.registration.map(wrap_request_handler))
+    }
+
+    /// Registriert `handler` für Stream-Requests vom Typ `R`; ein früherer Stream-Handler für `R` fällt weg.
+    #[must_use]
+    pub fn register_stream<R, H>(
+        self,
+        handler: Handler<H, S, P>,
+    ) -> MediatorBuilder<S, P, WithHandlers>
+    where
+        R: StreamRequest + 'static,
+        H: StreamRequestHandler<R> + 'static,
+    {
+        self.with_registration(handler.registration.map(wrap_stream_request_handler))
     }
 
     /// Registriert `handler` für Notifications vom Typ `N`; ist für `N` schon ein Handler vom Typ `H` registriert, fällt `handler` weg.

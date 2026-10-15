@@ -2,15 +2,22 @@
 
 use std::fmt;
 use std::marker::PhantomData;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+use futures_core::Stream;
 
 use mediatr_provider::{Provider, WeakProvider};
 
 use crate::pipeline::{Behaviors, Slot};
 use crate::request::HandlerResult;
-use crate::wrappers::{NotificationHandlerWrapper, RequestHandlerWrapper};
+use crate::stream_request::StreamResult;
+use crate::wrappers::{
+    LocalBoxStream, NotificationHandlerWrapper, RequestHandlerWrapper, StreamRequestHandlerWrapper,
+};
 use crate::{
     ForeachAwaitPublisher, MediatorBuilder, Next, Notification, NotificationPublisher, Publisher,
-    Request, SendError, Sender,
+    Request, SendError, Sender, StreamRequest, StreamSender,
 };
 
 /// Stellt Requests und Notifications den Handlern zu, die für ihren Typ registriert sind.
@@ -132,5 +139,31 @@ impl<S: NotificationPublisher, P, N: Notification + 'static> Publisher<N> for We
         let mediator: Mediator<S, P> =
             Mediator::new(self.provider.upgrade().ok_or(SendError::MediatorDropped)?);
         mediator.publish(notification).await
+    }
+}
+
+impl<S, P, R: StreamRequest + 'static> StreamSender<R> for Mediator<S, P> {
+    fn create_stream(&self, request: R) -> impl Stream<Item = StreamResult<R>> {
+        // dyn: der Stream des Handlers und `Once` sind verschiedene Typen und brauchen einen gemeinsamen.
+        let stream: LocalBoxStream<StreamResult<R>> =
+            match self.provider.get::<StreamRequestHandlerWrapper<R>>() {
+                Some(handler) => handler(request),
+                None => Box::pin(Once(None)),
+            };
+        stream
+    }
+}
+
+/// Ein Stream, der höchstens ein Element liefert und danach endet.
+struct Once<T>(Option<T>);
+
+// Von Hand: `Once` hält sein Element nie angeheftet, es nimmt es nur heraus.
+impl<T> Unpin for Once<T> {}
+
+impl<T> Stream for Once<T> {
+    type Item = T;
+
+    fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<T>> {
+        Poll::Ready(self.get_mut().0.take())
     }
 }
