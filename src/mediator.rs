@@ -148,7 +148,7 @@ impl<S, P, R: StreamRequest + 'static> StreamSender<R> for Mediator<S, P> {
         let stream: LocalBoxStream<StreamResult<R>> =
             match self.provider.get::<StreamRequestHandlerWrapper<R>>() {
                 Some(handler) => handler(request),
-                None => Box::pin(Once(None)),
+                None => Box::pin(Once(Some(Err(R::Error::from(SendError::NoHandler))))),
             };
         stream
     }

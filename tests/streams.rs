@@ -1,7 +1,7 @@
 //! Tests für den Abschnitt „Stream-Request — Stream anfordern“ in `TESTLIST.md`.
 
 use futures_util::StreamExt;
-use mediatr_rs::{Handler, Mediator, StreamSender};
+use mediatr_rs::{Handler, Mediator, SendError, StreamSender};
 
 mod streams_fixtures;
 
@@ -28,4 +28,16 @@ async fn create_stream_yields_exactly_handler_items_then_ends() {
             Ok("Clara am Tag 3".to_owned())
         ]
     );
+}
+
+#[tokio::test]
+async fn create_stream_without_handler_yields_no_handler_error() {
+    let mediator = Mediator::builder().build();
+
+    let arrivals: Vec<_> = mediator
+        .create_stream(ListArrivals { day: 3 })
+        .collect()
+        .await;
+
+    assert_eq!(arrivals, vec![Err(SendError::NoHandler)]);
 }
