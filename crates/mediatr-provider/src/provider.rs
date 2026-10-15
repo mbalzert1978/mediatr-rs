@@ -6,6 +6,7 @@ mod registration;
 use std::any::{Any, TypeId};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
+use std::thread::{self, ThreadId};
 
 use registration::Recipe;
 
@@ -36,8 +37,8 @@ struct Shared {
     services: Services,
     /// Der Speicher des Providers, aus dem alle Scopes stammen; dort liegen die `scoped`-Dienste eines Singletons.
     root: Arc<Built>,
-    /// Typen, deren Bauanleitung gerade läuft.
-    building: Mutex<HashSet<TypeId>>,
+    /// Typen, deren Bauanleitung gerade läuft, je mit dem Thread, auf dem sie läuft.
+    building: Mutex<HashSet<(ThreadId, TypeId)>>,
 }
 
 /// Verweis auf einen [`Provider`], den [`Provider::downgrade`] liefert; hält dessen Dienste nicht am Leben.
@@ -133,24 +134,25 @@ pub(crate) fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-/// Hält den Typ `id` in `types`, solange er lebt; gibt ihn beim Fallen frei, auch nach einem Panic der Bauanleitung.
+/// Hält den Typ `id` für den laufenden Thread in `types`, solange er lebt; gibt ihn beim Fallen frei, auch nach einem Panic der Bauanleitung.
 struct Building<'a> {
-    types: &'a Mutex<HashSet<TypeId>>,
-    id: TypeId,
+    types: &'a Mutex<HashSet<(ThreadId, TypeId)>>,
+    key: (ThreadId, TypeId),
 }
 
 impl<'a> Building<'a> {
-    /// Trägt `id` in `types` ein; `None`, wenn `id` dort schon steht.
-    fn enter(types: &'a Mutex<HashSet<TypeId>>, id: TypeId) -> Option<Self> {
-        if !lock(types).insert(id) {
+    /// Trägt `id` für den laufenden Thread in `types` ein; `None`, wenn er dort schon steht.
+    fn enter(types: &'a Mutex<HashSet<(ThreadId, TypeId)>>, id: TypeId) -> Option<Self> {
+        let key = (thread::current().id(), id);
+        if !lock(types).insert(key) {
             return None;
         }
-        Some(Self { types, id })
+        Some(Self { types, key })
     }
 }
 
 impl Drop for Building<'_> {
     fn drop(&mut self) {
-        lock(self.types).remove(&self.id);
+        lock(self.types).remove(&self.key);
     }
 }

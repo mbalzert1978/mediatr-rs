@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::{Arc, Barrier};
 
 use mediatr_provider::{Provider, WeakProvider};
 
@@ -157,4 +157,46 @@ impl From<Invoice> for LedgerEntry {
     fn from(invoice: Invoice) -> Self {
         Self(invoice.heading)
     }
+}
+
+/// Ein Tor für eine Bauanleitung: ihr erster Lauf meldet, dass er läuft, und wartet dann, bis `release` ihn weiterlässt.
+pub struct Gate {
+    started: Barrier,
+    released: Barrier,
+    entered: AtomicBool,
+}
+
+impl Gate {
+    /// Wartet, bis der erste Lauf der Bauanleitung läuft.
+    pub fn wait_started(&self) {
+        self.started.wait();
+    }
+
+    /// Lässt den ersten Lauf der Bauanleitung weiterlaufen.
+    pub fn release(&self) {
+        self.released.wait();
+    }
+
+    /// Hält den ersten Lauf an, bis `release` ihn weiterlässt; jeder weitere Lauf geht durch.
+    fn pass(&self) {
+        if !self.entered.swap(true, Ordering::SeqCst) {
+            self.started.wait();
+            self.released.wait();
+        }
+    }
+}
+
+/// Liefert ein Tor und eine Bauanleitung für `Config`, deren erster Lauf an diesem Tor wartet.
+pub fn gated_recipe() -> (Arc<Gate>, impl Fn(&Provider) -> Config) {
+    let gate = Arc::new(Gate {
+        started: Barrier::new(2),
+        released: Barrier::new(2),
+        entered: AtomicBool::new(false),
+    });
+    let pass = Arc::clone(&gate);
+    let recipe = move |_: &Provider| {
+        pass.pass();
+        Config
+    };
+    (gate, recipe)
 }

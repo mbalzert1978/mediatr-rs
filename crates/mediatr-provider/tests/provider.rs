@@ -11,7 +11,7 @@ mod provider_fixtures;
 use provider_fixtures::{
     Alive, AuditLog, Config, Connection, Course, DeliveryNote, Document, Employee, Folder,
     Greeting, Invoice, LedgerEntry, MenuItem, Name, Printer, Report, Repository, Scheduler,
-    Session, Settings, Student, Team, UnitOfWork, connection_recipe, counting_recipe,
+    Session, Settings, Student, Team, UnitOfWork, connection_recipe, counting_recipe, gated_recipe,
     settings_recipe,
 };
 
@@ -823,4 +823,23 @@ fn provider_moved_to_other_thread_returns_registered_service() {
         .unwrap();
 
     assert_eq!(name, Some("Ada"));
+}
+
+#[test]
+fn second_thread_gets_transient_service_while_first_thread_builds_it() {
+    let (gate, recipe) = gated_recipe();
+    let provider = Provider::builder()
+        .register(Registration::transient(recipe))
+        .build();
+
+    let second = std::thread::scope(|scope| {
+        let first = scope.spawn(|| provider.get::<Config>());
+        gate.wait_started();
+        let second = scope.spawn(|| provider.get::<Config>()).join().unwrap();
+        gate.release();
+        first.join().unwrap();
+        second
+    });
+
+    assert!(second.is_some());
 }

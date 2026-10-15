@@ -39,6 +39,8 @@ impl<T: Send + Sync + 'static> Registration<T> {
     }
 
     /// Dienst aus `recipe`; die erste Abfrage baut ihn mit dem Provider statt mit dem Scope, jede weitere liefert dasselbe Objekt.
+    ///
+    /// Singleton-Bauanleitungen dürfen einander nicht abfragen: Starten zwei Threads gleichzeitig je eine davon, warten beide für immer.
     #[must_use]
     #[expect(
         clippy::disallowed_types,
