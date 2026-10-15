@@ -367,7 +367,7 @@ fn recipe_asking_for_own_type_gets_none() {
 }
 
 #[test]
-fn first_of_two_recipes_asking_for_own_type_through_all_gets_none() {
+fn first_of_two_recipes_asking_for_own_type_through_all_gets_nothing() {
     let provider = Provider::builder()
         .register(Registration::transient(settings_recipe))
         .register(Registration::transient(|_| Settings { parent: None }))
