@@ -64,8 +64,12 @@ impl<T: Send + Sync + 'static> Registration<T> {
     /// Beim Provider selbst abgefragt, liefert sie `Err(GetError::ScopedFromRoot)`; nur ein Scope aus [`Provider::scope`] baut den Dienst.
     ///
     /// Fragen zwei Threads im selben Scope gleichzeitig ab, kann die Bauanleitung zweimal laufen; beide bekommen dasselbe Objekt.
+    ///
+    /// Liefert `recipe` einen Fehler, liefert die Abfrage ihn weiter; aus `Err(GetError::NoService)` wird dabei `Err(GetError::NoDependency)`.
     #[must_use]
-    pub fn scoped(recipe: impl Fn(&Provider) -> T + Send + Sync + 'static) -> Self {
+    pub fn scoped(
+        recipe: impl Fn(&Provider) -> Result<T, GetError> + Send + Sync + 'static,
+    ) -> Self {
         Self::new(move |provider, slot| scoped_service(provider, slot, &recipe))
     }
 
@@ -118,7 +122,7 @@ impl<T> fmt::Debug for Registration<T> {
 fn scoped_service<T: Send + Sync + 'static>(
     provider: &Provider,
     slot: Slot,
-    recipe: impl Fn(&Provider) -> T,
+    recipe: impl Fn(&Provider) -> Result<T, GetError>,
 ) -> Result<Arc<T>, GetError> {
     if provider.is_root() {
         return Err(GetError::ScopedFromRoot);
@@ -126,13 +130,14 @@ fn scoped_service<T: Send + Sync + 'static>(
     let cached = lock(&provider.built)
         .get(&slot)
         .and_then(|service| Arc::clone(service).downcast().ok());
-    Ok(cached.unwrap_or_else(|| {
-        let service = Arc::new(recipe(provider));
-        let kept = Arc::clone(
-            lock(&provider.built)
-                .entry(slot)
-                .or_insert(Arc::clone(&service) as Arc<dyn Any + Send + Sync>),
-        );
-        kept.downcast().unwrap_or(service)
-    }))
+    if let Some(service) = cached {
+        return Ok(service);
+    }
+    let service = Arc::new(recipe(provider)?);
+    let kept = Arc::clone(
+        lock(&provider.built)
+            .entry(slot)
+            .or_insert(Arc::clone(&service) as Arc<dyn Any + Send + Sync>),
+    );
+    Ok(kept.downcast().unwrap_or(service))
 }

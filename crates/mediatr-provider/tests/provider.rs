@@ -104,7 +104,7 @@ fn singleton_all_returns_same_object_as_get() {
 #[test]
 fn scoped_all_returns_same_object_as_get_within_scope() {
     let provider = Provider::builder()
-        .register(Registration::scoped(|_| Config))
+        .register(Registration::scoped(|_| Ok(Config)))
         .build();
     let first = provider.scope();
     let second = provider.scope();
@@ -150,7 +150,7 @@ fn singleton_runs_recipe_once_on_first_get() {
 fn scoped_runs_recipe_once_per_scope() {
     let (calls, recipe) = counting_recipe();
     let provider = Provider::builder()
-        .register(Registration::scoped(recipe))
+        .register(Registration::scoped(move |provider| Ok(recipe(provider))))
         .build();
     let first = provider.scope();
     let second = provider.scope();
@@ -194,8 +194,8 @@ fn recipe_gets_other_service_from_provider() {
 #[test]
 fn two_scoped_registrations_of_same_type_build_one_object_each() {
     let scope = Provider::builder()
-        .register(Registration::scoped(|_| Name("haupt")))
-        .register(Registration::scoped(|_| Name("ersatz")))
+        .register(Registration::scoped(|_| Ok(Name("haupt"))))
+        .register(Registration::scoped(|_| Ok(Name("ersatz"))))
         .build()
         .scope();
 
@@ -213,7 +213,7 @@ fn two_scoped_registrations_of_same_type_build_one_object_each() {
 fn cloned_scope_returns_same_scoped_service() {
     let (calls, recipe) = counting_recipe();
     let scope = Provider::builder()
-        .register(Registration::scoped(recipe))
+        .register(Registration::scoped(move |provider| Ok(recipe(provider))))
         .build()
         .scope();
     let clone = scope.clone();
@@ -287,7 +287,7 @@ fn upgrade_after_provider_dropped_returns_none() {
 #[test]
 fn upgraded_weak_scope_returns_same_scoped_service() {
     let scope = Provider::builder()
-        .register(Registration::scoped(|_| Config))
+        .register(Registration::scoped(|_| Ok(Config)))
         .build()
         .scope();
     let weak = scope.downgrade();
@@ -316,9 +316,11 @@ fn scoped_holding_weak_scope_is_released_with_scope() {
     let open = Arc::new(AtomicBool::new(true));
     let flag = Arc::clone(&open);
     let provider = Provider::builder()
-        .register(Registration::scoped(move |scope| UnitOfWork {
-            _scope: scope.downgrade(),
-            _alive: Alive(Arc::clone(&flag)),
+        .register(Registration::scoped(move |scope| {
+            Ok(UnitOfWork {
+                _scope: scope.downgrade(),
+                _alive: Alive(Arc::clone(&flag)),
+            })
         }))
         .build();
     let scope = provider.scope();
@@ -374,7 +376,9 @@ fn singleton_recipe_asking_for_own_type_gets_nothing() {
 #[test]
 fn scoped_recipe_asking_for_own_type_in_scope_gets_nothing() {
     let provider = Provider::builder()
-        .register(Registration::scoped(settings_recipe))
+        .register(Registration::scoped(|provider| {
+            Ok(settings_recipe(provider))
+        }))
         .build();
 
     let settings = provider.scope().get::<Settings>().unwrap();
@@ -509,7 +513,7 @@ fn singleton_recipe_runs_again_after_caught_panic() {
 fn scoped_recipe_runs_again_after_caught_panic() {
     let (server_up, recipe) = connection_recipe();
     let scope = Provider::builder()
-        .register(Registration::scoped(recipe))
+        .register(Registration::scoped(move |provider| Ok(recipe(provider))))
         .build()
         .scope();
     let failed = panic::catch_unwind(AssertUnwindSafe(|| scope.get::<Connection>()));
@@ -885,7 +889,7 @@ fn two_threads_get_same_scoped_service_in_one_scope() {
     let provider = Provider::builder()
         .register(Registration::scoped(move |_| {
             both_building.wait();
-            Session
+            Ok(Session)
         }))
         .build();
     let scope = provider.scope();
@@ -903,7 +907,7 @@ fn two_threads_get_same_scoped_service_in_one_scope() {
 #[test]
 fn scoped_service_from_provider_itself_gets_scoped_from_root() {
     let provider = Provider::builder()
-        .register(Registration::scoped(|_| Session))
+        .register(Registration::scoped(|_| Ok(Session)))
         .build();
 
     let session = provider.get::<Session>();
@@ -914,7 +918,7 @@ fn scoped_service_from_provider_itself_gets_scoped_from_root() {
 #[test]
 fn singleton_recipe_asking_for_scoped_service_gets_scoped_from_root() {
     let provider = Provider::builder()
-        .register(Registration::scoped(|_| Session))
+        .register(Registration::scoped(|_| Ok(Session)))
         .register(Registration::singleton(|provider| AuditLog {
             session: provider.get::<Session>(),
         }))
@@ -928,7 +932,7 @@ fn singleton_recipe_asking_for_scoped_service_gets_scoped_from_root() {
 #[test]
 fn transient_recipe_in_scope_gets_scoped_service_of_scope() {
     let provider = Provider::builder()
-        .register(Registration::scoped(|_| Session))
+        .register(Registration::scoped(|_| Ok(Session)))
         .register(Registration::transient(|provider| {
             Ok(Report {
                 session: provider.get::<Session>(),
@@ -946,7 +950,7 @@ fn transient_recipe_in_scope_gets_scoped_service_of_scope() {
 #[test]
 fn scoped_all_from_provider_itself_gets_scoped_from_root() {
     let provider = Provider::builder()
-        .register(Registration::scoped(|_| Session))
+        .register(Registration::scoped(|_| Ok(Session)))
         .build();
 
     let sessions = provider.all::<Session>();
@@ -963,6 +967,19 @@ fn recipe_asking_for_unregistered_service_gets_no_dependency() {
         .build();
 
     let greeting = provider.get::<Greeting>();
+
+    assert!(matches!(greeting, Err(GetError::NoDependency)));
+}
+
+#[test]
+fn scoped_recipe_asking_for_unregistered_service_gets_no_dependency() {
+    let provider = Provider::builder()
+        .register(Registration::scoped(|provider| {
+            Ok(Greeting(format!("Hallo {}", provider.get::<Name>()?.0)))
+        }))
+        .build();
+
+    let greeting = provider.scope().get::<Greeting>();
 
     assert!(matches!(greeting, Err(GetError::NoDependency)));
 }

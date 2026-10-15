@@ -93,7 +93,7 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] Bauanleitung von `transient` fragt nach einem nicht registrierten Dienst und gibt den Fehler mit `?` weiter → die äußere Abfrage liefert `Err(GetError::NoDependency)` · `recipe_asking_for_unregistered_service_gets_no_dependency`
 - [ ] (T11) Bauanleitung gibt das `Err(GetError::Cycle)` einer inneren Abfrage weiter → die äußere Abfrage liefert `Err(GetError::Cycle)`, nicht `NoDependency`
 - [ ] Bauanleitung, über `all` abgefragt, fragt nach einem nicht registrierten Dienst und gibt den Fehler weiter → `all` liefert `Err(GetError::NoDependency)`
-- [ ] Bauanleitung von `scoped` fragt nach einem nicht registrierten Dienst und gibt den Fehler weiter → die Abfrage im Scope liefert `Err(GetError::NoDependency)`
+- [x] Bauanleitung von `scoped` fragt nach einem nicht registrierten Dienst und gibt den Fehler weiter → die Abfrage im Scope liefert `Err(GetError::NoDependency)` · `scoped_recipe_asking_for_unregistered_service_gets_no_dependency`
 - [ ] Bauanleitung von `singleton` fragt nach einem nicht registrierten Dienst und gibt den Fehler weiter → die Abfrage liefert `Err(GetError::NoDependency)`, und die nächste Abfrage baut neu
 
 ## Notification — `publish`
