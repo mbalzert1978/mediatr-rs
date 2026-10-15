@@ -196,3 +196,32 @@ async fn error_handler_without_replacement_runs_once_per_send_on_handler_error()
         ]
     );
 }
+
+#[tokio::test]
+async fn error_handler_replacement_is_returned_and_error_action_does_not_run() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .open_request_error_action(BookingAlert {
+            journal: Rc::clone(&journal),
+        })
+        .open_request_error_handler(WaitingList {
+            journal: Rc::clone(&journal),
+        })
+        .register(Handler::instance(FullHotel {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let booking = mediator.send(BookRoom { room: 12 }).await;
+
+    assert_eq!(
+        (booking, journal.borrow().clone()),
+        (
+            Ok(9000),
+            vec![
+                "Zimmer 12 ausgebucht".to_owned(),
+                "Zimmer 12 auf der Warteliste".to_owned()
+            ]
+        )
+    );
+}
