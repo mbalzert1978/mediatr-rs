@@ -98,13 +98,7 @@ impl<S, P: Behaviors<R>, R: Request + 'static> Sender<R> for Mediator<S, P> {
             .provider
             .get::<RequestHandlerWrapper<R>>()
             .ok_or(SendError::NoHandler)?;
-        // ponytail: liest die behaltenen Plätze bei jeder Nachricht; einmal beim Bauen merken, wenn das messbar bremst.
-        let active: Vec<Slot> = self
-            .provider
-            .all::<Slot>()
-            .iter()
-            .map(|slot| **slot)
-            .collect();
+        let active = self.provider.get::<Vec<Slot>>().unwrap_or_default();
         let behaviors = self.provider.get::<P>().map_or_else(Vec::new, |behaviors| {
             Behaviors::<R>::wrap(&*behaviors, &active)
         });
@@ -143,13 +137,7 @@ impl<S: NotificationPublisher, P, N: Notification + 'static> Publisher<N> for We
 
 impl<S, P: StreamBehaviors<R>, R: StreamRequest + 'static> StreamSender<R> for Mediator<S, P> {
     fn create_stream(&self, request: R) -> impl Stream<Item = StreamResult<R>> {
-        // ponytail: liest die behaltenen Plätze bei jeder Nachricht; einmal beim Bauen merken, wenn das messbar bremst.
-        let active: Vec<Slot> = self
-            .provider
-            .all::<Slot>()
-            .iter()
-            .map(|slot| **slot)
-            .collect();
+        let active = self.provider.get::<Vec<Slot>>().unwrap_or_default();
         let behaviors = self.provider.get::<P>().map_or_else(Vec::new, |behaviors| {
             StreamBehaviors::<R>::wrap(&*behaviors, &active)
         });

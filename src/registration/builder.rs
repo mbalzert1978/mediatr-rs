@@ -338,6 +338,12 @@ impl<S, P, F> MediatorBuilder<S, P, F> {
         Mediator::new(
             self.provider
                 .register(Registration::instance(self.behaviors))
+                // Die Plätze der Behaviors, die nach dem Aussortieren der Doppelten laufen; der Provider ermittelt sie einmal.
+                .register(Registration::singleton(
+                    |provider: &Provider| -> Vec<Slot> {
+                        provider.all::<Slot>().iter().map(|slot| **slot).collect()
+                    },
+                ))
                 .build(),
         )
     }
