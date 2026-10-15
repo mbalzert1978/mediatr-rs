@@ -175,7 +175,7 @@ Quelle: MediatR `test/MediatR.Tests/Pipeline/RequestPreProcessorTests.cs`, `Pipe
 
 Quelle: MediatR `test/MediatR.Tests/Pipeline/RequestExceptionHandlerTests.cs`, `Pipeline/RequestExceptionActionTests.cs`, `MicrosoftExtensionsDI/PipelineTests.cs`. Ein Fehler-Handler kann eine Ersatzantwort setzen; eine Fehler-Aktion reagiert nur und läuft, wenn kein Fehler-Handler eine Ersatzantwort gesetzt hat (Standard `ApplyForUnhandledExceptions`). MediatR wählt nach der Fehler-Basisklasse; ohne Vererbung laufen sie in Registrierungsreihenfolge.
 
-- [ ] Handler scheitert, eine Fehler-Aktion ist registriert → die Aktion läuft, `send` liefert trotzdem genau den Fehler des Handlers
+- [x] Handler scheitert, eine Fehler-Aktion ist registriert → die Aktion läuft, `send` liefert trotzdem genau den Fehler des Handlers · `error_action_runs_on_handler_error_and_send_returns_handler_error`
 - [ ] Handler scheitert, eine Fehler-Aktion ist registriert → sie läuft pro `send` genau einmal
 - [ ] Handler scheitert, zwei Fehler-Aktionen sind registriert → beide laufen, `send` liefert den Fehler des Handlers
 - [ ] Handler scheitert, zwei Fehler-Handler, der erste setzt eine Ersatzantwort → `send` liefert `Ok` mit dieser Ersatzantwort, der zweite Fehler-Handler läuft nicht
@@ -185,6 +185,10 @@ Quelle: MediatR `test/MediatR.Tests/Pipeline/RequestExceptionHandlerTests.cs`, `
 - [ ] Handler scheitert, ein Fehler-Handler setzt eine Ersatzantwort, zusätzlich ist eine Fehler-Aktion registriert → `send` liefert die Ersatzantwort, die Fehler-Aktion läuft nicht
 - [ ] Handler scheitert, ein Fehler-Handler ohne Ersatzantwort und eine Fehler-Aktion sind registriert → beide laufen, `send` liefert den Fehler des Handlers
 - [ ] Ein Behavior scheitert, bevor der Handler läuft, ein Fehler-Handler ohne Ersatzantwort und eine Fehler-Aktion sind registriert → beide laufen, `send` liefert den Fehler des Behaviors
+- [ ] Handler scheitert, die Fehler-Aktion scheitert selbst → `send` liefert genau den Fehler der Aktion statt den des Handlers
+- [ ] Handler hat Erfolg, eine Fehler-Aktion ist registriert → sie läuft nicht, `send` liefert die Antwort des Handlers
+- [ ] Ein Vorverarbeiter oder Nachverarbeiter scheitert, eine Fehler-Aktion ist registriert → sie läuft, `send` liefert den Fehler des Verarbeiters
+- [ ] Fehler-Aktion nur für einen Request-Typ registriert, ein Request eines anderen Typs scheitert → sie läuft nicht, `send` liefert dessen Fehler
 
 ## Stream-Request — Stream anfordern
 

@@ -32,6 +32,7 @@ impl<R: Request> Next<R> {
                 .rev()
                 .chain(at(Stage::After))
                 .chain(at(Stage::Before).rev())
+                .chain(at(Stage::ErrorAction))
                 .collect(),
             handler,
         }

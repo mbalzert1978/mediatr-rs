@@ -26,7 +26,9 @@ pub trait Behaviors<R: Request>: 'static {
 /// Wo ein Behavior in der Pipeline liegt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Stage {
-    /// Außerhalb aller anderen; läuft vor ihnen in Registrierungsreihenfolge.
+    /// Außerhalb aller anderen; reagiert nach ihnen in Registrierungsreihenfolge.
+    ErrorAction,
+    /// Innerhalb von `ErrorAction`, außerhalb aller anderen; läuft vor ihnen in Registrierungsreihenfolge.
     Before,
     /// Innerhalb von `Before`, außerhalb von `Around`; läuft nach dem Rest in Registrierungsreihenfolge.
     After,
@@ -46,10 +48,16 @@ pub struct OpenBehavior<B> {
 }
 
 /// Ein Vorverarbeiter als Behavior: `B` sieht den Request, dann geht dieser weiter.
+#[derive(Debug)]
 pub struct RequestPreProcessorBehavior<B>(pub(crate) B);
 
 /// Ein Nachverarbeiter als Behavior: `B` sieht eine Kopie des Requests mit der Antwort der inneren Pipeline (Behaviors und Handler).
+#[derive(Debug)]
 pub struct RequestPostProcessorBehavior<B>(pub(crate) B);
+
+/// Eine Fehler-Aktion als Behavior: `B` sieht eine Kopie des Requests mit dem Fehler der inneren Pipeline (Behaviors und Handler).
+#[derive(Debug)]
+pub struct RequestErrorActionProcessorBehavior<B>(pub(crate) B);
 
 /// Ein Behavior nur für einen Request-Typ, als Glied der Kette.
 /// Ein eigener [`Provider`] hält es als [`BehaviorWrapper`] dieses Typs, damit `wrap` es nur für diesen Typ findet.
@@ -77,22 +85,6 @@ impl<B> fmt::Debug for OpenBehavior<B> {
         f.debug_struct("OpenBehavior")
             .field("slot", &self.slot)
             .field("stage", &self.stage)
-            .finish_non_exhaustive()
-    }
-}
-
-// Von Hand statt `derive`: `derive(Debug)` verlangte `B: Debug`.
-impl<B> fmt::Debug for RequestPreProcessorBehavior<B> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("RequestPreProcessorBehavior")
-            .finish_non_exhaustive()
-    }
-}
-
-// Von Hand statt `derive`: `derive(Debug)` verlangte `B: Debug`.
-impl<B> fmt::Debug for RequestPostProcessorBehavior<B> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("RequestPostProcessorBehavior")
             .finish_non_exhaustive()
     }
 }

@@ -15,7 +15,9 @@ pub use error::SendError;
 pub use mediator::{Mediator, WeakMediator};
 pub use notification::{Notification, NotificationHandler};
 pub use notification_publishers::{ForeachAwaitPublisher, NotificationPublisher, WhenAllPublisher};
-pub use pipeline::{Next, PipelineBehavior, RequestPostProcessor, RequestPreProcessor};
+pub use pipeline::{
+    Next, PipelineBehavior, RequestErrorAction, RequestPostProcessor, RequestPreProcessor,
+};
 pub use publisher::Publisher;
 pub use registration::{Handler, MediatorBuilder, NoHandlers, WithHandlers};
 pub use request::{Request, RequestHandler};

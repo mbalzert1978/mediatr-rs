@@ -1,5 +1,6 @@
 //! Die Pipeline um den Handler eines Requests.
 
+mod error_action;
 mod next;
 mod post_processor;
 mod pre_processor;
@@ -10,12 +11,13 @@ use std::future::Future;
 use crate::Request;
 use crate::request::HandlerResult;
 
+pub use error_action::RequestErrorAction;
 pub use next::Next;
 pub use post_processor::RequestPostProcessor;
 pub use pre_processor::RequestPreProcessor;
 pub(crate) use sealed::{
-    Behaviors, Closed, OpenBehavior, RequestPostProcessorBehavior, RequestPreProcessorBehavior,
-    Slot, Stage,
+    Behaviors, Closed, OpenBehavior, RequestErrorActionProcessorBehavior,
+    RequestPostProcessorBehavior, RequestPreProcessorBehavior, Slot, Stage,
 };
 
 /// Umschließt den Handler von Requests vom Typ `R`: läuft davor und danach und entscheidet, ob es weitergeht.
