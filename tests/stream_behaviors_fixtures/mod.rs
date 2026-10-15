@@ -5,8 +5,8 @@ use std::task::Poll;
 use futures_core::Stream;
 use futures_util::StreamExt;
 use mediatr_rs::{
-    Next, PipelineBehavior, Request, SendError, StreamNext, StreamPipelineBehavior, StreamRequest,
-    StreamRequestHandler,
+    Next, PipelineBehavior, Request, RequestHandler, SendError, StreamNext, StreamPipelineBehavior,
+    StreamRequest, StreamRequestHandler,
 };
 
 /// Fragt die Gäste ab, die an diesem Tag anreisen.
@@ -218,5 +218,29 @@ impl<R: Request> PipelineBehavior<R> for DoorLog {
         let response = next.run(request).await;
         self.journal.borrow_mut().push("Tür zu".to_owned());
         response
+    }
+}
+
+/// Checkt den Gast in dieses Zimmer ein.
+pub struct CheckIn {
+    pub room: u32,
+}
+
+impl Request for CheckIn {
+    type Response = ();
+    type Error = SendError;
+}
+
+/// Der Check-in-Schalter: Er schreibt jeden Check-in ins Protokoll.
+pub struct CheckInDesk {
+    pub journal: Rc<RefCell<Vec<String>>>,
+}
+
+impl RequestHandler<CheckIn> for CheckInDesk {
+    async fn handle(&self, request: CheckIn) -> Result<(), SendError> {
+        self.journal
+            .borrow_mut()
+            .push(format!("Check-in Zimmer {}", request.room));
+        Ok(())
     }
 }

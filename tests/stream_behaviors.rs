@@ -4,14 +4,14 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use futures_util::StreamExt;
-use mediatr_rs::{Handler, Mediator, StreamSender};
+use mediatr_rs::{Handler, Mediator, Sender, StreamSender};
 
 mod stream_behaviors_fixtures;
 
 use stream_behaviors_fixtures::{
-    ClosedDesk, Concierge, DepartureBoard, DoorLog, FrontOffice, Greeter, ListArrivals,
-    ListDepartures, NightPorter, bellboy, concierge, concierge_and_night_porter_around,
-    concierge_bellboy_and_night_porter_around, night_porter,
+    CheckIn, CheckInDesk, ClosedDesk, Concierge, DepartureBoard, DoorLog, FrontOffice, Greeter,
+    ListArrivals, ListDepartures, NightPorter, bellboy, concierge,
+    concierge_and_night_porter_around, concierge_bellboy_and_night_porter_around, night_porter,
 };
 
 #[tokio::test]
@@ -228,5 +228,23 @@ async fn behavior_for_all_request_types_does_not_wrap_stream() {
     assert_eq!(
         journal.borrow().clone(),
         vec!["Anreisen für Tag 8 nachgeschlagen".to_owned()]
+    );
+}
+
+#[tokio::test]
+async fn stream_behavior_for_all_stream_request_types_does_not_wrap_send() {
+    let journal = Rc::new(RefCell::new(Vec::new()));
+    let mediator = Mediator::builder()
+        .open_stream_behavior(concierge(&journal))
+        .register(Handler::instance(CheckInDesk {
+            journal: Rc::clone(&journal),
+        }))
+        .build();
+
+    let check_in = mediator.send(CheckIn { room: 5 }).await;
+
+    assert_eq!(
+        (check_in, journal.borrow().clone()),
+        (Ok(()), vec!["Check-in Zimmer 5".to_owned()])
     );
 }
