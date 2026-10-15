@@ -1,7 +1,7 @@
 //! Tests für den Abschnitt „Provider-Crate `mediatr-provider`“ in `TESTLIST.md`.
 
 use std::panic::{self, AssertUnwindSafe};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Barrier, Mutex, PoisonError};
 
 use mediatr_provider::{GetError, Provider, Registration};
@@ -78,9 +78,7 @@ fn all_without_registration_returns_empty_list() {
 fn transient_all_runs_recipe_on_every_call() {
     let (calls, recipe) = counting_recipe();
     let provider = Provider::builder()
-        .register(Registration::transient(move |provider| {
-            Ok(recipe(provider))
-        }))
+        .register(Registration::transient(recipe))
         .build();
 
     drop(provider.all::<Config>());
@@ -92,7 +90,7 @@ fn transient_all_runs_recipe_on_every_call() {
 #[test]
 fn singleton_all_returns_same_object_as_get() {
     let provider = Provider::builder()
-        .register(Registration::singleton(|_| Config))
+        .register(Registration::singleton(|_| Ok(Config)))
         .build();
 
     let single = provider.get::<Config>().unwrap();
@@ -121,9 +119,7 @@ fn scoped_all_returns_same_object_as_get_within_scope() {
 fn transient_runs_recipe_on_every_get() {
     let (calls, recipe) = counting_recipe();
     let provider = Provider::builder()
-        .register(Registration::transient(move |provider| {
-            Ok(recipe(provider))
-        }))
+        .register(Registration::transient(recipe))
         .build();
 
     provider.get::<Config>().unwrap();
@@ -150,7 +146,7 @@ fn singleton_runs_recipe_once_on_first_get() {
 fn scoped_runs_recipe_once_per_scope() {
     let (calls, recipe) = counting_recipe();
     let provider = Provider::builder()
-        .register(Registration::scoped(move |provider| Ok(recipe(provider))))
+        .register(Registration::scoped(recipe))
         .build();
     let first = provider.scope();
     let second = provider.scope();
@@ -165,7 +161,7 @@ fn scoped_runs_recipe_once_per_scope() {
 #[test]
 fn singleton_returns_same_object_in_new_scope() {
     let provider = Provider::builder()
-        .register(Registration::singleton(|_| Config))
+        .register(Registration::singleton(|_| Ok(Config)))
         .build();
 
     let first = provider.get::<Config>().unwrap();
@@ -213,7 +209,7 @@ fn two_scoped_registrations_of_same_type_build_one_object_each() {
 fn cloned_scope_returns_same_scoped_service() {
     let (calls, recipe) = counting_recipe();
     let scope = Provider::builder()
-        .register(Registration::scoped(move |provider| Ok(recipe(provider))))
+        .register(Registration::scoped(recipe))
         .build()
         .scope();
     let clone = scope.clone();
@@ -227,7 +223,7 @@ fn cloned_scope_returns_same_scoped_service() {
 #[test]
 fn upgraded_weak_provider_returns_same_singleton() {
     let provider = Provider::builder()
-        .register(Registration::singleton(|_| Config))
+        .register(Registration::singleton(|_| Ok(Config)))
         .build();
     let weak = provider.downgrade();
 
@@ -262,9 +258,11 @@ fn singleton_holding_weak_provider_is_released_with_provider() {
     let running = Arc::new(AtomicBool::new(true));
     let flag = Arc::clone(&running);
     let provider = Provider::builder()
-        .register(Registration::singleton(move |provider| Scheduler {
-            _provider: provider.downgrade(),
-            _alive: Alive(Arc::clone(&flag)),
+        .register(Registration::singleton(move |provider| {
+            Ok(Scheduler {
+                _provider: provider.downgrade(),
+                _alive: Alive(Arc::clone(&flag)),
+            })
         }))
         .build();
     provider.get::<Scheduler>().unwrap();
@@ -365,7 +363,9 @@ fn first_of_two_recipes_asking_for_own_type_through_all_gets_nothing() {
 #[test]
 fn singleton_recipe_asking_for_own_type_gets_nothing() {
     let provider = Provider::builder()
-        .register(Registration::singleton(settings_recipe))
+        .register(Registration::singleton(|provider| {
+            Ok(settings_recipe(provider))
+        }))
         .build();
 
     let settings = provider.get::<Settings>().unwrap();
@@ -481,9 +481,7 @@ fn mutually_dependent_recipes_get_nothing_for_inner_query() {
 fn recipe_runs_again_after_caught_panic() {
     let (server_up, recipe) = connection_recipe();
     let provider = Provider::builder()
-        .register(Registration::transient(move |provider| {
-            Ok(recipe(provider))
-        }))
+        .register(Registration::transient(recipe))
         .build();
     let failed = panic::catch_unwind(AssertUnwindSafe(|| provider.get::<Connection>()));
     assert!(failed.is_err());
@@ -513,7 +511,7 @@ fn singleton_recipe_runs_again_after_caught_panic() {
 fn scoped_recipe_runs_again_after_caught_panic() {
     let (server_up, recipe) = connection_recipe();
     let scope = Provider::builder()
-        .register(Registration::scoped(move |provider| Ok(recipe(provider))))
+        .register(Registration::scoped(recipe))
         .build()
         .scope();
     let failed = panic::catch_unwind(AssertUnwindSafe(|| scope.get::<Connection>()));
@@ -529,9 +527,7 @@ fn scoped_recipe_runs_again_after_caught_panic() {
 fn recipe_runs_again_after_caught_panic_in_dependency() {
     let (server_up, recipe) = connection_recipe();
     let provider = Provider::builder()
-        .register(Registration::transient(move |provider| {
-            Ok(recipe(provider))
-        }))
+        .register(Registration::transient(recipe))
         .register(Registration::transient(|provider| {
             Ok(Repository {
                 connection: provider.get::<Connection>().ok(),
@@ -763,8 +759,10 @@ fn mapped_singleton_passes_same_object_to_f_on_every_get() {
     let seen = Arc::new(Mutex::new(Vec::new()));
     let provider = Provider::builder()
         .register(
-            Registration::singleton(|_| Invoice {
-                heading: "Rechnung 1".to_owned(),
+            Registration::singleton(|_| {
+                Ok(Invoice {
+                    heading: "Rechnung 1".to_owned(),
+                })
             })
             .map({
                 let seen = Arc::clone(&seen);
@@ -844,9 +842,7 @@ fn provider_moved_to_other_thread_returns_registered_service() {
 fn second_thread_gets_transient_service_while_first_thread_builds_it() {
     let (gate, recipe) = gated_recipe();
     let provider = Provider::builder()
-        .register(Registration::transient(move |provider| {
-            Ok(recipe(provider))
-        }))
+        .register(Registration::transient(recipe))
         .build();
 
     let second = std::thread::scope(|scope| {
@@ -919,8 +915,10 @@ fn scoped_service_from_provider_itself_gets_scoped_from_root() {
 fn singleton_recipe_asking_for_scoped_service_gets_scoped_from_root() {
     let provider = Provider::builder()
         .register(Registration::scoped(|_| Ok(Session)))
-        .register(Registration::singleton(|provider| AuditLog {
-            session: provider.get::<Session>(),
+        .register(Registration::singleton(|provider| {
+            Ok(AuditLog {
+                session: provider.get::<Session>(),
+            })
         }))
         .build();
 
@@ -982,4 +980,22 @@ fn scoped_recipe_asking_for_unregistered_service_gets_no_dependency() {
     let greeting = provider.scope().get::<Greeting>();
 
     assert!(matches!(greeting, Err(GetError::NoDependency)));
+}
+
+#[test]
+fn singleton_recipe_asking_for_unregistered_service_gets_no_dependency_and_builds_again() {
+    let calls = Arc::new(AtomicU32::new(0));
+    let counter = Arc::clone(&calls);
+    let provider = Provider::builder()
+        .register(Registration::singleton(move |provider| {
+            counter.fetch_add(1, Ordering::SeqCst);
+            Ok(Greeting(format!("Hallo {}", provider.get::<Name>()?.0)))
+        }))
+        .build();
+
+    let first = provider.get::<Greeting>();
+    drop(provider.get::<Greeting>());
+
+    assert!(matches!(first, Err(GetError::NoDependency)));
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
 }

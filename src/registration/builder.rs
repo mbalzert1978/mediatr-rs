@@ -4,7 +4,7 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use mediatr_provider::{Provider, ProviderBuilder, Registration};
+use mediatr_provider::{GetError, Provider, ProviderBuilder, Registration};
 
 use crate::pipeline::{
     Closed, ClosedStream, OpenBehavior, OpenStreamBehavior, RequestErrorActionProcessorBehavior,
@@ -340,14 +340,14 @@ impl<S, P, F> MediatorBuilder<S, P, F> {
                 .register(Registration::instance(self.behaviors))
                 // Die Plätze der Behaviors, die nach dem Aussortieren der Doppelten laufen; der Provider ermittelt sie einmal.
                 .register(Registration::singleton(
-                    |provider: &Provider| -> Vec<Slot> {
+                    |provider: &Provider| -> Result<Vec<Slot>, GetError> {
                         // Kreis und Wurzel-Fehler sind über den Mediator nicht erreichbar.
-                        provider
+                        Ok(provider
                             .all::<Slot>()
                             .unwrap_or_default()
                             .iter()
                             .map(|slot| **slot)
-                            .collect()
+                            .collect())
                     },
                 ))
                 .build(),

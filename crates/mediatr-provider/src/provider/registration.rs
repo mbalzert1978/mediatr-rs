@@ -2,12 +2,7 @@
 
 use std::any::{Any, TypeId, type_name};
 use std::fmt;
-use std::sync::Arc;
-#[expect(
-    clippy::disallowed_types,
-    reason = "lokaler Wert einer Bauanleitung, kein globaler Zustand"
-)]
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex};
 
 use super::{Slot, lock};
 use crate::{GetError, Provider};
@@ -18,6 +13,8 @@ use crate::{GetError, Provider};
 pub(super) type Recipe<T> = Box<dyn Fn(&Provider, Slot) -> Result<Arc<T>, GetError> + Send + Sync>;
 
 /// Wie ein Dienst vom Typ `T` entsteht; [`ProviderBuilder::register`](crate::ProviderBuilder::register) nimmt ihn auf.
+///
+/// Liefert die Bauanleitung von `transient`, `singleton` oder `scoped` einen Fehler, liefert die Abfrage ihn weiter; aus `Err(GetError::NoService)` wird dabei `Err(GetError::NoDependency)`.
 pub struct Registration<T> {
     pub(super) recipe: Recipe<T>,
     /// Schlüsseltyp aus [`Registration::unique_by`]; `None` heißt: nicht einmalig.
@@ -33,8 +30,6 @@ impl<T: Send + Sync + 'static> Registration<T> {
     }
 
     /// Dienst aus `recipe`; jede Abfrage baut ihn damit neu.
-    ///
-    /// Liefert `recipe` einen Fehler, liefert die Abfrage ihn weiter; aus `Err(GetError::NoService)` wird dabei `Err(GetError::NoDependency)`.
     #[must_use]
     pub fn transient(
         recipe: impl Fn(&Provider) -> Result<T, GetError> + Send + Sync + 'static,
@@ -45,18 +40,13 @@ impl<T: Send + Sync + 'static> Registration<T> {
     /// Dienst aus `recipe`; die erste Abfrage baut ihn mit dem Provider statt mit dem Scope, jede weitere liefert dasselbe Objekt.
     ///
     /// Fragt die Bauanleitung nach ihrem eigenen Typ, bekommt sie `Err(GetError::Cycle)`. Fragt sie nach einem `scoped`-Dienst, bekommt sie `Err(GetError::ScopedFromRoot)`, denn sie baut mit dem Provider. Singleton-Bauanleitungen dürfen einander nicht abfragen: Starten zwei Threads gleichzeitig je eine davon, warten beide für immer.
+    /// Schlägt `recipe` fehl, merkt sich die Bauanleitung nichts, und die nächste Abfrage baut neu.
     #[must_use]
-    #[expect(
-        clippy::disallowed_types,
-        reason = "lokaler Wert einer Bauanleitung, kein globaler Zustand"
-    )]
-    pub fn singleton(recipe: impl Fn(&Provider) -> T + Send + Sync + 'static) -> Self {
-        let service = OnceLock::new();
-        Self::new(move |provider, _| {
-            Ok(Arc::clone(
-                service.get_or_init(|| Arc::new(recipe(&provider.root()))),
-            ))
-        })
+    pub fn singleton(
+        recipe: impl Fn(&Provider) -> Result<T, GetError> + Send + Sync + 'static,
+    ) -> Self {
+        let kept = Mutex::new(None);
+        Self::new(move |provider, _| singleton_service(&kept, provider, &recipe))
     }
 
     /// Dienst aus `recipe`; die erste Abfrage in einem Scope baut ihn, jede weitere im selben Scope liefert dasselbe Objekt.
@@ -64,8 +54,6 @@ impl<T: Send + Sync + 'static> Registration<T> {
     /// Beim Provider selbst abgefragt, liefert sie `Err(GetError::ScopedFromRoot)`; nur ein Scope aus [`Provider::scope`] baut den Dienst.
     ///
     /// Fragen zwei Threads im selben Scope gleichzeitig ab, kann die Bauanleitung zweimal laufen; beide bekommen dasselbe Objekt.
-    ///
-    /// Liefert `recipe` einen Fehler, liefert die Abfrage ihn weiter; aus `Err(GetError::NoService)` wird dabei `Err(GetError::NoDependency)`.
     #[must_use]
     pub fn scoped(
         recipe: impl Fn(&Provider) -> Result<T, GetError> + Send + Sync + 'static,
@@ -114,6 +102,21 @@ impl<T> fmt::Debug for Registration<T> {
             .field("key", &self.key)
             .finish_non_exhaustive()
     }
+}
+
+/// Liefert den Dienst in `kept`; fehlt er dort, baut `recipe` ihn mit dem Provider statt mit dem Scope von `provider`, und `kept` merkt ihn sich. Die Sperre bleibt während des Baus, damit er nur einmal läuft; schlägt er fehl, bleibt `kept` leer.
+fn singleton_service<T>(
+    kept: &Mutex<Option<Arc<T>>>,
+    provider: &Provider,
+    recipe: impl Fn(&Provider) -> Result<T, GetError>,
+) -> Result<Arc<T>, GetError> {
+    let mut kept = lock(kept);
+    if let Some(service) = kept.as_ref() {
+        return Ok(Arc::clone(service));
+    }
+    let built = Arc::new(recipe(&provider.root())?);
+    *kept = Some(Arc::clone(&built));
+    Ok(built)
 }
 
 /// Liefert den Dienst auf Platz `slot` im Scope von `provider`; fehlt er dort, baut `recipe` ihn, und der Scope merkt ihn sich. Ist `provider` der Provider selbst, liefert sie `Err(GetError::ScopedFromRoot)`.

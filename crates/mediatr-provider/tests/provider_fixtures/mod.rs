@@ -100,23 +100,29 @@ pub struct Repository {
 }
 
 /// Liefert den Schalter für den Server (anfangs aus) und eine Bauanleitung für `Connection`, die mit einem Panic abbricht, solange er aus ist.
-pub fn connection_recipe() -> (Arc<AtomicBool>, impl Fn(&Provider) -> Connection) {
+pub fn connection_recipe() -> (
+    Arc<AtomicBool>,
+    impl Fn(&Provider) -> Result<Connection, GetError>,
+) {
     let server_up = Arc::new(AtomicBool::new(false));
     let reachable = Arc::clone(&server_up);
     let recipe = move |_: &Provider| {
         assert!(reachable.load(Ordering::SeqCst), "Server nicht erreichbar");
-        Connection
+        Ok(Connection)
     };
     (server_up, recipe)
 }
 
 /// Liefert eine Bauanleitung für `Config` und den Zähler ihrer Läufe.
-pub fn counting_recipe() -> (Arc<AtomicU32>, impl Fn(&Provider) -> Config) {
+pub fn counting_recipe() -> (
+    Arc<AtomicU32>,
+    impl Fn(&Provider) -> Result<Config, GetError>,
+) {
     let calls = Arc::new(AtomicU32::new(0));
     let counter = Arc::clone(&calls);
     let recipe = move |_: &Provider| {
         counter.fetch_add(1, Ordering::SeqCst);
-        Config
+        Ok(Config)
     };
     (calls, recipe)
 }
@@ -186,7 +192,7 @@ impl Gate {
 }
 
 /// Liefert ein Tor und eine Bauanleitung für `Config`, deren erster Lauf an diesem Tor wartet.
-pub fn gated_recipe() -> (Arc<Gate>, impl Fn(&Provider) -> Config) {
+pub fn gated_recipe() -> (Arc<Gate>, impl Fn(&Provider) -> Result<Config, GetError>) {
     let gate = Arc::new(Gate {
         started: Barrier::new(2),
         released: Barrier::new(2),
@@ -195,7 +201,7 @@ pub fn gated_recipe() -> (Arc<Gate>, impl Fn(&Provider) -> Config) {
     let pass = Arc::clone(&gate);
     let recipe = move |_: &Provider| {
         pass.pass();
-        Config
+        Ok(Config)
     };
     (gate, recipe)
 }

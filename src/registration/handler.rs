@@ -35,10 +35,10 @@ impl<H: Send + Sync + 'static, S: 'static, P: 'static> Handler<H, S, P> {
     #[must_use]
     pub fn singleton(make: impl Fn(WeakMediator<S, P>) -> H + Send + Sync + 'static) -> Self {
         Self::new(Registration::singleton(move |provider| {
-            make(WeakMediator {
+            Ok(make(WeakMediator {
                 provider: provider.downgrade(),
                 types: PhantomData,
-            })
+            }))
         }))
     }
 
