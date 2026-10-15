@@ -54,6 +54,8 @@ impl<T: Send + Sync + 'static> Registration<T> {
     }
 
     /// Dienst aus `recipe`; die erste Abfrage in einem Scope baut ihn, jede weitere im selben Scope liefert dasselbe Objekt.
+    ///
+    /// Fragen zwei Threads im selben Scope gleichzeitig ab, kann die Bauanleitung zweimal laufen; beide bekommen dasselbe Objekt.
     #[must_use]
     pub fn scoped(recipe: impl Fn(&Provider) -> T + Send + Sync + 'static) -> Self {
         Self::new(move |provider, slot| scoped_service(provider, slot, &recipe))
@@ -101,6 +103,8 @@ impl<T> fmt::Debug for Registration<T> {
 }
 
 /// Liefert den Dienst auf Platz `slot` im Scope von `provider`; fehlt er dort, baut `recipe` ihn, und der Scope merkt ihn sich.
+///
+/// Bauen zwei Threads denselben Platz, bleibt der Dienst des ersten; der zweite verwirft seinen Bau.
 fn scoped_service<T: Send + Sync + 'static>(
     provider: &Provider,
     slot: Slot,
@@ -111,7 +115,11 @@ fn scoped_service<T: Send + Sync + 'static>(
         .and_then(|service| Arc::clone(service).downcast().ok());
     cached.unwrap_or_else(|| {
         let service = Arc::new(recipe(provider));
-        lock(&provider.built).insert(slot, Arc::clone(&service) as Arc<dyn Any + Send + Sync>);
-        service
+        let kept = Arc::clone(
+            lock(&provider.built)
+                .entry(slot)
+                .or_insert(Arc::clone(&service) as Arc<dyn Any + Send + Sync>),
+        );
+        kept.downcast().unwrap_or(service)
     })
 }

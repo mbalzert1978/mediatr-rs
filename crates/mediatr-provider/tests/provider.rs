@@ -865,3 +865,24 @@ fn two_threads_get_same_singleton_built_once() {
     assert!(Arc::ptr_eq(&first, &second));
     assert_eq!(calls.load(Ordering::SeqCst), 1);
 }
+
+#[test]
+fn two_threads_get_same_scoped_service_in_one_scope() {
+    let both_building = Arc::new(Barrier::new(2));
+    let provider = Provider::builder()
+        .register(Registration::scoped(move |_| {
+            both_building.wait();
+            Session(1)
+        }))
+        .build();
+    let scope = provider.scope();
+
+    let (first, second) = std::thread::scope(|threads| {
+        let get = || scope.get::<Session>().unwrap();
+        let first = threads.spawn(get);
+        let second = threads.spawn(get);
+        (first.join().unwrap(), second.join().unwrap())
+    });
+
+    assert!(Arc::ptr_eq(&first, &second));
+}
