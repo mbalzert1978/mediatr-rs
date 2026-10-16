@@ -196,3 +196,26 @@ impl NotificationHandler<CartCheckedOut> for OrderLineCommitter {
         Ok(())
     }
 }
+
+/// Listet die offenen Bestellzeilen auf, eine Zeilennummer nach der anderen, ab 1.
+pub struct ListOrderLines;
+
+impl StreamRequest for ListOrderLines {
+    type Item = u32;
+    type Error = SendError;
+}
+
+/// Nummeriert die offenen Bestellzeilen der Arbeitseinheit, die er per Konstruktor bekommt.
+pub struct OrderLineLister {
+    pub unit_of_work: Arc<UnitOfWork>,
+}
+
+impl StreamRequestHandler<ListOrderLines> for OrderLineLister {
+    fn handle(
+        &self,
+        _request: ListOrderLines,
+    ) -> impl Stream<Item = Result<u32, SendError>> + use<> {
+        let pending = self.unit_of_work.pending_lines.load(Ordering::SeqCst);
+        futures_util::stream::iter((1..=pending).map(Ok))
+    }
+}
