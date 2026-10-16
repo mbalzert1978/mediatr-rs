@@ -164,3 +164,16 @@ async fn scoped_notification_handler_runs_when_published_through_scope() {
 
     assert_eq!(journal.entries(), ["Beleg über 420"]);
 }
+
+#[tokio::test]
+async fn publish_to_scoped_handler_without_scope_gets_no_scope() {
+    let mediator = Mediator::builder()
+        .subscribe(Handler::scoped(|_| ReceiptPrinter {
+            journal: Journal::default(),
+        }))
+        .build();
+
+    let result = mediator.publish(CartCheckedOut { total: 420 }).await;
+
+    assert_eq!(result, Err(SendError::NoScope));
+}

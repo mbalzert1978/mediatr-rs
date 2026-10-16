@@ -124,11 +124,10 @@ impl<S: NotificationPublisher, R: Request> Sender<R> for Mediator<S> {
 
 impl<S: NotificationPublisher, N: Notification + 'static> Publisher<N> for Mediator<S> {
     async fn publish(&self, notification: N) -> Result<(), N::Error> {
-        // Kreis und Wurzel-Fehler sind über den Mediator nicht erreichbar.
         let handlers = self
             .provider
             .all::<NotificationHandlerWrapper<N>>()
-            .unwrap_or_default();
+            .map_err(|error| N::Error::from(undeliverable(&error)))?;
         S::publish(
             handlers
                 .iter()
