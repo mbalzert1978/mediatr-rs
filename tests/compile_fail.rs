@@ -17,7 +17,7 @@ fn behavior_requiring_clone_rejects_non_clone_request_at_compile_time() {
 }
 
 #[test]
-fn post_processor_makes_send_for_non_clone_request_not_compile() {
+fn post_processor_rejects_non_clone_request_at_compile_time() {
     trybuild::TestCases::new().compile_fail("tests/ui/post_processor_requires_clone.rs");
 }
 
