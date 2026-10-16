@@ -197,3 +197,16 @@ async fn scoped_stream_handler_yields_items_through_scope() {
 
     assert_eq!(prices, vec![Ok(300), Ok(120)]);
 }
+
+#[tokio::test]
+async fn stream_from_scoped_handler_without_scope_yields_no_scope() {
+    let mediator = Mediator::builder()
+        .register_stream(Handler::scoped(|_| CartContents {
+            prices: vec![300, 120],
+        }))
+        .build();
+
+    let prices: Vec<_> = mediator.create_stream(ListCartItems).collect().await;
+
+    assert_eq!(prices, vec![Err(SendError::NoScope)]);
+}

@@ -55,7 +55,7 @@ Quelle: Microsoft.Extensions.DependencyInjection `AddScoped`, `IServiceScopeFact
 - [x] Notification-Handler mit `Handler::scoped`, `publish` über einen Scope → der Handler läuft · `scoped_notification_handler_runs_when_published_through_scope`
 - [x] Notification-Handler mit `Handler::scoped`, `publish` direkt über den Mediator ohne `scope` → `Err(SendError::NoScope)`, kein Panic · `publish_to_scoped_handler_without_scope_gets_no_scope`
 - [x] Stream-Handler mit `Handler::scoped`, `create_stream` über einen Scope → der Stream liefert die Elemente des Handlers · `scoped_stream_handler_yields_items_through_scope`
-- [ ] Stream-Handler mit `Handler::scoped`, `create_stream` direkt über den Mediator ohne `scope` → der Stream liefert ein Element `Err(SendError::NoScope)` und endet, kein Panic
+- [x] Stream-Handler mit `Handler::scoped`, `create_stream` direkt über den Mediator ohne `scope` → der Stream liefert ein Element `Err(SendError::NoScope)` und endet, kein Panic · `stream_from_scoped_handler_without_scope_yields_no_scope`
 - [ ] Eigener Dienst `UnitOfWork` mit `Registration::scoped` über `MediatorBuilder::service` registriert, zwei Handler mit `Handler::scoped_from`, deren Bauanleitung `UnitOfWork` aus dem Provider holt, `AddOrderLine` und danach `CountOrderLines` über denselben Scope → `CountOrderLines` liefert 1
 - [ ] (T11) Dieselben Registrierungen, `AddOrderLine` über einen Scope, `CountOrderLines` über einen zweiten → `CountOrderLines` liefert 0
 - [ ] Handler mit `Handler::scoped_from`, dessen Bauanleitung `UnitOfWork` holt, `UnitOfWork` nicht registriert, `send` über einen Scope → `Err(SendError::NoDependency)`, kein Panic
