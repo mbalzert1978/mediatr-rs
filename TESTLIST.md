@@ -52,7 +52,7 @@ Quelle: Microsoft.Extensions.DependencyInjection `AddScoped`, `IServiceScopeFact
 - [x] (T11) `Handler::singleton`, über einen Scope aufgerufen, schickt über seinen `WeakMediator` `AddToCart` an den `scoped`-Warenkorb → `Err(SendError::NoScope)`, kein Panic · `singleton_handler_sending_to_scoped_cart_gets_no_scope`
 - [x] (T11) Scope fällt weg, der Mediator lebt → der Warenkorb wird freigegeben (sein `Drop` läuft) · `scoped_cart_is_released_with_its_scope`
 - [x] (T11) Ein Handler mit `Handler::scoped`, der den `WeakMediator` seines Scopes behalten hat, schickt `AddToCart`, nachdem der Scope weggefallen ist; der Mediator lebt → `Err(SendError::MediatorDropped)`, kein Panic · `scoped_handler_sending_after_scope_dropped_gets_mediator_dropped`
-- [ ] Notification-Handler mit `Handler::scoped`, `publish` über einen Scope → der Handler läuft
+- [x] Notification-Handler mit `Handler::scoped`, `publish` über einen Scope → der Handler läuft · `scoped_notification_handler_runs_when_published_through_scope`
 - [ ] Notification-Handler mit `Handler::scoped`, `publish` direkt über den Mediator ohne `scope` → `Err(SendError::NoScope)`, kein Panic
 - [ ] Stream-Handler mit `Handler::scoped`, `create_stream` über einen Scope → der Stream liefert die Elemente des Handlers
 - [ ] Stream-Handler mit `Handler::scoped`, `create_stream` direkt über den Mediator ohne `scope` → der Stream liefert ein Element `Err(SendError::NoScope)` und endet, kein Panic

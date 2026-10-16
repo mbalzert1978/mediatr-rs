@@ -2,8 +2,11 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use mediatr_rs::{
-    Handler, Mediator, Next, PipelineBehavior, Request, RequestHandler, SendError, Sender,
+    Handler, Mediator, Next, Notification, NotificationHandler, PipelineBehavior, Request,
+    RequestHandler, SendError, Sender,
 };
+
+use crate::common::Journal;
 
 /// Legt einen Artikel in den Warenkorb; die Antwort ist die Summe aller Artikel bisher, in Rappen.
 pub struct AddToCart {
@@ -88,5 +91,26 @@ impl<S: Sender<AddToCart>> RequestHandler<AddGiftWrap> for GiftWrapHandler<S> {
                 price: GIFT_WRAP_PRICE,
             })
             .await
+    }
+}
+
+/// Der Kunde hat den Warenkorb bezahlt; `total` ist die Summe, in Rappen.
+pub struct CartCheckedOut {
+    pub total: u32,
+}
+
+impl Notification for CartCheckedOut {
+    type Error = SendError;
+}
+
+/// Druckt zu jedem bezahlten Warenkorb einen Beleg ins Protokoll.
+pub struct ReceiptPrinter {
+    pub journal: Journal,
+}
+
+impl NotificationHandler<CartCheckedOut> for ReceiptPrinter {
+    async fn handle(&self, event: &CartCheckedOut) -> Result<(), SendError> {
+        self.journal.push(format!("Beleg über {}", event.total));
+        Ok(())
     }
 }
