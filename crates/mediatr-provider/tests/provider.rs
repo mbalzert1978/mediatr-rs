@@ -402,6 +402,28 @@ fn first_recipe_asking_for_own_type_through_all_gets_built_singleton() {
 }
 
 #[test]
+fn first_recipe_asking_for_own_type_through_all_in_scope_gets_built_scoped_service() {
+    let provider = Provider::builder()
+        .register(Registration::transient(|provider| {
+            Ok(settings_recipe(provider))
+        }))
+        .register(Registration::scoped(|_| {
+            Ok(Settings {
+                parent: Err(GetError::NoService),
+            })
+        }))
+        .build();
+    let scope = provider.scope();
+    let scoped = scope.get::<Settings>().unwrap();
+
+    let settings = scope.all::<Settings>().unwrap();
+
+    assert!(
+        matches!(settings.as_slice(), [first, _] if first.parent.as_ref().is_ok_and(|parent| Arc::ptr_eq(parent, &scoped)))
+    );
+}
+
+#[test]
 fn singleton_recipe_asking_for_own_type_gets_nothing() {
     let provider = Provider::builder()
         .register(Registration::singleton(|provider| {
