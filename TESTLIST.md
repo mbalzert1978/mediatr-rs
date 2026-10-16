@@ -32,7 +32,7 @@ Quelle: MediatR `Mediator(IServiceProvider)` speichert keine Handler; es holt si
 - [x] `Handler` für einen Handler-Typ ohne `Debug` mit `{:?}` formatiert → die Ausgabe nennt den Handler-Typ · `handler_debug_names_handler_type_without_debug`
 - [x] Mediator mit Behaviors in einem Feld vom Typ `Mediator` gespeichert, ohne die Behaviors zu nennen → `send` darüber läuft durch die Behaviors und liefert die Antwort des Handlers · `mediator_with_behaviors_stored_as_plain_mediator_field_runs_behaviors`
 - [x] (T11) Mediator mit Behaviors, ein `Handler::singleton` hält `WeakMediator` als Feld, ohne die Behaviors zu nennen → `send` über diesen `WeakMediator` läuft durch die Behaviors · `singleton_handler_with_plain_weak_mediator_field_runs_behaviors`
-- [ ] Mediator mit Stream-Behaviors in einem Feld vom Typ `Mediator` gespeichert, ohne die Behaviors zu nennen → `create_stream` darüber läuft durch die Stream-Behaviors und liefert die Items des Handlers
+- [x] Mediator mit Stream-Behaviors in einem Feld vom Typ `Mediator` gespeichert, ohne die Behaviors zu nennen → `create_stream` darüber läuft durch die Stream-Behaviors und liefert die Items des Handlers · `mediator_with_stream_behaviors_stored_as_plain_mediator_field_runs_stream_behaviors`
 
 ## Provider-Crate `mediatr-provider`
 

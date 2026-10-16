@@ -3,13 +3,16 @@
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, mpsc};
 
-use mediatr_rs::{Handler, Mediator, RequestHandler, SendError, Sender, WeakMediator};
+use futures_util::StreamExt;
+use mediatr_rs::{
+    Handler, Mediator, RequestHandler, SendError, Sender, StreamSender, WeakMediator,
+};
 
 mod mediator_fixtures;
 
 use mediator_fixtures::{
-    Confirmation, CustomerDirectory, CustomerError, FixedCustomer, GetCustomer, OrderError,
-    PlaceOrder, PlaceOrderHandler, Shop, Turnstile, WarehouseOrderHandler, ada,
+    Confirmation, CustomerDirectory, CustomerError, FixedCustomer, GetCustomer, ListCustomers,
+    OrderError, PlaceOrder, PlaceOrderHandler, Shop, Turnstile, WarehouseOrderHandler, ada,
 };
 
 #[tokio::test]
@@ -250,4 +253,26 @@ async fn singleton_handler_with_plain_weak_mediator_field_runs_behaviors() {
         .unwrap();
 
     assert_eq!((confirmation.total, passed.load(Ordering::SeqCst)), (90, 2));
+}
+
+#[tokio::test]
+async fn mediator_with_stream_behaviors_stored_as_plain_mediator_field_runs_stream_behaviors() {
+    let passed = Arc::new(AtomicU32::new(0));
+    let shop = Shop {
+        mediator: Mediator::builder()
+            .open_stream_behavior(Turnstile {
+                passed: Arc::clone(&passed),
+            })
+            .register_stream(Handler::instance(CustomerDirectory {
+                customers: vec![ada()],
+            }))
+            .build(),
+    };
+
+    let names: Vec<_> = shop.mediator.create_stream(ListCustomers).collect().await;
+
+    assert_eq!(
+        (names, passed.load(Ordering::SeqCst)),
+        (vec![Ok("Ada".to_owned())], 1)
+    );
 }
