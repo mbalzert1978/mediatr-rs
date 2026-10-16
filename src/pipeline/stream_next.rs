@@ -10,18 +10,21 @@ use crate::pipeline::Deferred;
 use crate::stream_request::StreamResult;
 use crate::wrappers::{StreamBehaviorWrapper, StreamRequestHandlerWrapper};
 
+/// Die Stream-Behaviors einer Stream-Pipeline für Stream-Requests vom Typ `R`, geordnet, das innerste zuerst; [`MediatorBuilder::register_stream`](crate::MediatorBuilder::register_stream) baut sie einmal je Typ.
+pub(crate) type StreamPipeline<R> = Vec<Arc<StreamBehaviorWrapper<R>>>;
+
 /// Der Rest der Stream-Pipeline hinter einem Stream-Behavior; [`StreamNext::run`] schickt einen Stream-Request hinein.
 pub struct StreamNext<R: StreamRequest> {
     handler: Arc<StreamRequestHandlerWrapper<R>>,
     /// Die noch ausstehenden Stream-Behaviors, das innerste zuerst; `run` nimmt das letzte, also äußerste.
-    behaviors: Vec<Arc<StreamBehaviorWrapper<R>>>,
+    behaviors: StreamPipeline<R>,
 }
 
 impl<R: StreamRequest> StreamNext<R> {
     /// Stream-Pipeline aus `behaviors`, geordnet wie [`order::stream_behaviors`](crate::pipeline::order::stream_behaviors) sie liefert, und `handler`.
     pub(crate) fn new(
         handler: Arc<StreamRequestHandlerWrapper<R>>,
-        behaviors: Vec<Arc<StreamBehaviorWrapper<R>>>,
+        behaviors: StreamPipeline<R>,
     ) -> Self {
         Self { handler, behaviors }
     }

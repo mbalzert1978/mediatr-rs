@@ -12,7 +12,7 @@ use crate::{PipelineBehavior, Request, StreamPipelineBehavior, StreamRequest};
 
 /// Die Kette der Behaviors eines Mediators: `()` oder ein Paar aus der Kette davor und einem weiteren Behavior.
 ///
-/// Öffentlich, weil [`Sender`](crate::Sender) für [`Mediator`](crate::Mediator) es verlangt;
+/// Öffentlich, weil [`MediatorBuilder::register`](crate::MediatorBuilder::register) es verlangt;
 /// in einem privaten Modul, damit nur diese Crate es implementiert.
 ///
 /// # Vertrag
@@ -26,7 +26,7 @@ pub trait Behaviors<R: Request>: 'static {
 
 /// Die Kette der Behaviors eines Mediators, gelesen für Stream-Requests: nur ihre Stream-Behaviors zählen.
 ///
-/// Öffentlich, weil [`StreamSender`](crate::StreamSender) für [`Mediator`](crate::Mediator) es verlangt;
+/// Öffentlich, weil [`MediatorBuilder::register_stream`](crate::MediatorBuilder::register_stream) es verlangt;
 /// in einem privaten Modul, damit nur diese Crate es implementiert.
 ///
 /// # Vertrag

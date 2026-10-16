@@ -1,16 +1,15 @@
 error[E0277]: the trait bound `LookupStock: Clone` is not satisfied
-  --> tests/ui/behavior_requires_clone.rs:43:32
+  --> tests/ui/behavior_requires_clone.rs:41:10
    |
-43 |     let _stock = mediator.send(LookupStock { sku: 4 });
-   |                           ---- ^^^^^^^^^^^^^^^^^^^^^^ the trait `Clone` is not implemented for `LookupStock`
-   |                           |
-   |                           required by a bound introduced by this call
+41 |         .register(Handler::instance(StockLedger))
+   |          ^^^^^^^^ the trait `Clone` is not implemented for `LookupStock`
    |
-help: the trait `mediatr_rs::Sender<R>` is implemented for `Mediator<S, P>`
-  --> src/mediator.rs
-   |
-   | impl<S, P: Behaviors<R>, R: Request + 'static> Sender<R> for Mediator<S, P> {
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: the following other types implement trait `mediatr_rs::pipeline::sealed::Behaviors<R>`:
+             ()
+             (P, mediatr_rs::pipeline::sealed::Closed)
+             (P, mediatr_rs::pipeline::sealed::ClosedStream)
+             (P, mediatr_rs::pipeline::sealed::OpenBehavior<B>)
+             (P, mediatr_rs::pipeline::sealed::OpenStreamBehavior<B>)
 note: required for `RetryWithCopy` to implement `PipelineBehavior<LookupStock>`
   --> tests/ui/behavior_requires_clone.rs:29:26
    |
@@ -19,7 +18,14 @@ note: required for `RetryWithCopy` to implement `PipelineBehavior<LookupStock>`
    |                   |
    |                   unsatisfied trait bound introduced here
    = note: required for `((), mediatr_rs::pipeline::sealed::OpenBehavior<RetryWithCopy>)` to implement `mediatr_rs::pipeline::sealed::Behaviors<LookupStock>`
-   = note: required for `Mediator<ForeachAwaitPublisher, ((), mediatr_rs::pipeline::sealed::OpenBehavior<RetryWithCopy>)>` to implement `mediatr_rs::Sender<LookupStock>`
+note: required by a bound in `MediatorBuilder::<S, P, F>::register`
+  --> src/registration/builder.rs
+   |
+   |     pub fn register<R, H>(self, handler: Handler<H, S, P>) -> MediatorBuilder<S, P, WithHandlers>
+   |            -------- required by a bound in this associated function
+...
+   |         P: Behaviors<R>,
+   |            ^^^^^^^^^^^^ required by this bound in `MediatorBuilder::<S, P, F>::register`
 help: consider annotating `LookupStock` with `#[derive(Clone)]`
    |
  8 + #[derive(Clone)]

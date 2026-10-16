@@ -20,6 +20,7 @@ pub(crate) use deferred::Deferred;
 pub use error_action::RequestErrorAction;
 pub use error_handler::RequestErrorHandler;
 pub use next::Next;
+pub(crate) use next::Pipeline;
 pub use post_processor::RequestPostProcessor;
 pub use pre_processor::RequestPreProcessor;
 pub(crate) use sealed::{
@@ -29,6 +30,7 @@ pub(crate) use sealed::{
 };
 pub use stream_behavior::StreamPipelineBehavior;
 pub use stream_next::StreamNext;
+pub(crate) use stream_next::StreamPipeline;
 
 /// Umschließt den Handler von Requests vom Typ `R`: läuft davor und danach und entscheidet, ob es weitergeht.
 ///

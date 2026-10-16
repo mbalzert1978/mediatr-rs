@@ -7,19 +7,19 @@ use crate::Request;
 use crate::request::HandlerResult;
 use crate::wrappers::{BehaviorWrapper, RequestHandlerWrapper};
 
+/// Die Behaviors einer Pipeline für Requests vom Typ `R`, geordnet, das innerste zuerst; [`MediatorBuilder::register`](crate::MediatorBuilder::register) baut sie einmal je Typ.
+pub(crate) type Pipeline<R> = Vec<Arc<BehaviorWrapper<R>>>;
+
 /// Der Rest der Pipeline hinter einem Behavior; [`Next::run`] schickt einen Request hinein.
 pub struct Next<R: Request> {
     handler: Arc<RequestHandlerWrapper<R>>,
     /// Die noch ausstehenden Behaviors, das innerste zuerst; `run` nimmt das letzte, also äußerste.
-    behaviors: Vec<Arc<BehaviorWrapper<R>>>,
+    behaviors: Pipeline<R>,
 }
 
 impl<R: Request> Next<R> {
     /// Pipeline aus `behaviors`, geordnet wie [`order::behaviors`](crate::pipeline::order::behaviors) sie liefert, und `handler`.
-    pub(crate) fn new(
-        handler: Arc<RequestHandlerWrapper<R>>,
-        behaviors: Vec<Arc<BehaviorWrapper<R>>>,
-    ) -> Self {
+    pub(crate) fn new(handler: Arc<RequestHandlerWrapper<R>>, behaviors: Pipeline<R>) -> Self {
         Self { handler, behaviors }
     }
 
