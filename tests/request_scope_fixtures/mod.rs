@@ -166,6 +166,15 @@ impl RequestHandler<AddOrderLine> for OrderLineRecorder {
     }
 }
 
+/// [`OrderLineRecorder`] als `Handler::scoped_from`; seine Bauanleitung holt die [`UnitOfWork`] aus dem Scope.
+pub fn order_line_recorder() -> Handler<OrderLineRecorder> {
+    Handler::scoped_from(|_, provider| {
+        Ok(OrderLineRecorder {
+            unit_of_work: provider.get()?,
+        })
+    })
+}
+
 /// Fragt, wie viele Bestellzeilen noch nicht gespeichert sind.
 pub struct CountOrderLines;
 

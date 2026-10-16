@@ -16,8 +16,8 @@ use common::Journal;
 use request_scope_fixtures::{
     AddGiftWrap, AddOrderLine, AddToCart, Cart, CartAudit, CartCheckedOut, CartContents,
     CheckoutCart, CountOrderLines, GIFT_WRAP_PRICE, GiftWrapHandler, ListCartItems, ListOrderLines,
-    OrderLineCommitter, OrderLineCounter, OrderLineLister, OrderLineRecorder, ReceiptPrinter,
-    UnitOfWork, cart_mediator,
+    OrderLineCommitter, OrderLineCounter, OrderLineLister, ReceiptPrinter, UnitOfWork,
+    cart_mediator, order_line_recorder,
 };
 
 #[tokio::test]
@@ -218,11 +218,7 @@ async fn stream_from_scoped_handler_without_scope_yields_no_scope() {
 async fn scoped_service_is_shared_by_handlers_within_same_scope() {
     let mediator = Mediator::builder()
         .service(Registration::scoped(|_| Ok(UnitOfWork::default())))
-        .register(Handler::scoped_from(|_, provider| {
-            Ok(OrderLineRecorder {
-                unit_of_work: provider.get()?,
-            })
-        }))
+        .register(order_line_recorder())
         .register(Handler::scoped_from(|_, provider| {
             Ok(OrderLineCounter {
                 unit_of_work: provider.get()?,
@@ -241,11 +237,7 @@ async fn scoped_service_is_shared_by_handlers_within_same_scope() {
 async fn scoped_service_is_separate_in_each_scope() {
     let mediator = Mediator::builder()
         .service(Registration::scoped(|_| Ok(UnitOfWork::default())))
-        .register(Handler::scoped_from(|_, provider| {
-            Ok(OrderLineRecorder {
-                unit_of_work: provider.get()?,
-            })
-        }))
+        .register(order_line_recorder())
         .register(Handler::scoped_from(|_, provider| {
             Ok(OrderLineCounter {
                 unit_of_work: provider.get()?,
@@ -261,13 +253,7 @@ async fn scoped_service_is_separate_in_each_scope() {
 
 #[tokio::test]
 async fn scoped_handler_without_registered_dependency_gets_no_dependency() {
-    let mediator = Mediator::builder()
-        .register(Handler::scoped_from(|_, provider| {
-            Ok(OrderLineRecorder {
-                unit_of_work: provider.get()?,
-            })
-        }))
-        .build();
+    let mediator = Mediator::builder().register(order_line_recorder()).build();
 
     let result = mediator.scope().send(AddOrderLine).await;
 
@@ -313,13 +299,7 @@ async fn stream_from_scoped_handler_without_registered_dependency_yields_no_depe
 
 #[tokio::test]
 async fn scoped_handler_without_scope_and_dependency_gets_no_scope() {
-    let mediator = Mediator::builder()
-        .register(Handler::scoped_from(|_, provider| {
-            Ok(OrderLineRecorder {
-                unit_of_work: provider.get()?,
-            })
-        }))
-        .build();
+    let mediator = Mediator::builder().register(order_line_recorder()).build();
 
     let result = mediator.send(AddOrderLine).await;
 
