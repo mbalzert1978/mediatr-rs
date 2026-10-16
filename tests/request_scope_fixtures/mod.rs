@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use mediatr_rs::{
     Handler, Mediator, Next, PipelineBehavior, Request, RequestHandler, SendError, Sender,
@@ -25,6 +25,24 @@ impl RequestHandler<AddToCart> for Cart {
     async fn handle(&self, request: AddToCart) -> Result<u32, SendError> {
         let before = self.total.fetch_add(request.price, Ordering::SeqCst);
         Ok(before.saturating_add(request.price))
+    }
+}
+
+/// Warenkorb wie [`Cart`], der dafür die Kasse offen hält; beim Freigeben schließt er sie.
+pub struct CheckoutCart {
+    pub cart: Cart,
+    pub till_open: Arc<AtomicBool>,
+}
+
+impl RequestHandler<AddToCart> for CheckoutCart {
+    async fn handle(&self, request: AddToCart) -> Result<u32, SendError> {
+        self.cart.handle(request).await
+    }
+}
+
+impl Drop for CheckoutCart {
+    fn drop(&mut self) {
+        self.till_open.store(false, Ordering::SeqCst);
     }
 }
 

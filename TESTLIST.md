@@ -50,7 +50,7 @@ Quelle: Microsoft.Extensions.DependencyInjection `AddScoped`, `IServiceScopeFact
 - [x] (T11) Handler mit `Handler::singleton`, `send` über zwei Scopes und direkt über den Mediator → der Handler wird einmal gebaut · `singleton_handler_is_built_once_across_scopes_and_mediator`
 - [x] (T11) Mediator mit einem Behavior, `AddToCart` über einen Scope an den Warenkorb mit `Handler::scoped` → das Behavior läuft, die Antwort kommt vom Warenkorb · `behavior_runs_around_scoped_cart_in_scope`
 - [x] (T11) `Handler::singleton`, über einen Scope aufgerufen, schickt über seinen `WeakMediator` `AddToCart` an den `scoped`-Warenkorb → `Err(SendError::NoScope)`, kein Panic · `singleton_handler_sending_to_scoped_cart_gets_no_scope`
-- [ ] (T11) Scope fällt weg, der Mediator lebt → der Warenkorb wird freigegeben (sein `Drop` läuft)
+- [x] (T11) Scope fällt weg, der Mediator lebt → der Warenkorb wird freigegeben (sein `Drop` läuft) · `scoped_cart_is_released_with_its_scope`
 - [ ] (T11) Ein Warenkorb, der den `WeakMediator` seines Scopes behalten hat, schickt `AddToCart`, nachdem der Scope weggefallen ist; der Mediator lebt → `Err(SendError::MediatorDropped)`, kein Panic
 - [ ] Notification-Handler mit `Handler::scoped`, `publish` über einen Scope → der Handler läuft
 - [ ] Notification-Handler mit `Handler::scoped`, `publish` direkt über den Mediator ohne `scope` → `Err(SendError::NoScope)`, kein Panic

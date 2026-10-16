@@ -1,14 +1,15 @@
 //! Tests für den Abschnitt „Mediator — Request-Scope“ in `TESTLIST.md`.
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use mediatr_rs::{Handler, Mediator, SendError, Sender};
 
 mod request_scope_fixtures;
 
 use request_scope_fixtures::{
-    AddGiftWrap, AddToCart, Cart, CartAudit, GIFT_WRAP_PRICE, GiftWrapHandler, cart_mediator,
+    AddGiftWrap, AddToCart, Cart, CartAudit, CheckoutCart, GIFT_WRAP_PRICE, GiftWrapHandler,
+    cart_mediator,
 };
 
 #[tokio::test]
@@ -101,4 +102,22 @@ async fn behavior_runs_around_scoped_cart_in_scope() {
     let total = mediator.scope().send(AddToCart { price: 300 }).await;
 
     assert_eq!((total, seen.load(Ordering::SeqCst)), (Ok(300), 1));
+}
+
+#[tokio::test]
+async fn scoped_cart_is_released_with_its_scope() {
+    let till = Arc::new(AtomicBool::new(true));
+    let till_open = Arc::clone(&till);
+    let mediator = Mediator::builder()
+        .register(Handler::scoped(move |_| CheckoutCart {
+            cart: Cart::default(),
+            till_open: Arc::clone(&till_open),
+        }))
+        .build();
+    let scope = mediator.scope();
+    scope.send(AddToCart { price: 300 }).await.unwrap();
+
+    drop(scope);
+
+    assert!(!till.load(Ordering::SeqCst));
 }
