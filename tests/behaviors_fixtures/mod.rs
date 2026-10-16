@@ -31,6 +31,21 @@ impl Request for LookupStock {
     type Error = StockError;
 }
 
+/// Schickt jeden Request nach einem Fehler mit einer Kopie noch einmal los; braucht dafür `Clone` und zählt seine Durchläufe.
+pub struct RetryWithCopy {
+    pub attempts: Arc<AtomicU32>,
+}
+
+impl<R: Request + Clone> PipelineBehavior<R> for RetryWithCopy {
+    async fn handle(&self, request: R, next: Next<R>) -> Result<R::Response, R::Error> {
+        self.attempts.fetch_add(1, Ordering::SeqCst);
+        match next.clone().run(request.clone()).await {
+            Ok(response) => Ok(response),
+            Err(_) => next.run(request).await,
+        }
+    }
+}
+
 /// Führt den Lagerbestand; der Lagerserver antwortet auf die erste Abfrage zu spät.
 pub struct SlowStockLedger {
     pub calls: Arc<AtomicU32>,
