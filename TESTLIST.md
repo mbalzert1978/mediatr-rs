@@ -30,6 +30,8 @@ Quelle: MediatR `Mediator(IServiceProvider)` speichert keine Handler; es holt si
 - [x] Handler mit Sender per Konstruktor ist als `Handler::singleton` registriert, der Mediator wird fallen gelassen → der Handler wird freigegeben (sein `Drop` läuft) · `singleton_handler_with_sender_is_released_with_mediator`
 - [x] Handler mit Sender ist als `Handler::singleton` registriert und schickt einen Request, nachdem der Mediator weggefallen ist → `send` liefert `Err(SendError::MediatorDropped)`, kein Panic · `singleton_handler_sending_after_mediator_dropped_gets_mediator_dropped`
 - [x] `Handler` für einen Handler-Typ ohne `Debug` mit `{:?}` formatiert → die Ausgabe nennt den Handler-Typ · `handler_debug_names_handler_type_without_debug`
+- [ ] Mediator mit Behaviors in einem Feld vom Typ `Mediator` gespeichert, ohne die Behaviors zu nennen → `send` darüber läuft durch die Behaviors und liefert die Antwort des Handlers
+- [ ] (T11) Mediator mit Behaviors, ein `Handler::singleton` hält `WeakMediator` als Feld, ohne die Behaviors zu nennen → `send` über diesen `WeakMediator` läuft durch die Behaviors
 
 ## Provider-Crate `mediatr-provider`
 
@@ -98,6 +100,10 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] Bauanleitung, über `all` abgefragt, fragt nach einem nicht registrierten Dienst und gibt den Fehler weiter → `all` liefert `Err(GetError::NoDependency)` · `all_with_recipe_asking_for_unregistered_service_gets_no_dependency`
 - [x] Bauanleitung von `scoped` fragt nach einem nicht registrierten Dienst und gibt den Fehler weiter → die Abfrage im Scope liefert `Err(GetError::NoDependency)` · `scoped_recipe_asking_for_unregistered_service_gets_no_dependency`
 - [x] Bauanleitung von `singleton` fragt nach einem nicht registrierten Dienst und gibt den Fehler weiter → die Abfrage liefert `Err(GetError::NoDependency)`, und die nächste Abfrage baut neu · `singleton_recipe_asking_for_unregistered_service_gets_no_dependency_and_builds_again`
+- [ ] `ProviderBuilder` ohne Registrierung mit `unique_by` → `has_unique` liefert `false`
+- [ ] Registrierung mit `unique_by` für einen Typ und einen Schlüsseltyp → `has_unique` für genau dieses Paar liefert `true`
+- [ ] (T11) Registrierung mit `unique_by` für einen Typ und einen Schlüsseltyp → `has_unique` für einen anderen Typ mit demselben Schlüsseltyp liefert `false`
+- [ ] Registrierung mit `unique_by` für einen Typ und einen Schlüsseltyp → `has_unique` für denselben Typ mit einem anderen Schlüsseltyp liefert `false`
 
 ## Notification — `publish`
 
