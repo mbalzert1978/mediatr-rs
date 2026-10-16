@@ -1,4 +1,4 @@
-//! Ein Behavior verlangt `Clone` vom Request, der Request-Typ erfüllt das nicht; `send` darf nicht kompilieren.
+//! Ein Behavior verlangt `Clone` vom Request, der Request-Typ mit Handler erfüllt das nicht; das Programm darf nicht kompilieren.
 
 use mediatr_rs::{
     Handler, Mediator, Next, PipelineBehavior, Request, RequestHandler, SendError, Sender,
