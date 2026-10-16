@@ -999,3 +999,19 @@ fn singleton_recipe_asking_for_unregistered_service_gets_no_dependency_and_build
     assert!(matches!(first, Err(GetError::NoDependency)));
     assert_eq!(calls.load(Ordering::SeqCst), 2);
 }
+
+#[test]
+fn recipe_passing_on_cycle_keeps_cycle() {
+    let provider = Provider::builder()
+        .register(Registration::transient(|provider| {
+            Ok(Folder {
+                parent: Some(provider.get::<Folder>()?),
+                template: None,
+            })
+        }))
+        .build();
+
+    let folder = provider.get::<Folder>();
+
+    assert!(matches!(folder, Err(GetError::Cycle)));
+}
