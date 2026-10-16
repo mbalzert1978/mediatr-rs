@@ -1,8 +1,11 @@
-//! Benchmarks für `send`, `publish` und `create_stream` eines Preisdienstes.
+//! Benchmarks für `send`, `publish` und `create_stream` eines Preisdienstes, auf einem und auf mehreren Threads.
 
 use std::hint::black_box;
 use std::pin::pin;
+use std::sync::Barrier;
 use std::task::{Context, Poll, Waker};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use futures_core::Stream;
@@ -106,6 +109,48 @@ fn send(c: &mut Criterion) {
     });
 }
 
+/// So viele Threads schicken im Bench mit mehreren Threads gleichzeitig.
+const THREADS: usize = 4;
+
+/// Schickt `rounds` Preisabfragen über `mediator`, sobald alle Threads an `start` angekommen sind, und misst die Zeit dafür.
+fn ask_prices(mediator: &Mediator, rounds: u64, start: &Barrier) -> Duration {
+    start.wait();
+    let began = Instant::now();
+    for _ in 0..rounds {
+        let _price = black_box(run(mediator.send(GetPrice { item: black_box(7) })));
+    }
+    began.elapsed()
+}
+
+/// Lässt [`THREADS`] Threads gleichzeitig je `rounds` Preisabfragen über ihren Klon von `mediator` schicken; liefert die Zeit des langsamsten.
+fn ask_prices_on_threads(mediator: &Mediator, rounds: u64) -> Duration {
+    let start = &Barrier::new(THREADS);
+    thread::scope(|scope| {
+        let clerks: Vec<_> = (0..THREADS)
+            .map(|_| {
+                let mediator = mediator.clone();
+                scope.spawn(move || ask_prices(&mediator, rounds, start))
+            })
+            .collect();
+        clerks
+            .into_iter()
+            .filter_map(|clerk| clerk.join().ok())
+            .max()
+            .unwrap_or_default()
+    })
+}
+
+/// Misst eine Runde, in der jeder von [`THREADS`] Threads gleichzeitig eine Preisabfrage schickt.
+// Grund: Jedes `get` im Provider nimmt einen Lock; ein Bench auf einem Thread sieht nicht, ob die Threads dort aufeinander warten.
+fn send_on_threads(c: &mut Criterion) {
+    let mediator = Mediator::builder()
+        .register(Handler::instance(PriceList))
+        .build();
+    c.bench_function("send auf 4 Threads gleichzeitig", |b| {
+        b.iter_custom(|rounds| ask_prices_on_threads(&mediator, rounds));
+    });
+}
+
 fn publish(c: &mut Criterion) {
     let mediator = Mediator::builder()
         .subscribe(Handler::instance(Branch::<1>))
@@ -132,5 +177,5 @@ fn create_stream(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, send, publish, create_stream);
+criterion_group!(benches, send, send_on_threads, publish, create_stream);
 criterion_main!(benches);
