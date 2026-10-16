@@ -165,8 +165,7 @@ impl<S: NotificationPublisher, R: StreamRequest> StreamSender<R> for Mediator<S>
         let stream: BoxStream<StreamResult<R>> =
             match self.provider.get::<StreamRequestHandlerWrapper<R>>() {
                 Ok(handler) => Box::pin(StreamNext::new(handler, pipeline).run(request)),
-                // Über den Mediator kommt nur `NoService` an.
-                Err(_) => Box::pin(Once(Some(Err(R::Error::from(SendError::NoHandler))))),
+                Err(error) => Box::pin(Once(Some(Err(R::Error::from(undeliverable(&error)))))),
             };
         stream
     }
