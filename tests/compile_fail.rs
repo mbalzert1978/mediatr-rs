@@ -47,7 +47,7 @@ fn error_handler_rejects_non_clone_request_at_compile_time() {
 }
 
 #[test]
-fn error_action_makes_send_for_non_clone_request_not_compile() {
+fn error_action_rejects_non_clone_request_at_compile_time() {
     trybuild::TestCases::new().compile_fail("tests/ui/error_action_requires_clone.rs");
 }
 
