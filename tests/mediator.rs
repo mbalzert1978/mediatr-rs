@@ -357,3 +357,19 @@ async fn publish_inside_spawned_task_runs_all_handlers() {
         (Ok(()), 1, 1)
     );
 }
+
+#[tokio::test]
+async fn stream_read_inside_spawned_task_yields_handler_items() {
+    let mediator = Mediator::builder()
+        .register_stream(Handler::instance(CustomerDirectory {
+            customers: vec![ada()],
+        }))
+        .build();
+
+    let names: Vec<_> =
+        tokio::spawn(async move { mediator.create_stream(ListCustomers).collect().await })
+            .await
+            .unwrap();
+
+    assert_eq!(names, vec![Ok("Ada".to_owned())]);
+}
