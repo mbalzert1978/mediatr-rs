@@ -54,11 +54,13 @@ Quelle: Microsoft.Extensions.DependencyInjection `AddScoped`, `IServiceScopeFact
 - [x] (T11) Ein Handler mit `Handler::scoped`, der den `WeakMediator` seines Scopes behalten hat, schickt `AddToCart`, nachdem der Scope weggefallen ist; der Mediator lebt → `Err(SendError::MediatorDropped)`, kein Panic · `scoped_handler_sending_after_scope_dropped_gets_mediator_dropped`
 - [x] Notification-Handler mit `Handler::scoped`, `publish` über einen Scope → der Handler läuft · `scoped_notification_handler_runs_when_published_through_scope`
 - [x] Notification-Handler mit `Handler::scoped`, `publish` direkt über den Mediator ohne `scope` → `Err(SendError::NoScope)`, kein Panic · `publish_to_scoped_handler_without_scope_gets_no_scope`
-- [ ] Stream-Handler mit `Handler::scoped`, `create_stream` über einen Scope → der Stream liefert die Elemente des Handlers
+- [x] Stream-Handler mit `Handler::scoped`, `create_stream` über einen Scope → der Stream liefert die Elemente des Handlers · `scoped_stream_handler_yields_items_through_scope`
 - [ ] Stream-Handler mit `Handler::scoped`, `create_stream` direkt über den Mediator ohne `scope` → der Stream liefert ein Element `Err(SendError::NoScope)` und endet, kein Panic
 - [ ] Eigener Dienst `UnitOfWork` mit `Registration::scoped` über `MediatorBuilder::service` registriert, zwei Handler mit `Handler::scoped_from`, deren Bauanleitung `UnitOfWork` aus dem Provider holt, `AddOrderLine` und danach `CountOrderLines` über denselben Scope → `CountOrderLines` liefert 1
 - [ ] (T11) Dieselben Registrierungen, `AddOrderLine` über einen Scope, `CountOrderLines` über einen zweiten → `CountOrderLines` liefert 0
 - [ ] Handler mit `Handler::scoped_from`, dessen Bauanleitung `UnitOfWork` holt, `UnitOfWork` nicht registriert, `send` über einen Scope → `Err(SendError::NoDependency)`, kein Panic
+- [ ] Notification-Handler mit `Handler::scoped_from`, dessen Bauanleitung `UnitOfWork` holt, `UnitOfWork` nicht registriert, `publish` über einen Scope → `Err(SendError::NoDependency)`, kein Panic
+- [ ] Stream-Handler mit `Handler::scoped_from`, dessen Bauanleitung `UnitOfWork` holt, `UnitOfWork` nicht registriert, `create_stream` über einen Scope → der Stream liefert ein Element `Err(SendError::NoDependency)` und endet, kein Panic
 
 ## Provider-Crate `mediatr-provider`
 

@@ -3,15 +3,18 @@
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, mpsc};
 
-use mediatr_rs::{Handler, Mediator, Publisher, RequestHandler, SendError, Sender, WeakMediator};
+use futures_util::StreamExt;
+use mediatr_rs::{
+    Handler, Mediator, Publisher, RequestHandler, SendError, Sender, StreamSender, WeakMediator,
+};
 
 mod common;
 mod request_scope_fixtures;
 
 use common::Journal;
 use request_scope_fixtures::{
-    AddGiftWrap, AddToCart, Cart, CartAudit, CartCheckedOut, CheckoutCart, GIFT_WRAP_PRICE,
-    GiftWrapHandler, ReceiptPrinter, cart_mediator,
+    AddGiftWrap, AddToCart, Cart, CartAudit, CartCheckedOut, CartContents, CheckoutCart,
+    GIFT_WRAP_PRICE, GiftWrapHandler, ListCartItems, ReceiptPrinter, cart_mediator,
 };
 
 #[tokio::test]
@@ -176,4 +179,21 @@ async fn publish_to_scoped_handler_without_scope_gets_no_scope() {
     let result = mediator.publish(CartCheckedOut { total: 420 }).await;
 
     assert_eq!(result, Err(SendError::NoScope));
+}
+
+#[tokio::test]
+async fn scoped_stream_handler_yields_items_through_scope() {
+    let mediator = Mediator::builder()
+        .register_stream(Handler::scoped(|_| CartContents {
+            prices: vec![300, 120],
+        }))
+        .build();
+
+    let prices: Vec<_> = mediator
+        .scope()
+        .create_stream(ListCartItems)
+        .collect()
+        .await;
+
+    assert_eq!(prices, vec![Ok(300), Ok(120)]);
 }

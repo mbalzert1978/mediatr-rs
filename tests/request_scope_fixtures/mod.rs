@@ -1,9 +1,10 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
+use futures_core::Stream;
 use mediatr_rs::{
     Handler, Mediator, Next, Notification, NotificationHandler, PipelineBehavior, Request,
-    RequestHandler, SendError, Sender,
+    RequestHandler, SendError, Sender, StreamRequest, StreamRequestHandler,
 };
 
 use crate::common::Journal;
@@ -112,5 +113,27 @@ impl NotificationHandler<CartCheckedOut> for ReceiptPrinter {
     async fn handle(&self, event: &CartCheckedOut) -> Result<(), SendError> {
         self.journal.push(format!("Beleg über {}", event.total));
         Ok(())
+    }
+}
+
+/// Listet die Preise der Artikel im Warenkorb auf, einen nach dem anderen, in Rappen.
+pub struct ListCartItems;
+
+impl StreamRequest for ListCartItems {
+    type Item = u32;
+    type Error = SendError;
+}
+
+/// Der Inhalt eines Warenkorbs: die Preise seiner Artikel in der Reihenfolge, in der sie hineinkamen.
+pub struct CartContents {
+    pub prices: Vec<u32>,
+}
+
+impl StreamRequestHandler<ListCartItems> for CartContents {
+    fn handle(
+        &self,
+        _request: ListCartItems,
+    ) -> impl Stream<Item = Result<u32, SendError>> + use<> {
+        futures_util::stream::iter(self.prices.clone().into_iter().map(Ok))
     }
 }
