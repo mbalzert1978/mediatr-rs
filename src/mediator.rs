@@ -7,7 +7,7 @@ use std::task::{Context, Poll};
 
 use futures_core::Stream;
 
-use mediatr_provider::{Provider, WeakProvider};
+use mediatr_provider::{GetError, Provider, WeakProvider};
 
 use crate::pipeline::{Pipeline, StreamPipeline};
 use crate::request::HandlerResult;
@@ -98,13 +98,21 @@ impl<S> Clone for WeakMediator<S> {
     }
 }
 
+/// Warum der Mediator eine Nachricht nicht zustellt, wenn der Provider ihren Handler nicht liefert.
+fn undeliverable(error: &GetError) -> SendError {
+    match error {
+        GetError::ScopedFromRoot => SendError::NoScope,
+        // Über den Mediator kommt sonst nur `NoService` an.
+        _ => SendError::NoHandler,
+    }
+}
+
 impl<S: NotificationPublisher, R: Request> Sender<R> for Mediator<S> {
     async fn send(&self, request: R) -> HandlerResult<R> {
         let handler = self
             .provider
             .get::<RequestHandlerWrapper<R>>()
-            // Über den Mediator kommt nur `NoService` an.
-            .map_err(|_| SendError::NoHandler)?;
+            .map_err(|error| undeliverable(&error))?;
         // Die Pipeline fehlt nur, wenn der Handler fehlt; dann ist `send` schon raus.
         let pipeline = self
             .provider
