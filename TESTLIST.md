@@ -59,7 +59,7 @@ Quelle: Microsoft.Extensions.DependencyInjection `AddScoped`, `IServiceScopeFact
 - [x] Eigener Dienst `UnitOfWork` mit `Registration::scoped` über `MediatorBuilder::service` registriert, zwei Handler mit `Handler::scoped_from`, deren Bauanleitung `UnitOfWork` aus dem Provider holt, `AddOrderLine` und danach `CountOrderLines` über denselben Scope → `CountOrderLines` liefert 1 · `scoped_service_is_shared_by_handlers_within_same_scope`
 - [x] (T11) Dieselben Registrierungen, `AddOrderLine` über einen Scope, `CountOrderLines` über einen zweiten → `CountOrderLines` liefert 0 · `scoped_service_is_separate_in_each_scope`
 - [x] Handler mit `Handler::scoped_from`, dessen Bauanleitung `UnitOfWork` holt, `UnitOfWork` nicht registriert, `send` über einen Scope → `Err(SendError::NoDependency)`, kein Panic · `scoped_handler_without_registered_dependency_gets_no_dependency`
-- [ ] Notification-Handler mit `Handler::scoped_from`, dessen Bauanleitung `UnitOfWork` holt, `UnitOfWork` nicht registriert, `publish` über einen Scope → `Err(SendError::NoDependency)`, kein Panic
+- [x] Notification-Handler mit `Handler::scoped_from`, dessen Bauanleitung `UnitOfWork` holt, `UnitOfWork` nicht registriert, `publish` über einen Scope → `Err(SendError::NoDependency)`, kein Panic · `publish_to_scoped_handler_without_registered_dependency_gets_no_dependency`
 - [ ] Stream-Handler mit `Handler::scoped_from`, dessen Bauanleitung `UnitOfWork` holt, `UnitOfWork` nicht registriert, `create_stream` über einen Scope → der Stream liefert ein Element `Err(SendError::NoDependency)` und endet, kein Panic
 
 ## Provider-Crate `mediatr-provider`

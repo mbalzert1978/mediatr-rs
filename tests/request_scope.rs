@@ -16,7 +16,8 @@ use common::Journal;
 use request_scope_fixtures::{
     AddGiftWrap, AddOrderLine, AddToCart, Cart, CartAudit, CartCheckedOut, CartContents,
     CheckoutCart, CountOrderLines, GIFT_WRAP_PRICE, GiftWrapHandler, ListCartItems,
-    OrderLineCounter, OrderLineRecorder, ReceiptPrinter, UnitOfWork, cart_mediator,
+    OrderLineCommitter, OrderLineCounter, OrderLineRecorder, ReceiptPrinter, UnitOfWork,
+    cart_mediator,
 };
 
 #[tokio::test]
@@ -269,6 +270,24 @@ async fn scoped_handler_without_registered_dependency_gets_no_dependency() {
         .build();
 
     let result = mediator.scope().send(AddOrderLine).await;
+
+    assert_eq!(result, Err(SendError::NoDependency));
+}
+
+#[tokio::test]
+async fn publish_to_scoped_handler_without_registered_dependency_gets_no_dependency() {
+    let mediator = Mediator::builder()
+        .subscribe(Handler::scoped_from(|_, provider| {
+            Ok(OrderLineCommitter {
+                unit_of_work: provider.get()?,
+            })
+        }))
+        .build();
+
+    let result = mediator
+        .scope()
+        .publish(CartCheckedOut { total: 420 })
+        .await;
 
     assert_eq!(result, Err(SendError::NoDependency));
 }

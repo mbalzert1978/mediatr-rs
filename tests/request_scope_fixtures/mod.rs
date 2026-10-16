@@ -184,3 +184,15 @@ impl RequestHandler<CountOrderLines> for OrderLineCounter {
         Ok(self.unit_of_work.pending_lines.load(Ordering::SeqCst))
     }
 }
+
+/// Speichert die offenen Bestellzeilen der Arbeitseinheit, die er per Konstruktor bekommt, sobald der Kunde bezahlt hat.
+pub struct OrderLineCommitter {
+    pub unit_of_work: Arc<UnitOfWork>,
+}
+
+impl NotificationHandler<CartCheckedOut> for OrderLineCommitter {
+    async fn handle(&self, _event: &CartCheckedOut) -> Result<(), SendError> {
+        self.unit_of_work.pending_lines.store(0, Ordering::SeqCst);
+        Ok(())
+    }
+}
