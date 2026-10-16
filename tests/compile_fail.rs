@@ -12,7 +12,7 @@ fn behavior_registered_after_first_notification_handler_does_not_compile() {
 }
 
 #[test]
-fn behavior_requiring_clone_makes_send_for_non_clone_request_not_compile() {
+fn behavior_requiring_clone_rejects_non_clone_request_at_compile_time() {
     trybuild::TestCases::new().compile_fail("tests/ui/behavior_requires_clone.rs");
 }
 
