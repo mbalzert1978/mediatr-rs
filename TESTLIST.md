@@ -37,7 +37,7 @@ Quelle: MediatR `Mediator(IServiceProvider)` speichert keine Handler; es holt si
 - [x] (T11) Handler bekommt den Mediator per Konstruktor als generischen `Sender`, Mediator in eine mit `tokio::spawn` gestartete Aufgabe verschoben, dort `send` → liefert die Antwort des Handlers · `generic_handler_with_injected_sender_runs_inside_spawned_task`
 - [x] Mediator in eine mit `tokio::spawn` gestartete Aufgabe verschoben, dort `publish` → alle Handler laufen · `publish_inside_spawned_task_runs_all_handlers`
 - [x] Mediator in eine mit `tokio::spawn` gestartete Aufgabe verschoben, dort einen Stream gelesen → er liefert die Elemente des Stream-Handlers · `stream_read_inside_spawned_task_yields_handler_items`
-- [ ] (T11) Zwei Threads schicken über Klone desselben Mediators gleichzeitig Requests an einen `Handler::singleton` → beide bekommen ihre Antwort, der Handler wird einmal gebaut
+- [x] (T11) Zwei Threads schicken über Klone desselben Mediators gleichzeitig Requests an einen `Handler::singleton` → beide bekommen ihre Antwort, der Handler wird einmal gebaut · `two_threads_send_through_cloned_mediator_build_singleton_once`
 
 ## Provider-Crate `mediatr-provider`
 
