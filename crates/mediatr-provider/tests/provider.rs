@@ -1166,3 +1166,15 @@ fn has_unique_without_unique_registration_returns_false() {
 
     assert!(!builder.has_unique::<Document, Invoice>());
 }
+
+#[test]
+fn has_unique_after_unique_registration_returns_true() {
+    let builder = Provider::builder().register(
+        Registration::instance(Document::from(Invoice {
+            heading: "Rechnung".to_owned(),
+        }))
+        .unique_by::<Invoice>(),
+    );
+
+    assert!(builder.has_unique::<Document, Invoice>());
+}
