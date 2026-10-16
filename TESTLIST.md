@@ -30,7 +30,7 @@ Quelle: MediatR `Mediator(IServiceProvider)` speichert keine Handler; es holt si
 - [x] Handler mit Sender per Konstruktor ist als `Handler::singleton` registriert, der Mediator wird fallen gelassen → der Handler wird freigegeben (sein `Drop` läuft) · `singleton_handler_with_sender_is_released_with_mediator`
 - [x] Handler mit Sender ist als `Handler::singleton` registriert und schickt einen Request, nachdem der Mediator weggefallen ist → `send` liefert `Err(SendError::MediatorDropped)`, kein Panic · `singleton_handler_sending_after_mediator_dropped_gets_mediator_dropped`
 - [x] `Handler` für einen Handler-Typ ohne `Debug` mit `{:?}` formatiert → die Ausgabe nennt den Handler-Typ · `handler_debug_names_handler_type_without_debug`
-- [ ] Mediator mit Behaviors in einem Feld vom Typ `Mediator` gespeichert, ohne die Behaviors zu nennen → `send` darüber läuft durch die Behaviors und liefert die Antwort des Handlers
+- [x] Mediator mit Behaviors in einem Feld vom Typ `Mediator` gespeichert, ohne die Behaviors zu nennen → `send` darüber läuft durch die Behaviors und liefert die Antwort des Handlers · `mediator_with_behaviors_stored_as_plain_mediator_field_runs_behaviors`
 - [ ] (T11) Mediator mit Behaviors, ein `Handler::singleton` hält `WeakMediator` als Feld, ohne die Behaviors zu nennen → `send` über diesen `WeakMediator` läuft durch die Behaviors
 - [ ] Mediator mit Stream-Behaviors in einem Feld vom Typ `Mediator` gespeichert, ohne die Behaviors zu nennen → `create_stream` darüber läuft durch die Stream-Behaviors und liefert die Items des Handlers
 
@@ -172,6 +172,7 @@ Quelle: MediatR `test/MediatR.Tests/PipelineTests.cs`, `MicrosoftExtensionsDI/Pi
 - [x] Ein Behavior nach dem ersten Handler registriert → kompiliert nicht · `behavior_registered_after_first_handler_does_not_compile`
 - [x] Ein Behavior nach dem ersten Notification-Handler (`subscribe`) registriert → kompiliert nicht · `behavior_registered_after_first_notification_handler_does_not_compile`
 - [x] Ein Behavior verlangt mehr vom Request (z. B. `Clone`), ein Request-Typ mit Handler erfüllt das nicht → kompiliert nicht · `behavior_requiring_clone_rejects_non_clone_request_at_compile_time`
+- [ ] Ein Behavior verlangt `Clone`, ein Request-Typ ohne Handler erfüllt das nicht → `send` für diesen Typ liefert `Err(SendError::NoHandler)`, kein Behavior läuft
 - [x] Handler mit `Handler::transient` registriert und von einem Behavior umschlossen → ein `send` baut den Handler genau einmal, das Behavior läuft genau einmal um ihn herum · `transient_handler_wrapped_by_behavior_is_built_once_per_send_and_wrapped_once`
 - [x] Behavior ruft den nächsten Schritt nicht auf und liefert selbst eine Antwort → `send` liefert diese Antwort, der Handler läuft nicht · `behavior_answering_without_next_returns_its_response_and_handler_does_not_run`
 - [x] Behavior setzt eine Frist, der Handler eines Requests mit Antwort braucht länger → `send` liefert `Err` statt einer Antwort, der Handler wird nicht fertig · `behavior_deadline_shorter_than_handler_returns_err_and_handler_does_not_finish`

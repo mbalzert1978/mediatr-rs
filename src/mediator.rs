@@ -24,17 +24,17 @@ use crate::{
 ///
 /// Entsteht über [`Mediator::builder`]. Verschickt wird über [`Sender`] und [`Publisher`].
 /// `S` ist der [`NotificationPublisher`], nach dem `publish` die Handler laufen lässt.
-/// `P` ist die Kette der Behaviors, die Requests umschließen; siehe [`MediatorBuilder::open_behavior`].
-pub struct Mediator<S = ForeachAwaitPublisher, P = ()> {
+/// Die Behaviors, die Requests umschließen, baut [`MediatorBuilder::register`] je Request-Typ in die Pipeline; der Typ nennt sie nicht.
+pub struct Mediator<S = ForeachAwaitPublisher> {
     provider: Provider,
-    types: PhantomData<(S, P)>,
+    publisher: PhantomData<S>,
 }
 
 /// Verweis auf einen [`Mediator`], der dessen Handler nicht am Leben hält; ein [`Handler::singleton`](crate::Handler::singleton) bekommt ihn als [`Sender`] und [`Publisher`].
-/// `S` und `P` sind Notification-Publisher und Behaviors dieses Mediators.
-pub struct WeakMediator<S = ForeachAwaitPublisher, P = ()> {
+/// `S` ist der Notification-Publisher dieses Mediators.
+pub struct WeakMediator<S = ForeachAwaitPublisher> {
     pub(crate) provider: WeakProvider,
-    pub(crate) types: PhantomData<(S, P)>,
+    pub(crate) publisher: PhantomData<S>,
 }
 
 impl Mediator {
@@ -45,54 +45,54 @@ impl Mediator {
     }
 }
 
-impl<S, P> Mediator<S, P> {
-    /// Mediator, der über `provider` an Handler und Behaviors kommt.
+impl<S> Mediator<S> {
+    /// Mediator, der über `provider` an Handler und Pipelines kommt.
     pub(crate) fn new(provider: Provider) -> Self {
         Self {
             provider,
-            types: PhantomData,
+            publisher: PhantomData,
         }
     }
 }
 
-// Von Hand statt `derive`: `derive(Debug)` verlangte `S: Debug` und `P: Debug`; `PhantomData` nennt beide Typen auch ohne.
-impl<S, P> fmt::Debug for Mediator<S, P> {
+// Von Hand statt `derive`: `derive(Debug)` verlangte `S: Debug`; `PhantomData` nennt den Publisher auch ohne.
+impl<S> fmt::Debug for Mediator<S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Mediator")
             .field("provider", &self.provider)
-            .field("types", &self.types)
+            .field("publisher", &self.publisher)
             .finish()
     }
 }
 
 // Von Hand statt `derive`, aus demselben Grund wie bei `Mediator`.
-impl<S, P> fmt::Debug for WeakMediator<S, P> {
+impl<S> fmt::Debug for WeakMediator<S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("WeakMediator")
             .field("provider", &self.provider)
-            .field("types", &self.types)
+            .field("publisher", &self.publisher)
             .finish()
     }
 }
 
-// Von Hand statt `derive`: `derive(Clone)` verlangte `S: Clone` und `P: Clone`, obwohl nur `PhantomData` von ihnen abhängt.
-impl<S, P> Clone for Mediator<S, P> {
+// Von Hand statt `derive`: `derive(Clone)` verlangte `S: Clone`, obwohl nur `PhantomData` von `S` abhängt.
+impl<S> Clone for Mediator<S> {
     fn clone(&self) -> Self {
         Self::new(self.provider.clone())
     }
 }
 
 // Von Hand statt `derive`, aus demselben Grund wie bei `Mediator`.
-impl<S, P> Clone for WeakMediator<S, P> {
+impl<S> Clone for WeakMediator<S> {
     fn clone(&self) -> Self {
         Self {
             provider: self.provider.clone(),
-            types: PhantomData,
+            publisher: PhantomData,
         }
     }
 }
 
-impl<S, P, R: Request + 'static> Sender<R> for Mediator<S, P> {
+impl<S, R: Request + 'static> Sender<R> for Mediator<S> {
     async fn send(&self, request: R) -> HandlerResult<R> {
         let handler = self
             .provider
@@ -108,7 +108,7 @@ impl<S, P, R: Request + 'static> Sender<R> for Mediator<S, P> {
     }
 }
 
-impl<S: NotificationPublisher, P, N: Notification + 'static> Publisher<N> for Mediator<S, P> {
+impl<S: NotificationPublisher, N: Notification + 'static> Publisher<N> for Mediator<S> {
     async fn publish(&self, notification: N) -> Result<(), N::Error> {
         // Kreis und Wurzel-Fehler sind über den Mediator nicht erreichbar.
         let handlers = self
@@ -125,23 +125,23 @@ impl<S: NotificationPublisher, P, N: Notification + 'static> Publisher<N> for Me
     }
 }
 
-impl<S, P, R: Request + 'static> Sender<R> for WeakMediator<S, P> {
+impl<S, R: Request + 'static> Sender<R> for WeakMediator<S> {
     async fn send(&self, request: R) -> HandlerResult<R> {
-        let mediator: Mediator<S, P> =
+        let mediator: Mediator<S> =
             Mediator::new(self.provider.upgrade().ok_or(SendError::MediatorDropped)?);
         mediator.send(request).await
     }
 }
 
-impl<S: NotificationPublisher, P, N: Notification + 'static> Publisher<N> for WeakMediator<S, P> {
+impl<S: NotificationPublisher, N: Notification + 'static> Publisher<N> for WeakMediator<S> {
     async fn publish(&self, notification: N) -> Result<(), N::Error> {
-        let mediator: Mediator<S, P> =
+        let mediator: Mediator<S> =
             Mediator::new(self.provider.upgrade().ok_or(SendError::MediatorDropped)?);
         mediator.publish(notification).await
     }
 }
 
-impl<S, P, R: StreamRequest + 'static> StreamSender<R> for Mediator<S, P> {
+impl<S, R: StreamRequest + 'static> StreamSender<R> for Mediator<S> {
     fn create_stream(&self, request: R) -> impl Stream<Item = StreamResult<R>> {
         // Die Stream-Pipeline fehlt nur, wenn der Handler fehlt; dann liefert der Stream den Fehler.
         let pipeline = self
