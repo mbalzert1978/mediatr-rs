@@ -310,3 +310,18 @@ async fn stream_from_scoped_handler_without_registered_dependency_yields_no_depe
 
     assert_eq!(lines, vec![Err(SendError::NoDependency)]);
 }
+
+#[tokio::test]
+async fn scoped_handler_without_scope_and_dependency_gets_no_scope() {
+    let mediator = Mediator::builder()
+        .register(Handler::scoped_from(|_, provider| {
+            Ok(OrderLineRecorder {
+                unit_of_work: provider.get()?,
+            })
+        }))
+        .build();
+
+    let result = mediator.send(AddOrderLine).await;
+
+    assert_eq!(result, Err(SendError::NoScope));
+}
