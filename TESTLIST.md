@@ -137,7 +137,7 @@ Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `ExceptionTests.cs`, `Micr
 
 ## Notification — Notification-Publisher
 
-Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `NotificationPublisherTests.cs`, `MicrosoftExtensionsDI/NotificationPublisherTests.cs`; `src/MediatR/NotificationPublishers/TaskWhenAllPublisher.cs` (startet alle Handler, meldet den ersten Fehler erst, wenn alle fertig sind). Default bleibt „nacheinander“ wie `ForeachAwaitPublisher`: Laufen Handler verschränkt, löst ein `RefCell`-Borrow über ein `await` eine Panic aus; „alle gleichzeitig“ gibt es deshalb nur bewusst gewählt.
+Quelle: MediatR `test/MediatR.Tests/PublishTests.cs`, `NotificationPublisherTests.cs`, `MicrosoftExtensionsDI/NotificationPublisherTests.cs`; `src/MediatR/NotificationPublishers/TaskWhenAllPublisher.cs` (startet alle Handler, meldet den ersten Fehler erst, wenn alle fertig sind). Default bleibt „nacheinander“ wie `ForeachAwaitPublisher`, wie in MediatR. „Alle gleichzeitig“ gibt es nur bewusst gewählt; wer eine feste Reihenfolge der Handler braucht, bleibt beim Default.
 
 - [x] Mediator mit eigenem Notification-Publisher, der die Handler in umgekehrter Reihenfolge aufruft, Notification mit zwei Handlern → beide laufen, in der Reihenfolge des eigenen Publishers · `custom_publisher_runs_both_handlers_in_its_own_order`
 - [x] Mediator mit eigenem Notification-Publisher, Request mit registriertem Handler → `send` liefert die Antwort des Handlers · `custom_publisher_send_returns_handler_response`

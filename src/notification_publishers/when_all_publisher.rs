@@ -1,4 +1,4 @@
-//! Der Publisher, der alle Handler gleichzeitig auf einem Thread laufen lässt.
+//! Der Publisher, der alle Handler gleichzeitig in einer Aufgabe laufen lässt.
 
 use std::future::{Future, poll_fn};
 use std::pin::Pin;
@@ -6,13 +6,8 @@ use std::task::{Context, Poll, ready};
 
 use crate::NotificationPublisher;
 
-/// Startet alle Handler gleichzeitig auf demselben Thread: Wartet einer, läuft der nächste weiter.
+/// Startet alle Handler gleichzeitig in derselben Aufgabe: Wartet einer, läuft der nächste weiter.
 /// Jeder Handler läuft zu Ende, auch nach einem Fehler; danach liefert `publish` den Fehler des zuerst registrierten Handlers, der gescheitert ist.
-///
-/// # Achtung
-///
-/// Hält ein Handler eine `RefCell`-Leihe über ein `await`, kann ein anderer Handler dieselbe `RefCell` leihen wollen;
-/// das löst eine Panic aus. Clippy meldet solche Stellen mit `await_holding_refcell_ref`; diesen Lint nicht abschalten.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct WhenAllPublisher;
 
