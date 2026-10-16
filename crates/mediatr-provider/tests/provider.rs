@@ -363,6 +363,24 @@ fn first_of_two_recipes_asking_for_own_type_through_all_gets_nothing() {
 }
 
 #[test]
+fn first_recipe_asking_for_own_type_through_all_gets_last_instance() {
+    let provider = Provider::builder()
+        .register(Registration::transient(|provider| {
+            Ok(settings_recipe(provider))
+        }))
+        .register(Registration::instance(Settings {
+            parent: Err(GetError::NoService),
+        }))
+        .build();
+
+    let settings = provider.all::<Settings>().unwrap();
+
+    assert!(
+        matches!(settings.as_slice(), [first, last] if first.parent.as_ref().is_ok_and(|parent| Arc::ptr_eq(parent, last)))
+    );
+}
+
+#[test]
 fn singleton_recipe_asking_for_own_type_gets_nothing() {
     let provider = Provider::builder()
         .register(Registration::singleton(|provider| {

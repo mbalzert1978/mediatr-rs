@@ -2,7 +2,7 @@
 
 use std::any::{Any, TypeId, type_name};
 use std::fmt;
-use std::sync::{Arc, Mutex, TryLockError};
+use std::sync::{Arc, Mutex, PoisonError, RwLock, TryLockError};
 
 use super::{Owning, Slot, Waiting, lock};
 use crate::{GetError, Provider};
@@ -34,7 +34,7 @@ impl<T: Send + Sync + 'static> Registration<T> {
     pub fn transient(
         recipe: impl Fn(&Provider) -> Result<T, GetError> + Send + Sync + 'static,
     ) -> Self {
-        Self::new(move |provider, _| Ok(Arc::new(recipe(provider)?)))
+        Self::new(move |provider, slot| provider.run_recipe(slot.0, &recipe))
     }
 
     /// Dienst aus `recipe`; die erste Abfrage baut ihn mit dem Provider statt mit dem Scope, jede weitere liefert dasselbe Objekt.
@@ -45,8 +45,11 @@ impl<T: Send + Sync + 'static> Registration<T> {
     pub fn singleton(
         recipe: impl Fn(&Provider) -> Result<T, GetError> + Send + Sync + 'static,
     ) -> Self {
-        let kept = Mutex::new(None);
-        Self::new(move |provider, slot| singleton_service(&kept, provider, slot, &recipe))
+        let kept = Singleton {
+            service: RwLock::new(None),
+            building: Mutex::new(()),
+        };
+        Self::new(move |provider, slot| kept.service(provider, slot, &recipe))
     }
 
     /// Dienst aus `recipe`; die erste Abfrage in einem Scope baut ihn, jede weitere im selben Scope liefert dasselbe Objekt.
@@ -104,30 +107,51 @@ impl<T> fmt::Debug for Registration<T> {
     }
 }
 
-/// Liefert den Dienst in `kept`; fehlt er dort, baut `recipe` ihn mit dem Provider statt mit dem Scope von `provider`, und `kept` merkt ihn sich. Die Sperre bleibt während des Baus, damit er nur einmal läuft; schlägt er fehl, bleibt `kept` leer.
-///
-/// Baut ein anderer Thread gerade, wartet dieser Thread auf ihn; führt die Kette der Wartenden zurück zu diesem Thread, liefert sie `Err(GetError::Cycle)` statt zu warten.
-fn singleton_service<T>(
-    kept: &Mutex<Option<Arc<T>>>,
-    provider: &Provider,
-    slot: Slot,
-    recipe: impl Fn(&Provider) -> Result<T, GetError>,
-) -> Result<Arc<T>, GetError> {
-    let mut kept = match kept.try_lock() {
-        Ok(kept) => kept,
-        Err(TryLockError::Poisoned(poisoned)) => poisoned.into_inner(),
-        Err(TryLockError::WouldBlock) => {
-            let _waiting = Waiting::enter(&provider.shared.builds, slot)?;
-            lock(kept)
-        }
-    };
-    if let Some(service) = kept.as_ref() {
-        return Ok(Arc::clone(service));
+/// Das Singleton einer `singleton`-Registrierung; leer, bis die erste Abfrage es baut.
+struct Singleton<T> {
+    /// Das fertige Singleton; Abfragen auf mehreren Threads lesen es gleichzeitig, ohne aufeinander zu warten.
+    service: RwLock<Option<Arc<T>>>,
+    /// Gesperrt, solange ein Thread das Singleton baut, damit der Bau nur einmal läuft.
+    building: Mutex<()>,
+}
+
+impl<T> Singleton<T> {
+    /// Das fertige Singleton; `None`, solange es fehlt.
+    fn built(&self) -> Option<Arc<T>> {
+        self.service
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
     }
-    let _owning = Owning::enter(&provider.shared.builds, slot);
-    let built = Arc::new(recipe(&provider.root())?);
-    *kept = Some(Arc::clone(&built));
-    Ok(built)
+
+    /// Liefert das fertige Singleton; fehlt es, baut `recipe` es mit dem Provider statt mit dem Scope von `provider`, und es bleibt gemerkt. Schlägt der Bau fehl, bleibt das Singleton leer.
+    ///
+    /// Baut ein anderer Thread gerade, wartet dieser Thread auf ihn; führt die Kette der Wartenden zurück zu diesem Thread, liefert sie `Err(GetError::Cycle)` statt zu warten.
+    fn service(
+        &self,
+        provider: &Provider,
+        slot: Slot,
+        recipe: impl Fn(&Provider) -> Result<T, GetError>,
+    ) -> Result<Arc<T>, GetError> {
+        if let Some(service) = self.built() {
+            return Ok(service);
+        }
+        let _building = match self.building.try_lock() {
+            Ok(building) => building,
+            Err(TryLockError::Poisoned(poisoned)) => poisoned.into_inner(),
+            Err(TryLockError::WouldBlock) => {
+                let _waiting = Waiting::enter(&provider.shared.builds, slot)?;
+                lock(&self.building)
+            }
+        };
+        if let Some(service) = self.built() {
+            return Ok(service);
+        }
+        let _owning = Owning::enter(&provider.shared.builds, slot);
+        let built = provider.root().run_recipe(slot.0, recipe)?;
+        *self.service.write().unwrap_or_else(PoisonError::into_inner) = Some(Arc::clone(&built));
+        Ok(built)
+    }
 }
 
 /// Liefert den Dienst auf Platz `slot` im Scope von `provider`; fehlt er dort, baut `recipe` ihn, und der Scope merkt ihn sich. Ist `provider` der Provider selbst, liefert sie `Err(GetError::ScopedFromRoot)`.
@@ -147,7 +171,7 @@ fn scoped_service<T: Send + Sync + 'static>(
     if let Some(service) = cached {
         return Ok(service);
     }
-    let service = Arc::new(recipe(provider)?);
+    let service = provider.run_recipe(slot.0, recipe)?;
     let kept = Arc::clone(
         lock(&provider.built)
             .entry(slot)
