@@ -30,7 +30,7 @@ pub struct Mediator<S = ForeachAwaitPublisher> {
     publisher: PhantomData<S>,
 }
 
-/// Verweis auf einen [`Mediator`], der dessen Handler nicht am Leben hält; ein [`Handler::singleton`](crate::Handler::singleton) bekommt ihn als [`Sender`] und [`Publisher`].
+/// Verweis auf einen [`Mediator`], der dessen Handler nicht am Leben hält; ein [`Handler::singleton`](crate::Handler::singleton) oder [`Handler::scoped`](crate::Handler::scoped) bekommt ihn als [`Sender`] und [`Publisher`].
 /// `S` ist der Notification-Publisher dieses Mediators.
 pub struct WeakMediator<S = ForeachAwaitPublisher> {
     pub(crate) provider: WeakProvider,
@@ -52,6 +52,12 @@ impl<S> Mediator<S> {
             provider,
             publisher: PhantomData,
         }
+    }
+
+    /// Beginnt einen neuen Scope mit denselben Handlern; [`Handler::scoped`](crate::Handler::scoped)-Handler baut er neu.
+    #[must_use]
+    pub fn scope(&self) -> Self {
+        Self::new(self.provider.scope())
     }
 }
 
