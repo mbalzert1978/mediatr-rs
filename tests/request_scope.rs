@@ -8,7 +8,7 @@ use mediatr_rs::{Handler, Mediator, SendError, Sender};
 mod request_scope_fixtures;
 
 use request_scope_fixtures::{
-    AddGiftWrap, AddToCart, Cart, GIFT_WRAP_PRICE, GiftWrapHandler, cart_mediator,
+    AddGiftWrap, AddToCart, Cart, CartAudit, GIFT_WRAP_PRICE, GiftWrapHandler, cart_mediator,
 };
 
 #[tokio::test]
@@ -86,4 +86,19 @@ async fn singleton_handler_is_built_once_across_scopes_and_mediator() {
     }
 
     assert_eq!(built.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn behavior_runs_around_scoped_cart_in_scope() {
+    let seen = Arc::new(AtomicU32::new(0));
+    let mediator = Mediator::builder()
+        .behavior(CartAudit {
+            seen: Arc::clone(&seen),
+        })
+        .register(Handler::scoped(|_| Cart::default()))
+        .build();
+
+    let total = mediator.scope().send(AddToCart { price: 300 }).await;
+
+    assert_eq!((total, seen.load(Ordering::SeqCst)), (Ok(300), 1));
 }

@@ -1,6 +1,9 @@
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use mediatr_rs::{Handler, Mediator, Request, RequestHandler, SendError, Sender};
+use mediatr_rs::{
+    Handler, Mediator, Next, PipelineBehavior, Request, RequestHandler, SendError, Sender,
+};
 
 /// Legt einen Artikel in den Warenkorb; die Antwort ist die Summe aller Artikel bisher, in Rappen.
 pub struct AddToCart {
@@ -30,6 +33,18 @@ pub fn cart_mediator() -> Mediator {
     Mediator::builder()
         .register(Handler::scoped(|_| Cart::default()))
         .build()
+}
+
+/// Zählt, wie oft ein Artikel in den Warenkorb soll, und reicht ihn an den Warenkorb weiter.
+pub struct CartAudit {
+    pub seen: Arc<AtomicU32>,
+}
+
+impl PipelineBehavior<AddToCart> for CartAudit {
+    async fn handle(&self, request: AddToCart, next: Next<AddToCart>) -> Result<u32, SendError> {
+        self.seen.fetch_add(1, Ordering::SeqCst);
+        next.run(request).await
+    }
 }
 
 /// Preis der Geschenkverpackung, in Rappen.
