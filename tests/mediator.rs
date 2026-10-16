@@ -1,7 +1,8 @@
 //! Tests für den Abschnitt „Mediator — Fassade und DI“ in `TESTLIST.md`.
 
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::{Arc, mpsc};
+use std::sync::{Arc, Barrier, mpsc};
+use std::thread;
 
 use futures_util::StreamExt;
 use mediatr_rs::{
@@ -13,7 +14,7 @@ mod mediator_fixtures;
 use mediator_fixtures::{
     Confirmation, CustomerDirectory, CustomerError, CustomerJoined, FixedCustomer, GetCustomer,
     ListCustomers, LoyaltyCard, OrderError, PlaceOrder, PlaceOrderHandler, Shop, Turnstile,
-    WarehouseOrderHandler, WelcomeMail, ada,
+    WarehouseOrderHandler, WelcomeMail, ada, send_when_all_ready,
 };
 
 #[tokio::test]
@@ -372,4 +373,31 @@ async fn stream_read_inside_spawned_task_yields_handler_items() {
             .unwrap();
 
     assert_eq!(names, vec![Ok("Ada".to_owned())]);
+}
+
+#[test]
+fn two_threads_send_through_cloned_mediator_build_singleton_once() {
+    let built = Arc::new(AtomicU32::new(0));
+    let counter = Arc::clone(&built);
+    let mediator = Mediator::builder()
+        .register(Handler::singleton(move |_: WeakMediator| {
+            counter.fetch_add(1, Ordering::SeqCst);
+            CustomerDirectory {
+                customers: vec![ada()],
+            }
+        }))
+        .build();
+    let start = &Barrier::new(2);
+
+    let names = thread::scope(|scope| {
+        let clerks = [mediator.clone(), mediator.clone()].map(|clone| {
+            scope.spawn(move || send_when_all_ready(&clone, GetCustomer { id: 7 }, start))
+        });
+        clerks.map(|clerk| clerk.join().unwrap().unwrap().map(|customer| customer.name))
+    });
+
+    assert_eq!(
+        (names, built.load(Ordering::SeqCst)),
+        ([Ok("Ada".to_owned()), Ok("Ada".to_owned())], 1)
+    );
 }

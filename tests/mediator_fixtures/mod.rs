@@ -1,5 +1,6 @@
-use std::sync::Arc;
+use std::io;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::{Arc, Barrier};
 
 use futures_core::Stream;
 use mediatr_rs::{
@@ -224,4 +225,19 @@ impl<R: StreamRequest> StreamPipelineBehavior<R> for Turnstile {
 /// Ein Laden, der seinen Mediator als Feld hält, ohne dessen Behaviors zu nennen.
 pub struct Shop {
     pub mediator: Mediator,
+}
+
+/// Schickt `request` von diesem Thread aus über `mediator`, auf einer eigenen Laufzeit, sobald alle Threads an `start` angekommen sind.
+///
+/// # Errors
+///
+/// Den Fehler von `tokio`, wenn die Laufzeit nicht startet.
+pub fn send_when_all_ready(
+    mediator: &Mediator,
+    request: GetCustomer,
+    start: &Barrier,
+) -> io::Result<Result<Customer, CustomerError>> {
+    let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+    start.wait();
+    Ok(runtime.block_on(mediator.send(request)))
 }
