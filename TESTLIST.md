@@ -60,7 +60,7 @@ Quelle: Microsoft.Extensions.DependencyInjection `AddScoped`, `IServiceScopeFact
 - [x] (T11) Dieselben Registrierungen, `AddOrderLine` über einen Scope, `CountOrderLines` über einen zweiten → `CountOrderLines` liefert 0 · `scoped_service_is_separate_in_each_scope`
 - [x] Handler mit `Handler::scoped_from`, dessen Bauanleitung `UnitOfWork` holt, `UnitOfWork` nicht registriert, `send` über einen Scope → `Err(SendError::NoDependency)`, kein Panic · `scoped_handler_without_registered_dependency_gets_no_dependency`
 - [x] Notification-Handler mit `Handler::scoped_from`, dessen Bauanleitung `UnitOfWork` holt, `UnitOfWork` nicht registriert, `publish` über einen Scope → `Err(SendError::NoDependency)`, kein Panic · `publish_to_scoped_handler_without_registered_dependency_gets_no_dependency`
-- [ ] Stream-Handler mit `Handler::scoped_from`, dessen Bauanleitung `UnitOfWork` holt, `UnitOfWork` nicht registriert, `create_stream` über einen Scope → der Stream liefert ein Element `Err(SendError::NoDependency)` und endet, kein Panic
+- [x] Stream-Handler mit `Handler::scoped_from`, dessen Bauanleitung `UnitOfWork` holt, `UnitOfWork` nicht registriert, `create_stream` über einen Scope → der Stream liefert ein Element `Err(SendError::NoDependency)` und endet, kein Panic · `stream_from_scoped_handler_without_registered_dependency_yields_no_dependency`
 
 ## Provider-Crate `mediatr-provider`
 
