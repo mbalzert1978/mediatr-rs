@@ -10,11 +10,11 @@ use mediatr_provider::{GetError, Provider, Registration};
 mod provider_fixtures;
 
 use provider_fixtures::{
-    Alive, AuditLog, Config, Connection, Course, DeliveryNote, Document, Employee, Folder,
-    Greeting, Invoice, LedgerEntry, MenuItem, Name, Printer, Report, Repository, Router, Scheduler,
-    Session, Settings, Shard, Student, Team, UnitOfWork, connection_recipe, counting_recipe,
-    employee_needing_team, gated_recipe, router_collecting_shards, settings_recipe,
-    shard_needing_router, shard_without_router, team_needing_lead,
+    Alive, AuditLog, Billing, Config, Connection, Course, DeliveryNote, Document, Employee, Folder,
+    Greeting, Invoice, LedgerEntry, MenuItem, Name, Orders, Printer, Report, Repository, Router,
+    Scheduler, Session, Settings, Shard, Shipping, Student, Team, UnitOfWork, built_together,
+    connection_recipe, counting_recipe, gated_recipe, router_collecting_shards, settings_recipe,
+    shard_needing_router, shard_without_router,
 };
 
 #[test]
@@ -1035,11 +1035,13 @@ fn all_with_recipe_asking_for_unregistered_service_gets_no_dependency() {
 fn mutually_dependent_singletons_on_two_threads_both_return() {
     let both_building = Arc::new(Barrier::new(2));
     let provider = Provider::builder()
-        .register(Registration::singleton(team_needing_lead(Arc::clone(
+        .register(Registration::singleton(built_together(
             &both_building,
-        ))))
-        .register(Registration::singleton(employee_needing_team(
-            both_building,
+            |lead| Team { lead },
+        )))
+        .register(Registration::singleton(built_together(
+            &both_building,
+            |team| Employee { team },
         )))
         .build();
     let (answers, answered) = mpsc::channel();
@@ -1098,11 +1100,13 @@ fn same_type_singletons_on_two_threads_with_third_thread_waiting_on_first_get_on
 fn mutually_dependent_singletons_on_two_threads_exactly_one_inner_query_gets_cycle() {
     let both_building = Arc::new(Barrier::new(2));
     let provider = Provider::builder()
-        .register(Registration::singleton(team_needing_lead(Arc::clone(
+        .register(Registration::singleton(built_together(
             &both_building,
-        ))))
-        .register(Registration::singleton(employee_needing_team(
-            both_building,
+            |lead| Team { lead },
+        )))
+        .register(Registration::singleton(built_together(
+            &both_building,
+            |team| Employee { team },
         )))
         .build();
     let (teams, team_built) = mpsc::channel();
@@ -1119,4 +1123,37 @@ fn mutually_dependent_singletons_on_two_threads_exactly_one_inner_query_gets_cyc
         (team.lead.as_ref().err(), employee.team.as_ref().err()),
         (Some(GetError::Cycle), None) | (None, Some(GetError::Cycle))
     ));
+}
+
+#[test]
+fn three_singletons_in_a_ring_on_three_threads_all_return_and_exactly_one_inner_query_gets_cycle() {
+    let ring = Arc::new(Barrier::new(3));
+    let provider = Provider::builder()
+        .register(Registration::singleton(built_together(&ring, |billing| {
+            Orders { billing }
+        })))
+        .register(Registration::singleton(built_together(&ring, |shipping| {
+            Billing { shipping }
+        })))
+        .register(Registration::singleton(built_together(&ring, |orders| {
+            Shipping { orders }
+        })))
+        .build();
+    let (orders, orders_built) = mpsc::channel();
+    let (billings, billing_built) = mpsc::channel();
+    let (shippings, shipping_built) = mpsc::channel();
+    let (orders_side, billing_side, shipping_side) = (provider.clone(), provider.clone(), provider);
+    let wait = Duration::from_secs(5);
+
+    std::thread::spawn(move || orders.send(orders_side.get::<Orders>()).unwrap());
+    std::thread::spawn(move || billings.send(billing_side.get::<Billing>()).unwrap());
+    std::thread::spawn(move || shippings.send(shipping_side.get::<Shipping>()).unwrap());
+    let orders = orders_built.recv_timeout(wait).unwrap().unwrap();
+    let billing = billing_built.recv_timeout(wait).unwrap().unwrap();
+    let shipping = shipping_built.recv_timeout(wait).unwrap().unwrap();
+
+    let errors = (orders.billing.as_ref().err().into_iter())
+        .chain(billing.shipping.as_ref().err())
+        .chain(shipping.orders.as_ref().err());
+    assert_eq!(errors.collect::<Vec<_>>(), [&GetError::Cycle]);
 }

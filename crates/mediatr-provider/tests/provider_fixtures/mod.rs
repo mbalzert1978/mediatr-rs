@@ -206,27 +206,15 @@ pub fn gated_recipe() -> (Arc<Gate>, impl Fn(&Provider) -> Result<Config, GetErr
     (gate, recipe)
 }
 
-/// Bauanleitung für ein Team, das nach seiner Leitung fragt; sie wartet an `both_building`, bis auch die Leitung gebaut wird, und fragt erst dann.
-pub fn team_needing_lead(
-    both_building: Arc<Barrier>,
-) -> impl Fn(&Provider) -> Result<Team, GetError> {
+/// Bauanleitung für einen Dienst vom Typ `T`, der beim Bau einen Dienst vom Typ `D` braucht: Sie wartet an `together`, bis alle Beteiligten bauen, fragt dann nach `D` und legt das Ergebnis mit `build` in den Dienst.
+pub fn built_together<T, D: Send + Sync + 'static>(
+    together: &Arc<Barrier>,
+    build: fn(Result<Arc<D>, GetError>) -> T,
+) -> impl Fn(&Provider) -> Result<T, GetError> + use<T, D> {
+    let together = Arc::clone(together);
     move |provider| {
-        both_building.wait();
-        Ok(Team {
-            lead: provider.get::<Employee>(),
-        })
-    }
-}
-
-/// Bauanleitung für eine Mitarbeiterin, die nach ihrem Team fragt; sie wartet an `both_building`, bis auch das Team gebaut wird, und fragt erst dann.
-pub fn employee_needing_team(
-    both_building: Arc<Barrier>,
-) -> impl Fn(&Provider) -> Result<Employee, GetError> {
-    move |provider| {
-        both_building.wait();
-        Ok(Employee {
-            team: provider.get::<Team>(),
-        })
+        together.wait();
+        Ok(build(provider.get::<D>()))
     }
 }
 
@@ -290,4 +278,19 @@ pub fn router_collecting_shards(
             shards: provider.all::<Shard>(),
         })
     }
+}
+
+/// Die Bestellungen; `billing` hält, was die Abfrage nach der Abrechnung beim Bau ergab.
+pub struct Orders {
+    pub billing: Result<Arc<Billing>, GetError>,
+}
+
+/// Die Abrechnung; `shipping` hält, was die Abfrage nach dem Versand beim Bau ergab.
+pub struct Billing {
+    pub shipping: Result<Arc<Shipping>, GetError>,
+}
+
+/// Der Versand; `orders` hält, was die Abfrage nach den Bestellungen beim Bau ergab.
+pub struct Shipping {
+    pub orders: Result<Arc<Orders>, GetError>,
 }
