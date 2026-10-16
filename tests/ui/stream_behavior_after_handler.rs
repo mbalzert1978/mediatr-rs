@@ -28,7 +28,7 @@ impl StreamRequestHandler<ListLoans> for Library {
 /// Reicht jede Abfrage unverändert weiter.
 struct Librarian;
 
-impl<R: StreamRequest + 'static> StreamPipelineBehavior<R> for Librarian {
+impl<R: StreamRequest> StreamPipelineBehavior<R> for Librarian {
     fn handle(
         &self,
         request: R,

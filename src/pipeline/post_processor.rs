@@ -11,7 +11,8 @@ use crate::{Next, PipelineBehavior, Request};
 /// # Vertrag
 ///
 /// `process` endet für jeden Request mit `Ok` oder einem Fehler und löst keine Panic aus.
-pub trait RequestPostProcessor<R: Request> {
+/// Der Nachverarbeiter ist `Send + Sync` und seine Future `Send`: Mehrere Threads teilen sich einen Nachverarbeiter.
+pub trait RequestPostProcessor<R: Request>: Send + Sync {
     /// Sieht `request` mit der `response` der inneren Pipeline (Behaviors und Handler).
     ///
     /// # Errors
@@ -21,7 +22,7 @@ pub trait RequestPostProcessor<R: Request> {
         &self,
         request: &R,
         response: &R::Response,
-    ) -> impl Future<Output = Result<(), R::Error>>;
+    ) -> impl Future<Output = Result<(), R::Error>> + Send;
 }
 
 impl<R: Request + Clone, B: RequestPostProcessor<R>> PipelineBehavior<R>

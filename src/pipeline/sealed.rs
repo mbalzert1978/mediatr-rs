@@ -151,9 +151,9 @@ impl<R: Request> Behaviors<R> for () {
 
 impl<R, P, B> Behaviors<R> for (P, OpenBehavior<B>)
 where
-    R: Request + 'static,
+    R: Request,
     P: Behaviors<R>,
-    B: PipelineBehavior<R> + Send + Sync + 'static,
+    B: PipelineBehavior<R> + 'static,
 {
     fn wrap(&self, active: &[Slot]) -> Vec<(Stage, Arc<BehaviorWrapper<R>>)> {
         let mut behaviors = self.0.wrap(active);
@@ -167,7 +167,7 @@ where
     }
 }
 
-impl<R: Request + 'static, P: Behaviors<R>> Behaviors<R> for (P, ClosedBehavior) {
+impl<R: Request, P: Behaviors<R>> Behaviors<R> for (P, ClosedBehavior) {
     fn wrap(&self, active: &[Slot]) -> Vec<(Stage, Arc<BehaviorWrapper<R>>)> {
         let mut behaviors = self.0.wrap(active);
         if active.contains(&self.1.slot) {
@@ -182,9 +182,7 @@ impl<R: Request + 'static, P: Behaviors<R>> Behaviors<R> for (P, ClosedBehavior)
     }
 }
 
-impl<R: Request + 'static, P: Behaviors<R>, B: 'static> Behaviors<R>
-    for (P, OpenStreamBehavior<B>)
-{
+impl<R: Request, P: Behaviors<R>, B: 'static> Behaviors<R> for (P, OpenStreamBehavior<B>) {
     fn wrap(&self, active: &[Slot]) -> Vec<(Stage, Arc<BehaviorWrapper<R>>)> {
         self.0.wrap(active)
     }
@@ -212,9 +210,9 @@ impl<R: StreamRequest, P: StreamBehaviors<R>> StreamBehaviors<R> for (P, ClosedB
 
 impl<R, P, B> StreamBehaviors<R> for (P, OpenStreamBehavior<B>)
 where
-    R: StreamRequest + 'static,
+    R: StreamRequest,
     P: StreamBehaviors<R>,
-    B: StreamPipelineBehavior<R> + Send + Sync + 'static,
+    B: StreamPipelineBehavior<R> + 'static,
 {
     fn wrap(&self, active: &[Slot]) -> Vec<Arc<StreamBehaviorWrapper<R>>> {
         let mut behaviors = self.0.wrap(active);
@@ -225,15 +223,13 @@ where
     }
 }
 
-impl<R: Request + 'static, P: Behaviors<R>> Behaviors<R> for (P, ClosedStreamBehavior) {
+impl<R: Request, P: Behaviors<R>> Behaviors<R> for (P, ClosedStreamBehavior) {
     fn wrap(&self, active: &[Slot]) -> Vec<(Stage, Arc<BehaviorWrapper<R>>)> {
         self.0.wrap(active)
     }
 }
 
-impl<R: StreamRequest + 'static, P: StreamBehaviors<R>> StreamBehaviors<R>
-    for (P, ClosedStreamBehavior)
-{
+impl<R: StreamRequest, P: StreamBehaviors<R>> StreamBehaviors<R> for (P, ClosedStreamBehavior) {
     fn wrap(&self, active: &[Slot]) -> Vec<Arc<StreamBehaviorWrapper<R>>> {
         let mut behaviors = self.0.wrap(active);
         if active.contains(&self.1.slot) {

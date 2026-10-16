@@ -178,7 +178,7 @@ impl<R: Request> PipelineBehavior<R> for Turnstile {
     }
 }
 
-impl<R: StreamRequest + 'static> StreamPipelineBehavior<R> for Turnstile {
+impl<R: StreamRequest> StreamPipelineBehavior<R> for Turnstile {
     fn handle(
         &self,
         request: R,

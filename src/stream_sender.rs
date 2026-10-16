@@ -10,9 +10,10 @@ use crate::stream_request::StreamResult;
 /// # Vertrag
 ///
 /// `create_stream` liefert für jeden Request genau einen Stream und löst keine Panic aus.
-pub trait StreamSender<R: StreamRequest> {
+/// Der Sender ist `Send + Sync` und sein Stream `Send`, aus demselben Grund wie bei [`Sender`](crate::Sender).
+pub trait StreamSender<R: StreamRequest>: Send + Sync {
     /// Schickt `request` an seinen Handler und liefert dessen Stream.
     ///
     /// Kann der Stream den Request nicht zustellen, liefert er einen [`SendError`](crate::SendError) als `R::Error`.
-    fn create_stream(&self, request: R) -> impl Stream<Item = StreamResult<R>>;
+    fn create_stream(&self, request: R) -> impl Stream<Item = StreamResult<R>> + Send;
 }

@@ -30,7 +30,7 @@ impl<R: StreamRequest> StreamNext<R> {
     }
 
     /// Schickt `request` an den nächsten Schritt und liefert dessen Stream; der nächste Schritt läuft erst, wenn jemand den Stream liest.
-    pub fn run(mut self, request: R) -> impl Stream<Item = StreamResult<R>> + use<R> {
+    pub fn run(mut self, request: R) -> impl Stream<Item = StreamResult<R>> + Send + use<R> {
         Deferred::new(move || match self.behaviors.pop() {
             Some(behavior) => behavior(request, self),
             None => (self.handler)(request),

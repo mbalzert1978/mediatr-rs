@@ -276,3 +276,26 @@ async fn mediator_with_stream_behaviors_stored_as_plain_mediator_field_runs_stre
         (vec![Ok("Ada".to_owned())], 1)
     );
 }
+
+#[tokio::test]
+async fn send_inside_spawned_task_runs_behavior_and_returns_handler_response() {
+    let passed = Arc::new(AtomicU32::new(0));
+    let mediator = Mediator::builder()
+        .open_behavior(Turnstile {
+            passed: Arc::clone(&passed),
+        })
+        .register(Handler::instance(CustomerDirectory {
+            customers: vec![ada()],
+        }))
+        .build();
+
+    let customer = tokio::spawn(async move { mediator.send(GetCustomer { id: 7 }).await })
+        .await
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(
+        (customer.name, passed.load(Ordering::SeqCst)),
+        ("Ada".to_owned(), 1)
+    );
+}

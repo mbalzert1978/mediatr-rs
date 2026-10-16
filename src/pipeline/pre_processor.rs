@@ -11,13 +11,14 @@ use crate::{Next, PipelineBehavior, Request};
 /// # Vertrag
 ///
 /// `process` endet für jeden Request mit `Ok` oder einem Fehler und löst keine Panic aus.
-pub trait RequestPreProcessor<R: Request> {
+/// Der Vorverarbeiter ist `Send + Sync` und seine Future `Send`: Mehrere Threads teilen sich einen Vorverarbeiter.
+pub trait RequestPreProcessor<R: Request>: Send + Sync {
     /// Sieht `request`, bevor der Handler ihn bekommt.
     ///
     /// # Errors
     ///
     /// `R::Error`, wenn `request` nicht weiter darf; dann läuft der Handler nicht, und `send` liefert diesen Fehler.
-    fn process(&self, request: &R) -> impl Future<Output = Result<(), R::Error>>;
+    fn process(&self, request: &R) -> impl Future<Output = Result<(), R::Error>> + Send;
 }
 
 impl<R: Request, B: RequestPreProcessor<R>> PipelineBehavior<R> for RequestPreProcessorBehavior<B> {

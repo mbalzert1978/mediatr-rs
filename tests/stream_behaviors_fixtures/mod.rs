@@ -61,7 +61,7 @@ pub struct Concierge {
     pub journal: Journal,
 }
 
-impl<R: StreamRequest + 'static> StreamPipelineBehavior<R> for Concierge {
+impl<R: StreamRequest> StreamPipelineBehavior<R> for Concierge {
     fn handle(
         &self,
         request: R,
@@ -76,7 +76,7 @@ pub struct NightPorter {
     pub journal: Journal,
 }
 
-impl<R: StreamRequest + 'static> StreamPipelineBehavior<R> for NightPorter {
+impl<R: StreamRequest> StreamPipelineBehavior<R> for NightPorter {
     fn handle(
         &self,
         request: R,

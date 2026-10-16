@@ -11,7 +11,8 @@ pub struct ForeachAwaitPublisher;
 impl NotificationPublisher for ForeachAwaitPublisher {
     async fn publish<E, F>(calls: Vec<F>) -> Result<(), E>
     where
-        F: Future<Output = Result<(), E>>,
+        F: Future<Output = Result<(), E>> + Send,
+        E: Send,
     {
         for call in calls {
             call.await?;

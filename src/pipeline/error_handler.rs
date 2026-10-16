@@ -11,13 +11,15 @@ use crate::{Next, PipelineBehavior, Request};
 /// # Vertrag
 ///
 /// `handle` liefert für jeden Fehler genau eine Ersatzantwort oder einen Fehler und löst keine Panic aus.
-pub trait RequestErrorHandler<R: Request> {
+/// Der Fehler-Handler ist `Send + Sync` und seine Future `Send`: Mehrere Threads teilen sich einen Fehler-Handler.
+pub trait RequestErrorHandler<R: Request>: Send + Sync {
     /// Bekommt `request` mit dem `error`, den die innere Pipeline (Behaviors und Handler) geliefert hat.
     ///
     /// # Errors
     ///
     /// `R::Error`, wenn der Handler keine Ersatzantwort hat: `error` selbst, um ihn weiterzureichen, oder einen eigenen Fehler.
-    fn handle(&self, request: &R, error: R::Error) -> impl Future<Output = HandlerResult<R>>;
+    fn handle(&self, request: &R, error: R::Error)
+    -> impl Future<Output = HandlerResult<R>> + Send;
 }
 
 impl<R: Request + Clone, B: RequestErrorHandler<R>> PipelineBehavior<R>

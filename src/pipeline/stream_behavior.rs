@@ -10,11 +10,12 @@ use crate::{StreamNext, StreamRequest};
 /// # Vertrag
 ///
 /// `handle` liefert für jeden Request genau einen Stream und löst keine Panic aus; der Stream leiht nichts vom Behavior.
-pub trait StreamPipelineBehavior<R: StreamRequest> {
+/// Das Behavior ist `Send + Sync` und sein Stream `Send`: Mehrere Threads teilen sich ein Behavior.
+pub trait StreamPipelineBehavior<R: StreamRequest>: Send + Sync {
     /// Bearbeitet `request`; `next` führt zum nächsten Stream-Behavior oder zum Stream-Handler.
     fn handle(
         &self,
         request: R,
         next: StreamNext<R>,
-    ) -> impl Stream<Item = StreamResult<R>> + use<Self, R>;
+    ) -> impl Stream<Item = StreamResult<R>> + Send + use<Self, R>;
 }

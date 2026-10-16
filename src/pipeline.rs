@@ -37,11 +37,12 @@ pub(crate) use stream_next::StreamPipeline;
 /// # Vertrag
 ///
 /// `handle` liefert für jeden Request genau eine Antwort oder einen Fehler und löst keine Panic aus.
-pub trait PipelineBehavior<R: Request> {
+/// Das Behavior ist `Send + Sync` und seine Future `Send`: Mehrere Threads teilen sich ein Behavior.
+pub trait PipelineBehavior<R: Request>: Send + Sync {
     /// Bearbeitet `request`; `next` führt zum nächsten Behavior oder zum Handler.
     ///
     /// # Errors
     ///
     /// `R::Error`, wenn das Behavior oder ein späterer Schritt `request` nicht beantworten kann.
-    fn handle(&self, request: R, next: Next<R>) -> impl Future<Output = HandlerResult<R>>;
+    fn handle(&self, request: R, next: Next<R>) -> impl Future<Output = HandlerResult<R>> + Send;
 }

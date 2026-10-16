@@ -17,12 +17,12 @@ pub(crate) use request::{RequestHandlerWrapper, wrap_request_handler};
 pub(crate) use stream_behavior::{StreamBehaviorWrapper, wrap_stream_behavior};
 pub(crate) use stream_request::{StreamRequestHandlerWrapper, wrap_stream_request_handler};
 
-/// Eine Future hinter `dyn Future` in einer `Pin<Box<…>>`; sie läuft auf diesem Thread (nicht `Send`) und leiht höchstens `'a` lang.
+/// Eine Future hinter `dyn Future` in einer `Pin<Box<…>>`; sie ist `Send` und leiht höchstens `'a` lang.
 // dyn: Handler, Behaviors und ihre Futures verschiedener Typen liegen hinter einem gemeinsamen Typ;
 // `Sender::send` und `Publisher::publish` kennen nur den Nachrichtentyp, nicht den Handler-Typ;
 // [`Next`] kennt nur den Request-Typ, nicht die Typen der Behaviors.
-type LocalBoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
+type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
-/// Ein Stream hinter `dyn Stream` in einer `Pin<Box<…>>`; er läuft auf diesem Thread (nicht `Send`) und leiht nichts.
-// dyn: wie bei `LocalBoxFuture`; `StreamSender::create_stream` kennt nur den Request-Typ, nicht den Handler-Typ.
-pub(crate) type LocalBoxStream<T> = Pin<Box<dyn Stream<Item = T>>>;
+/// Ein Stream hinter `dyn Stream` in einer `Pin<Box<…>>`; er ist `Send` und leiht nichts.
+// dyn: wie bei `BoxFuture`; `StreamSender::create_stream` kennt nur den Request-Typ, nicht den Handler-Typ.
+pub(crate) type BoxStream<T> = Pin<Box<dyn Stream<Item = T> + Send>>;
