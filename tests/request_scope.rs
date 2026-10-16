@@ -1,5 +1,8 @@
 //! Tests für den Abschnitt „Mediator — Request-Scope“ in `TESTLIST.md`.
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
+
 use mediatr_rs::{Handler, Mediator, SendError, Sender};
 
 mod request_scope_fixtures;
@@ -64,4 +67,23 @@ async fn singleton_handler_sending_to_scoped_cart_gets_no_scope() {
     let total = mediator.scope().send(AddGiftWrap).await;
 
     assert_eq!(total, Err(SendError::NoScope));
+}
+
+#[tokio::test]
+async fn singleton_handler_is_built_once_across_scopes_and_mediator() {
+    let built = Arc::new(AtomicU32::new(0));
+    let counter = Arc::clone(&built);
+    let mediator = Mediator::builder()
+        .register(Handler::singleton(move |_| {
+            counter.fetch_add(1, Ordering::SeqCst);
+            Cart::default()
+        }))
+        .build();
+    let (morning, evening) = (mediator.scope(), mediator.scope());
+
+    for sender in [&morning, &evening, &mediator] {
+        sender.send(AddToCart { price: 300 }).await.unwrap();
+    }
+
+    assert_eq!(built.load(Ordering::SeqCst), 1);
 }
