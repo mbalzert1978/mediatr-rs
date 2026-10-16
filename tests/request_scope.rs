@@ -235,3 +235,25 @@ async fn scoped_service_is_shared_by_handlers_within_same_scope() {
 
     assert_eq!(lines, Ok(1));
 }
+
+#[tokio::test]
+async fn scoped_service_is_separate_in_each_scope() {
+    let mediator = Mediator::builder()
+        .service(Registration::scoped(|_| Ok(UnitOfWork::default())))
+        .register(Handler::scoped_from(|_, provider| {
+            Ok(OrderLineRecorder {
+                unit_of_work: provider.get()?,
+            })
+        }))
+        .register(Handler::scoped_from(|_, provider| {
+            Ok(OrderLineCounter {
+                unit_of_work: provider.get()?,
+            })
+        }))
+        .build();
+    mediator.scope().send(AddOrderLine).await.unwrap();
+
+    let lines = mediator.scope().send(CountOrderLines).await;
+
+    assert_eq!(lines, Ok(0));
+}
