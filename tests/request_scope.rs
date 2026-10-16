@@ -3,13 +3,15 @@
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, mpsc};
 
-use mediatr_rs::{Handler, Mediator, RequestHandler, SendError, Sender, WeakMediator};
+use mediatr_rs::{Handler, Mediator, Publisher, RequestHandler, SendError, Sender, WeakMediator};
 
+mod common;
 mod request_scope_fixtures;
 
+use common::Journal;
 use request_scope_fixtures::{
-    AddGiftWrap, AddToCart, Cart, CartAudit, CheckoutCart, GIFT_WRAP_PRICE, GiftWrapHandler,
-    cart_mediator,
+    AddGiftWrap, AddToCart, Cart, CartAudit, CartCheckedOut, CheckoutCart, GIFT_WRAP_PRICE,
+    GiftWrapHandler, ReceiptPrinter, cart_mediator,
 };
 
 #[tokio::test]
@@ -142,4 +144,23 @@ async fn scoped_handler_sending_after_scope_dropped_gets_mediator_dropped() {
     let total = gift_wrap.handle(AddGiftWrap).await;
 
     assert_eq!(total, Err(SendError::MediatorDropped));
+}
+
+#[tokio::test]
+async fn scoped_notification_handler_runs_when_published_through_scope() {
+    let journal = Journal::default();
+    let receipts = journal.clone();
+    let mediator = Mediator::builder()
+        .subscribe(Handler::scoped(move |_| ReceiptPrinter {
+            journal: receipts.clone(),
+        }))
+        .build();
+
+    mediator
+        .scope()
+        .publish(CartCheckedOut { total: 420 })
+        .await
+        .unwrap();
+
+    assert_eq!(journal.entries(), ["Beleg über 420"]);
 }
