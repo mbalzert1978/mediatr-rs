@@ -6,8 +6,8 @@ error[E0277]: the trait bound `OrderTaxi: Clone` is not satisfied
    |
    = help: the following other types implement trait `mediatr_rs::pipeline::sealed::Behaviors<R>`:
              ()
-             (P, mediatr_rs::pipeline::sealed::Closed)
-             (P, mediatr_rs::pipeline::sealed::ClosedStream)
+             (P, mediatr_rs::pipeline::sealed::ClosedBehavior)
+             (P, mediatr_rs::pipeline::sealed::ClosedStreamBehavior)
              (P, mediatr_rs::pipeline::sealed::OpenBehavior<B>)
              (P, mediatr_rs::pipeline::sealed::OpenStreamBehavior<B>)
    = note: required for `mediatr_rs::pipeline::sealed::RequestErrorActionProcessorBehavior<ControlRoom>` to implement `PipelineBehavior<OrderTaxi>`
