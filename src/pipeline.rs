@@ -24,7 +24,7 @@ pub(crate) use next::Pipeline;
 pub use post_processor::RequestPostProcessor;
 pub use pre_processor::RequestPreProcessor;
 pub(crate) use sealed::{
-    Behaviors, Closed, ClosedStream, OpenBehavior, OpenStreamBehavior,
+    Behaviors, ClosedBehavior, ClosedStreamBehavior, OpenBehavior, OpenStreamBehavior,
     RequestErrorActionProcessorBehavior, RequestErrorProcessorBehavior,
     RequestPostProcessorBehavior, RequestPreProcessorBehavior, Slot, Stage, StreamBehaviors,
 };

@@ -166,7 +166,7 @@ impl Sender<GetCustomer> for FixedCustomer {
     }
 }
 
-/// Zählt jeden Request, der durch die Pipeline geht, und lässt ihn dann weiter.
+/// Zählt jeden Request und jeden Stream-Request, der durch die Pipeline geht, und lässt ihn dann weiter.
 pub struct Turnstile {
     pub passed: Arc<AtomicU32>,
 }
