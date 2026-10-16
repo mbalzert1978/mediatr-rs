@@ -39,6 +39,27 @@ Quelle: MediatR `Mediator(IServiceProvider)` speichert keine Handler; es holt si
 - [x] Mediator in eine mit `tokio::spawn` gestartete Aufgabe verschoben, dort einen Stream gelesen → er liefert die Elemente des Stream-Handlers · `stream_read_inside_spawned_task_yields_handler_items`
 - [x] (T11) Zwei Threads schicken über Klone desselben Mediators gleichzeitig Requests an einen `Handler::singleton` → beide bekommen ihre Antwort, der Handler wird einmal gebaut · `two_threads_send_through_cloned_mediator_build_singleton_once`
 
+## Mediator — Request-Scope
+
+Quelle: Microsoft.Extensions.DependencyInjection `AddScoped`, `IServiceScopeFactory.CreateScope`, `ValidateScopes`, Factory-Registrierung `AddScoped(sp => …)`; MediatR `Mediator(IServiceProvider)` holt Handler aus dem Provider, mit dem er gebaut ist. Fachlich: ein Warenkorb pro Web-Anfrage, `AddToCart` liefert die Summe bisher; eine Bestellung pro Web-Anfrage sammelt Zeilen in einer `UnitOfWork`, die für die DB-Transaktion steht.
+
+- [ ] Warenkorb mit `Handler::scoped`, zwei `AddToCart` über denselben Scope aus `Mediator::scope` → das zweite liefert die Summe beider Artikel
+- [ ] (T11) Warenkorb mit `Handler::scoped`, je ein `AddToCart` über zwei Scopes → jeder liefert nur seinen Artikel
+- [ ] Warenkorb mit `Handler::scoped`, `AddToCart` direkt über den Mediator ohne `scope` → `Err(SendError::NoScope)`, kein Panic
+- [ ] (T11) Handler mit `Handler::transient`, über einen Scope aufgerufen, schickt über den Mediator, den er bekommt, `AddToCart` an den Warenkorb → `AddToCart` trifft denselben Warenkorb wie ein `send` direkt über diesen Scope
+- [ ] (T11) Handler mit `Handler::singleton`, `send` über zwei Scopes und direkt über den Mediator → der Handler wird einmal gebaut
+- [ ] (T11) Mediator mit einem Behavior, `AddToCart` über einen Scope an den Warenkorb mit `Handler::scoped` → das Behavior läuft, die Antwort kommt vom Warenkorb
+- [ ] (T11) `Handler::singleton`, über einen Scope aufgerufen, schickt über seinen `WeakMediator` `AddToCart` an den `scoped`-Warenkorb → `Err(SendError::NoScope)`, kein Panic
+- [ ] (T11) Scope fällt weg, der Mediator lebt → der Warenkorb wird freigegeben (sein `Drop` läuft)
+- [ ] (T11) Ein Warenkorb, der den `WeakMediator` seines Scopes behalten hat, schickt `AddToCart`, nachdem der Scope weggefallen ist; der Mediator lebt → `Err(SendError::MediatorDropped)`, kein Panic
+- [ ] Notification-Handler mit `Handler::scoped`, `publish` über einen Scope → der Handler läuft
+- [ ] Notification-Handler mit `Handler::scoped`, `publish` direkt über den Mediator ohne `scope` → `Err(SendError::NoScope)`, kein Panic
+- [ ] Stream-Handler mit `Handler::scoped`, `create_stream` über einen Scope → der Stream liefert die Elemente des Handlers
+- [ ] Stream-Handler mit `Handler::scoped`, `create_stream` direkt über den Mediator ohne `scope` → der Stream liefert ein Element `Err(SendError::NoScope)` und endet, kein Panic
+- [ ] Eigener Dienst `UnitOfWork` mit `Registration::scoped` über `MediatorBuilder::service` registriert, zwei Handler mit `Handler::scoped_from`, deren Bauanleitung `UnitOfWork` aus dem Provider holt, `AddOrderLine` und danach `CountOrderLines` über denselben Scope → `CountOrderLines` liefert 1
+- [ ] (T11) Dieselben Registrierungen, `AddOrderLine` über einen Scope, `CountOrderLines` über einen zweiten → `CountOrderLines` liefert 0
+- [ ] Handler mit `Handler::scoped_from`, dessen Bauanleitung `UnitOfWork` holt, `UnitOfWork` nicht registriert, `send` über einen Scope → `Err(SendError::NoDependency)`, kein Panic
+
 ## Provider-Crate `mediatr-provider`
 
 Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSingleton`, `AddScoped`, `AddTransient`, `TryAddEnumerable` als `unique_by`); MediatR `test/MediatR.Tests/MicrosoftExtensionsDI/TypeResolutionTests.cs` (`ShouldNotThrowWithMissingEnumerables`). Der Container registriert und baut Dienste; vom Mediator weiß er nichts. `ValidateScopes` ist immer an.
