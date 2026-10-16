@@ -13,7 +13,7 @@ use crate::pipeline::{Pipeline, StreamPipeline};
 use crate::request::HandlerResult;
 use crate::stream_request::StreamResult;
 use crate::wrappers::{
-    LocalBoxStream, NotificationHandlerWrapper, RequestHandlerWrapper, StreamRequestHandlerWrapper,
+    BoxStream, NotificationHandlerWrapper, RequestHandlerWrapper, StreamRequestHandlerWrapper,
 };
 use crate::{
     ForeachAwaitPublisher, MediatorBuilder, Next, Notification, NotificationPublisher, Publisher,
@@ -92,7 +92,7 @@ impl<S> Clone for WeakMediator<S> {
     }
 }
 
-impl<S, R: Request + 'static> Sender<R> for Mediator<S> {
+impl<S: NotificationPublisher, R: Request> Sender<R> for Mediator<S> {
     async fn send(&self, request: R) -> HandlerResult<R> {
         let handler = self
             .provider
@@ -125,7 +125,7 @@ impl<S: NotificationPublisher, N: Notification + 'static> Publisher<N> for Media
     }
 }
 
-impl<S, R: Request + 'static> Sender<R> for WeakMediator<S> {
+impl<S: NotificationPublisher, R: Request> Sender<R> for WeakMediator<S> {
     async fn send(&self, request: R) -> HandlerResult<R> {
         let mediator: Mediator<S> =
             Mediator::new(self.provider.upgrade().ok_or(SendError::MediatorDropped)?);
@@ -141,15 +141,15 @@ impl<S: NotificationPublisher, N: Notification + 'static> Publisher<N> for WeakM
     }
 }
 
-impl<S, R: StreamRequest + 'static> StreamSender<R> for Mediator<S> {
-    fn create_stream(&self, request: R) -> impl Stream<Item = StreamResult<R>> {
+impl<S: NotificationPublisher, R: StreamRequest> StreamSender<R> for Mediator<S> {
+    fn create_stream(&self, request: R) -> impl Stream<Item = StreamResult<R>> + Send {
         // Die Stream-Pipeline fehlt nur, wenn der Handler fehlt; dann liefert der Stream den Fehler.
         let pipeline = self
             .provider
             .get::<StreamPipeline<R>>()
             .map_or_else(|_| Vec::new(), |pipeline| (*pipeline).clone());
         // dyn: der Stream der Pipeline und `Once` sind verschiedene Typen und brauchen einen gemeinsamen.
-        let stream: LocalBoxStream<StreamResult<R>> =
+        let stream: BoxStream<StreamResult<R>> =
             match self.provider.get::<StreamRequestHandlerWrapper<R>>() {
                 Ok(handler) => Box::pin(StreamNext::new(handler, pipeline).run(request)),
                 // Über den Mediator kommt nur `NoService` an.

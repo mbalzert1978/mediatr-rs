@@ -11,11 +11,13 @@ use crate::SendError;
 /// `Item` ist der einzige Typ, den ein Handler für diesen Request als Element liefert.
 /// `Error` ist der einzige Fehlertyp, den der Stream für diesen Request liefert.
 /// `From<SendError>` liefert einen Wert, der „der Stream kann den Request nicht zustellen“ bedeutet.
-pub trait StreamRequest {
+/// Request, Elemente und Fehler sind `Send`, und der Request ist `'static`: `create_stream` liefert einen `Send`-Stream,
+/// den eine mit `tokio::spawn` gestartete Aufgabe auf einen anderen Thread tragen kann.
+pub trait StreamRequest: Send + 'static {
     /// Typ der Elemente, die der Stream für diesen Request liefert.
-    type Item;
+    type Item: Send;
     /// Typ des Fehlers, den der Stream für diesen Request liefert.
-    type Error: From<SendError>;
+    type Error: From<SendError> + Send;
 }
 
 /// Was ein Stream für `R` je Schritt liefert: ein Element oder den Fehler von `R`.
@@ -26,7 +28,8 @@ pub(crate) type StreamResult<R> = Result<<R as StreamRequest>::Item, <R as Strea
 /// # Vertrag
 ///
 /// `handle` liefert für jeden Request genau einen Stream und löst keine Panic aus; der Stream leiht nichts vom Handler.
-pub trait StreamRequestHandler<R: StreamRequest> {
+/// Der Handler ist `Send + Sync` und sein Stream `Send`: Mehrere Threads teilen sich einen Handler.
+pub trait StreamRequestHandler<R: StreamRequest>: Send + Sync {
     /// Beantwortet `request` mit einem Stream seiner Elemente.
-    fn handle(&self, request: R) -> impl Stream<Item = StreamResult<R>> + use<Self, R>;
+    fn handle(&self, request: R) -> impl Stream<Item = StreamResult<R>> + Send + use<Self, R>;
 }

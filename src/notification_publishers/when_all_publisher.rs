@@ -19,7 +19,8 @@ pub struct WhenAllPublisher;
 impl NotificationPublisher for WhenAllPublisher {
     async fn publish<E, F>(calls: Vec<F>) -> Result<(), E>
     where
-        F: Future<Output = Result<(), E>>,
+        F: Future<Output = Result<(), E>> + Send,
+        E: Send,
     {
         let mut calls: Vec<Call<F>> = calls
             .into_iter()

@@ -14,13 +14,16 @@ pub use when_all_publisher::WhenAllPublisher;
 ///
 /// `publish` wartet jeden Aufruf aus `calls` ab; erst nachdem ein Aufruf einen Fehler geliefert hat, darf es die übrigen auslassen.
 /// Es liefert `Ok(())`, wenn jeder Aufruf `Ok(())` liefert, sonst den Fehler eines Aufrufs, und löst keine Panic aus.
-pub trait NotificationPublisher {
+/// Der Publisher ist `Send + Sync` und seine Future `Send`, wenn die Aufrufe und ihr Fehler `Send` sind:
+/// Ein [`Mediator`](crate::Mediator) ist nur `Send + Sync`, wenn sein Publisher es ist.
+pub trait NotificationPublisher: Send + Sync {
     /// Lässt `calls` laufen; `calls` enthält je einen Aufruf pro Handler, in der Reihenfolge ihrer Registrierung.
     ///
     /// # Errors
     ///
     /// Den Fehler eines Aufrufs.
-    fn publish<E, F>(calls: Vec<F>) -> impl Future<Output = Result<(), E>>
+    fn publish<E, F>(calls: Vec<F>) -> impl Future<Output = Result<(), E>> + Send
     where
-        F: Future<Output = Result<(), E>>;
+        F: Future<Output = Result<(), E>> + Send,
+        E: Send;
 }

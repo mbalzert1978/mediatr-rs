@@ -2,20 +2,20 @@
 
 use std::sync::Arc;
 
-use super::LocalBoxFuture;
+use super::BoxFuture;
 use crate::request::HandlerResult;
 use crate::{Next, PipelineBehavior, Request};
 
 /// Ein Behavior für `R` als `Box<dyn Fn …>`: Die Closure hält das konkrete Behavior in einem `Arc`, nimmt einen `R` und den Rest der Pipeline und liefert später die Antwort oder den Fehler.
-// dyn: wie bei `LocalBoxFuture`, je `R`.
+// dyn: wie bei `BoxFuture`, je `R`.
 pub(crate) type BehaviorWrapper<R> =
-    Box<dyn Fn(R, Next<R>) -> LocalBoxFuture<'static, HandlerResult<R>> + Send + Sync>;
+    Box<dyn Fn(R, Next<R>) -> BoxFuture<'static, HandlerResult<R>> + Send + Sync>;
 
 /// Verpackt `behavior` als [`BehaviorWrapper`].
 pub(crate) fn wrap_behavior<R, B>(behavior: Arc<B>) -> BehaviorWrapper<R>
 where
-    R: Request + 'static,
-    B: PipelineBehavior<R> + Send + Sync + 'static,
+    R: Request,
+    B: PipelineBehavior<R> + 'static,
 {
     Box::new(move |request, next| Box::pin(wrap(Arc::clone(&behavior), request, next)))
 }

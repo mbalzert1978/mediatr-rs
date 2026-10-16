@@ -11,12 +11,14 @@ use crate::Request;
 /// # Vertrag
 ///
 /// `send` liefert für jeden Request genau eine Antwort oder einen Fehler und löst keine Panic aus.
-pub trait Sender<R: Request> {
+/// Der Sender ist `Send + Sync` und seine Future `Send`: So beweist auch ein Handler mit generischem Sender,
+/// dass seine Future `Send` ist, ohne selbst `Sync` für den Sender zu verlangen.
+pub trait Sender<R: Request>: Send + Sync {
     /// Schickt `request` an seinen Handler und liefert dessen Antwort.
     ///
     /// # Errors
     ///
     /// Den Fehler des Handlers, oder einen [`SendError`](crate::SendError) als `R::Error`,
     /// wenn `send` den Request nicht zustellen kann.
-    fn send(&self, request: R) -> impl Future<Output = Result<R::Response, R::Error>>;
+    fn send(&self, request: R) -> impl Future<Output = Result<R::Response, R::Error>> + Send;
 }
