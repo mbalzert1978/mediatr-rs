@@ -45,6 +45,7 @@ impl<H: Send + Sync + 'static, S: 'static> Handler<H, S> {
     /// Handler aus `make`; die erste Nachricht in einem Scope aus [`Mediator::scope`] baut ihn, jede weitere im selben Scope erreicht denselben Handler.
     ///
     /// Der Handler bekommt den [`WeakMediator`] seines Scopes als [`Sender`](crate::Sender) und [`Publisher`](crate::Publisher), damit er den Scope nicht selbst am Leben hält.
+    /// Geht eine Nachricht direkt über den Mediator statt über einen Scope, liefert sie [`Err(SendError::NoScope)`](crate::SendError::NoScope).
     /// Schicken zwei Aufrufe im selben Scope gleichzeitig, kann `make` zweimal laufen; beide bekommen denselben Handler.
     #[must_use]
     pub fn scoped(make: impl Fn(WeakMediator<S>) -> H + Send + Sync + 'static) -> Self {

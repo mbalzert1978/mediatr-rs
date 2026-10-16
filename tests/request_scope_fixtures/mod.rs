@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use mediatr_rs::{Mediator, Request, RequestHandler, SendError, Sender};
+use mediatr_rs::{Handler, Mediator, Request, RequestHandler, SendError, Sender};
 
 /// Legt einen Artikel in den Warenkorb; die Antwort ist die Summe aller Artikel bisher, in Rappen.
 pub struct AddToCart {
@@ -23,6 +23,13 @@ impl RequestHandler<AddToCart> for Cart {
         let before = self.total.fetch_add(request.price, Ordering::SeqCst);
         Ok(before.saturating_add(request.price))
     }
+}
+
+/// Mediator, der nur den Warenkorb kennt, als `Handler::scoped`.
+pub fn cart_mediator() -> Mediator {
+    Mediator::builder()
+        .register(Handler::scoped(|_| Cart::default()))
+        .build()
 }
 
 /// Preis der Geschenkverpackung, in Rappen.
