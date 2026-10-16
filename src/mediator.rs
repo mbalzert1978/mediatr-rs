@@ -9,7 +9,7 @@ use futures_core::Stream;
 
 use mediatr_provider::{Provider, WeakProvider};
 
-use crate::pipeline::{Behaviors, Slot, StreamBehaviors, order};
+use crate::pipeline::{Pipeline, StreamPipeline};
 use crate::request::HandlerResult;
 use crate::stream_request::StreamResult;
 use crate::wrappers::{
@@ -92,21 +92,19 @@ impl<S, P> Clone for WeakMediator<S, P> {
     }
 }
 
-impl<S, P: Behaviors<R>, R: Request + 'static> Sender<R> for Mediator<S, P> {
+impl<S, P, R: Request + 'static> Sender<R> for Mediator<S, P> {
     async fn send(&self, request: R) -> HandlerResult<R> {
         let handler = self
             .provider
             .get::<RequestHandlerWrapper<R>>()
             // Über den Mediator kommt nur `NoService` an.
             .map_err(|_| SendError::NoHandler)?;
-        let active = self.provider.get::<Vec<Slot>>().unwrap_or_default();
-        let behaviors = self.provider.get::<P>().map_or_else(
-            |_| Vec::new(),
-            |behaviors| Behaviors::<R>::wrap(&*behaviors, &active),
-        );
-        Next::new(handler, order::behaviors(behaviors))
-            .run(request)
-            .await
+        // Die Pipeline fehlt nur, wenn der Handler fehlt; dann ist `send` schon raus.
+        let pipeline = self
+            .provider
+            .get::<Pipeline<R>>()
+            .map_or_else(|_| Vec::new(), |pipeline| (*pipeline).clone());
+        Next::new(handler, pipeline).run(request).await
     }
 }
 
@@ -127,7 +125,7 @@ impl<S: NotificationPublisher, P, N: Notification + 'static> Publisher<N> for Me
     }
 }
 
-impl<S, P: Behaviors<R>, R: Request + 'static> Sender<R> for WeakMediator<S, P> {
+impl<S, P, R: Request + 'static> Sender<R> for WeakMediator<S, P> {
     async fn send(&self, request: R) -> HandlerResult<R> {
         let mediator: Mediator<S, P> =
             Mediator::new(self.provider.upgrade().ok_or(SendError::MediatorDropped)?);
@@ -143,19 +141,17 @@ impl<S: NotificationPublisher, P, N: Notification + 'static> Publisher<N> for We
     }
 }
 
-impl<S, P: StreamBehaviors<R>, R: StreamRequest + 'static> StreamSender<R> for Mediator<S, P> {
+impl<S, P, R: StreamRequest + 'static> StreamSender<R> for Mediator<S, P> {
     fn create_stream(&self, request: R) -> impl Stream<Item = StreamResult<R>> {
-        let active = self.provider.get::<Vec<Slot>>().unwrap_or_default();
-        let behaviors = self.provider.get::<P>().map_or_else(
-            |_| Vec::new(),
-            |behaviors| StreamBehaviors::<R>::wrap(&*behaviors, &active),
-        );
+        // Die Stream-Pipeline fehlt nur, wenn der Handler fehlt; dann liefert der Stream den Fehler.
+        let pipeline = self
+            .provider
+            .get::<StreamPipeline<R>>()
+            .map_or_else(|_| Vec::new(), |pipeline| (*pipeline).clone());
         // dyn: der Stream der Pipeline und `Once` sind verschiedene Typen und brauchen einen gemeinsamen.
         let stream: LocalBoxStream<StreamResult<R>> =
             match self.provider.get::<StreamRequestHandlerWrapper<R>>() {
-                Ok(handler) => Box::pin(
-                    StreamNext::new(handler, order::stream_behaviors(behaviors)).run(request),
-                ),
+                Ok(handler) => Box::pin(StreamNext::new(handler, pipeline).run(request)),
                 // Über den Mediator kommt nur `NoService` an.
                 Err(_) => Box::pin(Once(Some(Err(R::Error::from(SendError::NoHandler))))),
             };

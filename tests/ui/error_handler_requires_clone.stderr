@@ -1,19 +1,25 @@
 error[E0277]: the trait bound `ReserveTable: Clone` is not satisfied
-  --> tests/ui/error_handler_requires_clone.rs:40:32
+  --> tests/ui/error_handler_requires_clone.rs:38:10
    |
-40 |     let _table = mediator.send(ReserveTable { guests: 4 });
-   |                           ---- ^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `Clone` is not implemented for `ReserveTable`
-   |                           |
-   |                           required by a bound introduced by this call
+38 |         .register(Handler::instance(Restaurant))
+   |          ^^^^^^^^ the trait `Clone` is not implemented for `ReserveTable`
    |
-help: the trait `mediatr_rs::Sender<R>` is implemented for `Mediator<S, P>`
-  --> src/mediator.rs
-   |
-   | impl<S, P: Behaviors<R>, R: Request + 'static> Sender<R> for Mediator<S, P> {
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: the following other types implement trait `mediatr_rs::pipeline::sealed::Behaviors<R>`:
+             ()
+             (P, mediatr_rs::pipeline::sealed::Closed)
+             (P, mediatr_rs::pipeline::sealed::ClosedStream)
+             (P, mediatr_rs::pipeline::sealed::OpenBehavior<B>)
+             (P, mediatr_rs::pipeline::sealed::OpenStreamBehavior<B>)
    = note: required for `mediatr_rs::pipeline::sealed::RequestErrorProcessorBehavior<Maitre>` to implement `PipelineBehavior<ReserveTable>`
    = note: required for `((), mediatr_rs::pipeline::sealed::OpenBehavior<mediatr_rs::pipeline::sealed::RequestErrorProcessorBehavior<Maitre>>)` to implement `mediatr_rs::pipeline::sealed::Behaviors<ReserveTable>`
-   = note: required for `Mediator<ForeachAwaitPublisher, ((), mediatr_rs::pipeline::sealed::OpenBehavior<mediatr_rs::pipeline::sealed::RequestErrorProcessorBehavior<Maitre>>)>` to implement `mediatr_rs::Sender<ReserveTable>`
+note: required by a bound in `MediatorBuilder::<S, P, F>::register`
+  --> src/registration/builder.rs
+   |
+   |     pub fn register<R, H>(self, handler: Handler<H, S, P>) -> MediatorBuilder<S, P, WithHandlers>
+   |            -------- required by a bound in this associated function
+...
+   |         P: Behaviors<R>,
+   |            ^^^^^^^^^^^^ required by this bound in `MediatorBuilder::<S, P, F>::register`
 help: consider annotating `ReserveTable` with `#[derive(Clone)]`
    |
  8 + #[derive(Clone)]
