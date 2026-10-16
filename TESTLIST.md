@@ -53,7 +53,7 @@ Quelle: Microsoft.Extensions.DependencyInjection `AddScoped`, `IServiceScopeFact
 - [x] (T11) Scope fällt weg, der Mediator lebt → der Warenkorb wird freigegeben (sein `Drop` läuft) · `scoped_cart_is_released_with_its_scope`
 - [x] (T11) Ein Handler mit `Handler::scoped`, der den `WeakMediator` seines Scopes behalten hat, schickt `AddToCart`, nachdem der Scope weggefallen ist; der Mediator lebt → `Err(SendError::MediatorDropped)`, kein Panic · `scoped_handler_sending_after_scope_dropped_gets_mediator_dropped`
 - [x] Notification-Handler mit `Handler::scoped`, `publish` über einen Scope → der Handler läuft · `scoped_notification_handler_runs_when_published_through_scope`
-- [ ] Notification-Handler mit `Handler::scoped`, `publish` direkt über den Mediator ohne `scope` → `Err(SendError::NoScope)`, kein Panic
+- [x] Notification-Handler mit `Handler::scoped`, `publish` direkt über den Mediator ohne `scope` → `Err(SendError::NoScope)`, kein Panic · `publish_to_scoped_handler_without_scope_gets_no_scope`
 - [ ] Stream-Handler mit `Handler::scoped`, `create_stream` über einen Scope → der Stream liefert die Elemente des Handlers
 - [ ] Stream-Handler mit `Handler::scoped`, `create_stream` direkt über den Mediator ohne `scope` → der Stream liefert ein Element `Err(SendError::NoScope)` und endet, kein Panic
 - [ ] Eigener Dienst `UnitOfWork` mit `Registration::scoped` über `MediatorBuilder::service` registriert, zwei Handler mit `Handler::scoped_from`, deren Bauanleitung `UnitOfWork` aus dem Provider holt, `AddOrderLine` und danach `CountOrderLines` über denselben Scope → `CountOrderLines` liefert 1
