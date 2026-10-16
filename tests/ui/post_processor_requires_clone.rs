@@ -1,4 +1,4 @@
-//! Ein Nachverarbeiter ist registriert, der Request-Typ lässt sich nicht klonen; `send` darf nicht kompilieren.
+//! Ein Nachverarbeiter ist registriert, der Request-Typ mit Handler lässt sich nicht klonen; das Programm darf nicht kompilieren.
 
 use mediatr_rs::{
     Handler, Mediator, Request, RequestHandler, RequestPostProcessor, SendError, Sender,
