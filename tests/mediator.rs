@@ -5,14 +5,15 @@ use std::sync::{Arc, mpsc};
 
 use futures_util::StreamExt;
 use mediatr_rs::{
-    Handler, Mediator, RequestHandler, SendError, Sender, StreamSender, WeakMediator,
+    Handler, Mediator, Publisher, RequestHandler, SendError, Sender, StreamSender, WeakMediator,
 };
 
 mod mediator_fixtures;
 
 use mediator_fixtures::{
-    Confirmation, CustomerDirectory, CustomerError, FixedCustomer, GetCustomer, ListCustomers,
-    OrderError, PlaceOrder, PlaceOrderHandler, Shop, Turnstile, WarehouseOrderHandler, ada,
+    Confirmation, CustomerDirectory, CustomerError, CustomerJoined, FixedCustomer, GetCustomer,
+    ListCustomers, LoyaltyCard, OrderError, PlaceOrder, PlaceOrderHandler, Shop, Turnstile,
+    WarehouseOrderHandler, WelcomeMail, ada,
 };
 
 #[tokio::test]
@@ -327,5 +328,32 @@ async fn generic_handler_with_injected_sender_runs_inside_spawned_task() {
             customer: "Ada".to_owned(),
             total: 90,
         }
+    );
+}
+
+#[tokio::test]
+async fn publish_inside_spawned_task_runs_all_handlers() {
+    let sent = Arc::new(AtomicU32::new(0));
+    let issued = Arc::new(AtomicU32::new(0));
+    let mediator = Mediator::builder()
+        .subscribe(Handler::instance(WelcomeMail {
+            sent: Arc::clone(&sent),
+        }))
+        .subscribe(Handler::instance(LoyaltyCard {
+            issued: Arc::clone(&issued),
+        }))
+        .build();
+
+    let published = tokio::spawn(async move { mediator.publish(CustomerJoined).await })
+        .await
+        .unwrap();
+
+    assert_eq!(
+        (
+            published,
+            sent.load(Ordering::SeqCst),
+            issued.load(Ordering::SeqCst)
+        ),
+        (Ok(()), 1, 1)
     );
 }
