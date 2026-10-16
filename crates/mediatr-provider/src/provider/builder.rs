@@ -34,6 +34,12 @@ impl ProviderBuilder {
         self
     }
 
+    /// Ob [`ProviderBuilder::register`] für `T` schon eine Registrierung mit `unique_by::<K>()` aufgenommen hat.
+    #[must_use]
+    pub fn has_unique<T: 'static, K: 'static>(&self) -> bool {
+        self.keys.contains(&(TypeId::of::<T>(), TypeId::of::<K>()))
+    }
+
     /// Baut den Provider mit allen registrierten Diensten.
     #[must_use]
     pub fn build(self) -> Provider {

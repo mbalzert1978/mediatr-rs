@@ -101,7 +101,7 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] Bauanleitung, über `all` abgefragt, fragt nach einem nicht registrierten Dienst und gibt den Fehler weiter → `all` liefert `Err(GetError::NoDependency)` · `all_with_recipe_asking_for_unregistered_service_gets_no_dependency`
 - [x] Bauanleitung von `scoped` fragt nach einem nicht registrierten Dienst und gibt den Fehler weiter → die Abfrage im Scope liefert `Err(GetError::NoDependency)` · `scoped_recipe_asking_for_unregistered_service_gets_no_dependency`
 - [x] Bauanleitung von `singleton` fragt nach einem nicht registrierten Dienst und gibt den Fehler weiter → die Abfrage liefert `Err(GetError::NoDependency)`, und die nächste Abfrage baut neu · `singleton_recipe_asking_for_unregistered_service_gets_no_dependency_and_builds_again`
-- [ ] `ProviderBuilder` ohne Registrierung mit `unique_by` → `has_unique` liefert `false`
+- [x] `ProviderBuilder` ohne Registrierung mit `unique_by` → `has_unique` liefert `false` · `has_unique_without_unique_registration_returns_false`
 - [ ] Registrierung mit `unique_by` für einen Typ und einen Schlüsseltyp → `has_unique` für genau dieses Paar liefert `true`
 - [ ] (T11) Registrierung mit `unique_by` für einen Typ und einen Schlüsseltyp → `has_unique` für einen anderen Typ mit demselben Schlüsseltyp liefert `false`
 - [ ] Registrierung mit `unique_by` für einen Typ und einen Schlüsseltyp → `has_unique` für denselben Typ mit einem anderen Schlüsseltyp liefert `false`
