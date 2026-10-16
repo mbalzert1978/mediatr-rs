@@ -299,3 +299,33 @@ async fn send_inside_spawned_task_runs_behavior_and_returns_handler_response() {
         ("Ada".to_owned(), 1)
     );
 }
+
+#[tokio::test]
+async fn generic_handler_with_injected_sender_runs_inside_spawned_task() {
+    let mediator = Mediator::builder()
+        .register(Handler::instance(CustomerDirectory {
+            customers: vec![ada()],
+        }))
+        .register(Handler::transient(|sender| PlaceOrderHandler { sender }))
+        .build();
+
+    let confirmation = tokio::spawn(async move {
+        mediator
+            .send(PlaceOrder {
+                customer_id: 7,
+                amount: 100,
+            })
+            .await
+    })
+    .await
+    .unwrap()
+    .unwrap();
+
+    assert_eq!(
+        confirmation,
+        Confirmation {
+            customer: "Ada".to_owned(),
+            total: 90,
+        }
+    );
+}
