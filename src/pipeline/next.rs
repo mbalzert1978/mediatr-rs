@@ -1,11 +1,9 @@
 //! Der Rest der Pipeline hinter einem Behavior.
 
-use std::cmp::Reverse;
 use std::fmt;
 use std::sync::Arc;
 
 use crate::Request;
-use crate::pipeline::Stage;
 use crate::request::HandlerResult;
 use crate::wrappers::{BehaviorWrapper, RequestHandlerWrapper};
 
@@ -13,26 +11,15 @@ use crate::wrappers::{BehaviorWrapper, RequestHandlerWrapper};
 pub struct Next<R: Request> {
     handler: Arc<RequestHandlerWrapper<R>>,
     /// Die noch ausstehenden Behaviors, das innerste zuerst; `run` nimmt das letzte, also äußerste.
-    behaviors: Vec<(Stage, Arc<BehaviorWrapper<R>>)>,
+    behaviors: Vec<Arc<BehaviorWrapper<R>>>,
 }
 
 impl<R: Request> Next<R> {
-    /// Pipeline aus `behaviors`, in der Reihenfolge ihrer Registrierung, und `handler`; jedes liegt, wo seine [`Stage`] sagt.
+    /// Pipeline aus `behaviors`, geordnet wie [`order::behaviors`](crate::pipeline::order::behaviors) sie liefert, und `handler`.
     pub(crate) fn new(
         handler: Arc<RequestHandlerWrapper<R>>,
-        mut behaviors: Vec<(Stage, Arc<BehaviorWrapper<R>>)>,
+        behaviors: Vec<Arc<BehaviorWrapper<R>>>,
     ) -> Self {
-        // Innerste Stufe zuerst; die Sortierung ist stabil, in jeder Stufe bleibt die Registrierungsreihenfolge.
-        behaviors.sort_by_key(|(stage, _)| Reverse(*stage));
-        // Bei `Around` und `Before` liegt das zuerst registrierte außen, also hinten.
-        for stage in [Stage::Around, Stage::Before] {
-            let start = behaviors.partition_point(|(other, _)| *other > stage);
-            let end = behaviors.partition_point(|(other, _)| *other >= stage);
-            behaviors
-                .get_mut(start..end)
-                .into_iter()
-                .for_each(<[_]>::reverse);
-        }
         Self { handler, behaviors }
     }
 
@@ -43,7 +30,7 @@ impl<R: Request> Next<R> {
     /// Den Fehler des nächsten Schritts.
     pub async fn run(mut self, request: R) -> HandlerResult<R> {
         match self.behaviors.pop() {
-            Some((_, behavior)) => behavior(request, self).await,
+            Some(behavior) => behavior(request, self).await,
             None => (self.handler)(request).await,
         }
     }

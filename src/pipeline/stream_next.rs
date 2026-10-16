@@ -18,15 +18,12 @@ pub struct StreamNext<R: StreamRequest> {
 }
 
 impl<R: StreamRequest> StreamNext<R> {
-    /// Stream-Pipeline aus `behaviors`, in der Reihenfolge ihrer Registrierung, und `handler`; das zuerst registrierte liegt außen.
+    /// Stream-Pipeline aus `behaviors`, geordnet wie [`order::stream_behaviors`](crate::pipeline::order::stream_behaviors) sie liefert, und `handler`.
     pub(crate) fn new(
         handler: Arc<StreamRequestHandlerWrapper<R>>,
         behaviors: Vec<Arc<StreamBehaviorWrapper<R>>>,
     ) -> Self {
-        Self {
-            handler,
-            behaviors: behaviors.into_iter().rev().collect(),
-        }
+        Self { handler, behaviors }
     }
 
     /// Schickt `request` an den nächsten Schritt und liefert dessen Stream; der nächste Schritt läuft erst, wenn jemand den Stream liest.

@@ -9,7 +9,7 @@ use futures_core::Stream;
 
 use mediatr_provider::{Provider, WeakProvider};
 
-use crate::pipeline::{Behaviors, Slot, StreamBehaviors};
+use crate::pipeline::{Behaviors, Slot, StreamBehaviors, order};
 use crate::request::HandlerResult;
 use crate::stream_request::StreamResult;
 use crate::wrappers::{
@@ -104,7 +104,9 @@ impl<S, P: Behaviors<R>, R: Request + 'static> Sender<R> for Mediator<S, P> {
             |_| Vec::new(),
             |behaviors| Behaviors::<R>::wrap(&*behaviors, &active),
         );
-        Next::new(handler, behaviors).run(request).await
+        Next::new(handler, order::behaviors(behaviors))
+            .run(request)
+            .await
     }
 }
 
@@ -151,7 +153,9 @@ impl<S, P: StreamBehaviors<R>, R: StreamRequest + 'static> StreamSender<R> for M
         // dyn: der Stream der Pipeline und `Once` sind verschiedene Typen und brauchen einen gemeinsamen.
         let stream: LocalBoxStream<StreamResult<R>> =
             match self.provider.get::<StreamRequestHandlerWrapper<R>>() {
-                Ok(handler) => Box::pin(StreamNext::new(handler, behaviors).run(request)),
+                Ok(handler) => Box::pin(
+                    StreamNext::new(handler, order::stream_behaviors(behaviors)).run(request),
+                ),
                 // Über den Mediator kommt nur `NoService` an.
                 Err(_) => Box::pin(Once(Some(Err(R::Error::from(SendError::NoHandler))))),
             };
