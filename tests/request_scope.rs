@@ -5,7 +5,8 @@ use std::sync::{Arc, mpsc};
 
 use futures_util::StreamExt;
 use mediatr_rs::{
-    Handler, Mediator, Publisher, RequestHandler, SendError, Sender, StreamSender, WeakMediator,
+    Handler, Mediator, Publisher, Registration, RequestHandler, SendError, Sender, StreamSender,
+    WeakMediator,
 };
 
 mod common;
@@ -13,8 +14,9 @@ mod request_scope_fixtures;
 
 use common::Journal;
 use request_scope_fixtures::{
-    AddGiftWrap, AddToCart, Cart, CartAudit, CartCheckedOut, CartContents, CheckoutCart,
-    GIFT_WRAP_PRICE, GiftWrapHandler, ListCartItems, ReceiptPrinter, cart_mediator,
+    AddGiftWrap, AddOrderLine, AddToCart, Cart, CartAudit, CartCheckedOut, CartContents,
+    CheckoutCart, CountOrderLines, GIFT_WRAP_PRICE, GiftWrapHandler, ListCartItems,
+    OrderLineCounter, OrderLineRecorder, ReceiptPrinter, UnitOfWork, cart_mediator,
 };
 
 #[tokio::test]
@@ -209,4 +211,27 @@ async fn stream_from_scoped_handler_without_scope_yields_no_scope() {
     let prices: Vec<_> = mediator.create_stream(ListCartItems).collect().await;
 
     assert_eq!(prices, vec![Err(SendError::NoScope)]);
+}
+
+#[tokio::test]
+async fn scoped_service_is_shared_by_handlers_within_same_scope() {
+    let mediator = Mediator::builder()
+        .service(Registration::scoped(|_| Ok(UnitOfWork::default())))
+        .register(Handler::scoped_from(|_, provider| {
+            Ok(OrderLineRecorder {
+                unit_of_work: provider.get()?,
+            })
+        }))
+        .register(Handler::scoped_from(|_, provider| {
+            Ok(OrderLineCounter {
+                unit_of_work: provider.get()?,
+            })
+        }))
+        .build();
+    let scope = mediator.scope();
+    scope.send(AddOrderLine).await.unwrap();
+
+    let lines = scope.send(CountOrderLines).await;
+
+    assert_eq!(lines, Ok(1));
 }

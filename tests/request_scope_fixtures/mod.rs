@@ -137,3 +137,50 @@ impl StreamRequestHandler<ListCartItems> for CartContents {
         futures_util::stream::iter(self.prices.clone().into_iter().map(Ok))
     }
 }
+
+/// Die Arbeitseinheit einer Web-Anfrage; sammelt die Bestellzeilen, bis die Anfrage sie speichert.
+#[derive(Default)]
+pub struct UnitOfWork {
+    pending_lines: AtomicU32,
+}
+
+/// Fügt der Bestellung eine Zeile hinzu.
+pub struct AddOrderLine;
+
+impl Request for AddOrderLine {
+    type Response = ();
+    type Error = SendError;
+}
+
+/// Merkt sich jede neue Bestellzeile in der Arbeitseinheit, die er per Konstruktor bekommt.
+pub struct OrderLineRecorder {
+    pub unit_of_work: Arc<UnitOfWork>,
+}
+
+impl RequestHandler<AddOrderLine> for OrderLineRecorder {
+    async fn handle(&self, _request: AddOrderLine) -> Result<(), SendError> {
+        self.unit_of_work
+            .pending_lines
+            .fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+}
+
+/// Fragt, wie viele Bestellzeilen noch nicht gespeichert sind.
+pub struct CountOrderLines;
+
+impl Request for CountOrderLines {
+    type Response = u32;
+    type Error = SendError;
+}
+
+/// Zählt die Bestellzeilen in der Arbeitseinheit, die er per Konstruktor bekommt.
+pub struct OrderLineCounter {
+    pub unit_of_work: Arc<UnitOfWork>,
+}
+
+impl RequestHandler<CountOrderLines> for OrderLineCounter {
+    async fn handle(&self, _request: CountOrderLines) -> Result<u32, SendError> {
+        Ok(self.unit_of_work.pending_lines.load(Ordering::SeqCst))
+    }
+}

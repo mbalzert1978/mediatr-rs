@@ -296,6 +296,15 @@ impl<S, P> MediatorBuilder<S, P, NoHandlers> {
 }
 
 impl<S, P, F> MediatorBuilder<S, P, F> {
+    /// Registriert `registration` als Dienst; die Bauanleitung eines [`Handler::scoped_from`] holt ihn aus dem Provider.
+    #[must_use]
+    pub fn service<T: Send + Sync + 'static>(self, registration: Registration<T>) -> Self {
+        Self {
+            provider: self.provider.register(registration),
+            ..self
+        }
+    }
+
     /// Registriert `handler` für Requests vom Typ `R` und baut die Pipeline der Behaviors um ihn; ein früherer Handler für `R` fällt weg.
     ///
     /// Verlangt, dass jedes Behavior für alle Request-Typen den Typ `R` kann, zum Beispiel [`PipelineBehavior`] für `R` ist.

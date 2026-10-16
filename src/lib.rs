@@ -15,6 +15,7 @@ mod wrappers;
 
 pub use error::SendError;
 pub use mediator::{Mediator, WeakMediator};
+pub use mediatr_provider::{GetError, Provider, Registration};
 pub use notification::{Notification, NotificationHandler};
 pub use notification_publishers::{ForeachAwaitPublisher, NotificationPublisher, WhenAllPublisher};
 pub use pipeline::{
