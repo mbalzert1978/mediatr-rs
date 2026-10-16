@@ -32,6 +32,7 @@ impl<H: Send + Sync + 'static, S: 'static> Handler<H, S> {
     /// Handler aus `make`; die erste Nachricht baut ihn damit, jede weitere erreicht denselben Handler.
     ///
     /// Der Handler bekommt einen [`WeakMediator`] als [`Sender`](crate::Sender) und [`Publisher`](crate::Publisher), damit er den Mediator nicht selbst am Leben hält.
+    /// Das ist der `WeakMediator` des Mediators selbst, auch wenn die erste Nachricht aus einem Scope kommt; ein `send` darüber an einen [`Handler::scoped`]-Handler liefert [`Err(SendError::NoScope)`](crate::SendError::NoScope).
     #[must_use]
     pub fn singleton(make: impl Fn(WeakMediator<S>) -> H + Send + Sync + 'static) -> Self {
         Self::new(Registration::singleton(move |provider| {

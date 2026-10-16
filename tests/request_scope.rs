@@ -53,3 +53,15 @@ async fn scoped_cart_without_scope_gets_no_scope() {
 
     assert_eq!(total, Err(SendError::NoScope));
 }
+
+#[tokio::test]
+async fn singleton_handler_sending_to_scoped_cart_gets_no_scope() {
+    let mediator = Mediator::builder()
+        .register(Handler::scoped(|_| Cart::default()))
+        .register(Handler::singleton(|sender| GiftWrapHandler { sender }))
+        .build();
+
+    let total = mediator.scope().send(AddGiftWrap).await;
+
+    assert_eq!(total, Err(SendError::NoScope));
+}
