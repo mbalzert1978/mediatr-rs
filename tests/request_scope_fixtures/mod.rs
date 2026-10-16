@@ -44,11 +44,11 @@ impl Request for AddGiftWrap {
 }
 
 /// Legt die Geschenkverpackung über den Sender, den er per Konstruktor bekommt, in den Warenkorb.
-pub struct GiftWrapHandler {
-    pub sender: Mediator,
+pub struct GiftWrapHandler<S> {
+    pub sender: S,
 }
 
-impl RequestHandler<AddGiftWrap> for GiftWrapHandler {
+impl<S: Sender<AddToCart>> RequestHandler<AddGiftWrap> for GiftWrapHandler<S> {
     async fn handle(&self, _request: AddGiftWrap) -> Result<u32, SendError> {
         self.sender
             .send(AddToCart {
