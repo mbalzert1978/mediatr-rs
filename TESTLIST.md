@@ -43,7 +43,7 @@ Quelle: MediatR `Mediator(IServiceProvider)` speichert keine Handler; es holt si
 
 Quelle: Microsoft.Extensions.DependencyInjection `AddScoped`, `IServiceScopeFactory.CreateScope`, `ValidateScopes`, Factory-Registrierung `AddScoped(sp => …)`; MediatR `Mediator(IServiceProvider)` holt Handler aus dem Provider, mit dem er gebaut ist. Fachlich: ein Warenkorb pro Web-Anfrage, `AddToCart` liefert die Summe bisher; eine Bestellung pro Web-Anfrage sammelt Zeilen in einer `UnitOfWork`, die für die DB-Transaktion steht.
 
-- [ ] Warenkorb mit `Handler::scoped`, zwei `AddToCart` über denselben Scope aus `Mediator::scope` → das zweite liefert die Summe beider Artikel
+- [x] Warenkorb mit `Handler::scoped`, zwei `AddToCart` über denselben Scope aus `Mediator::scope` → das zweite liefert die Summe beider Artikel · `scoped_cart_sums_items_added_within_same_scope`
 - [ ] (T11) Warenkorb mit `Handler::scoped`, je ein `AddToCart` über zwei Scopes → jeder liefert nur seinen Artikel
 - [ ] Warenkorb mit `Handler::scoped`, `AddToCart` direkt über den Mediator ohne `scope` → `Err(SendError::NoScope)`, kein Panic
 - [ ] (T11) Handler mit `Handler::transient`, über einen Scope aufgerufen, schickt über den Mediator, den er bekommt, `AddToCart` an den Warenkorb → `AddToCart` trifft denselben Warenkorb wie ein `send` direkt über diesen Scope
