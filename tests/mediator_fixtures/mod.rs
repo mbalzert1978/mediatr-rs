@@ -3,8 +3,9 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use futures_core::Stream;
 use mediatr_rs::{
-    Mediator, Next, PipelineBehavior, Request, RequestHandler, SendError, Sender, StreamNext,
-    StreamPipelineBehavior, StreamRequest, StreamRequestHandler, WeakMediator,
+    Mediator, Next, Notification, NotificationHandler, PipelineBehavior, Request, RequestHandler,
+    SendError, Sender, StreamNext, StreamPipelineBehavior, StreamRequest, StreamRequestHandler,
+    WeakMediator,
 };
 
 #[derive(Clone)]
@@ -78,6 +79,37 @@ impl StreamRequestHandler<ListCustomers> for CustomerDirectory {
             .map(|customer| Ok(customer.name.clone()))
             .collect();
         futures_util::stream::iter(names)
+    }
+}
+
+/// Meldet, dass ein neuer Kunde dazugekommen ist.
+pub struct CustomerJoined;
+
+impl Notification for CustomerJoined {
+    type Error = CustomerError;
+}
+
+/// Schickt jedem neuen Kunden eine Begrüßung und zählt die verschickten.
+pub struct WelcomeMail {
+    pub sent: Arc<AtomicU32>,
+}
+
+impl NotificationHandler<CustomerJoined> for WelcomeMail {
+    async fn handle(&self, _event: &CustomerJoined) -> Result<(), CustomerError> {
+        self.sent.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+}
+
+/// Stellt jedem neuen Kunden eine Kundenkarte aus und zählt die ausgestellten.
+pub struct LoyaltyCard {
+    pub issued: Arc<AtomicU32>,
+}
+
+impl NotificationHandler<CustomerJoined> for LoyaltyCard {
+    async fn handle(&self, _event: &CustomerJoined) -> Result<(), CustomerError> {
+        self.issued.fetch_add(1, Ordering::SeqCst);
+        Ok(())
     }
 }
 
