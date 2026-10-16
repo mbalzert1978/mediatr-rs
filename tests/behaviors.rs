@@ -4,16 +4,19 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
-use mediatr_rs::{Handler, Mediator, MediatorBuilder, Publisher, Sender, WhenAllPublisher};
+use mediatr_rs::{
+    Handler, Mediator, MediatorBuilder, Publisher, SendError, Sender, WhenAllPublisher,
+};
 
 mod behaviors_fixtures;
 mod common;
 
 use behaviors_fixtures::{
     AuditTrail, BookReceipt, Deadline, LoadingDock, LookupStock, ReceiptBook, RemoteReceiving,
-    RemoteWarehouse, ReorderCheck, RetryOnce, ShelfLabeling, ShelfLock, SlowStockLedger,
-    StockCache, StockCounted, StockError, StockLedger, audit_and_stopwatch, audited_and_timed,
-    audited_locked_and_timed, checkpoint, labeled_and_reordered_together, passed_checkpoints,
+    RemoteWarehouse, ReorderCheck, RetryOnce, RetryWithCopy, ShelfLabeling, ShelfLock,
+    SlowStockLedger, StockCache, StockCounted, StockError, StockLedger, audit_and_stopwatch,
+    audited_and_timed, audited_locked_and_timed, checkpoint, labeled_and_reordered_together,
+    passed_checkpoints,
 };
 use common::Journal;
 
@@ -478,5 +481,22 @@ async fn behavior_deadline_shorter_than_unit_response_handler_returns_err_and_ha
             Err(StockError::Timeout),
             vec!["Außenlager bucht 9".to_owned()]
         )
+    );
+}
+
+#[tokio::test]
+async fn behavior_requiring_clone_with_non_clone_request_without_handler_returns_no_handler() {
+    let attempts = Arc::new(AtomicU32::new(0));
+    let mediator = Mediator::builder()
+        .open_behavior(RetryWithCopy {
+            attempts: Arc::clone(&attempts),
+        })
+        .build();
+
+    let stock = mediator.send(LookupStock { sku: 4 }).await;
+
+    assert_eq!(
+        (stock, attempts.load(Ordering::SeqCst)),
+        (Err(StockError::Undeliverable(SendError::NoHandler)), 0)
     );
 }

@@ -172,7 +172,7 @@ Quelle: MediatR `test/MediatR.Tests/PipelineTests.cs`, `MicrosoftExtensionsDI/Pi
 - [x] Ein Behavior nach dem ersten Handler registriert → kompiliert nicht · `behavior_registered_after_first_handler_does_not_compile`
 - [x] Ein Behavior nach dem ersten Notification-Handler (`subscribe`) registriert → kompiliert nicht · `behavior_registered_after_first_notification_handler_does_not_compile`
 - [x] Ein Behavior verlangt mehr vom Request (z. B. `Clone`), ein Request-Typ mit Handler erfüllt das nicht → kompiliert nicht · `behavior_requiring_clone_rejects_non_clone_request_at_compile_time`
-- [ ] Ein Behavior verlangt `Clone`, ein Request-Typ ohne Handler erfüllt das nicht → `send` für diesen Typ liefert `Err(SendError::NoHandler)`, kein Behavior läuft
+- [x] Ein Behavior verlangt `Clone`, ein Request-Typ ohne Handler erfüllt das nicht → `send` für diesen Typ liefert `Err(SendError::NoHandler)`, kein Behavior läuft · `behavior_requiring_clone_with_non_clone_request_without_handler_returns_no_handler`
 - [x] Handler mit `Handler::transient` registriert und von einem Behavior umschlossen → ein `send` baut den Handler genau einmal, das Behavior läuft genau einmal um ihn herum · `transient_handler_wrapped_by_behavior_is_built_once_per_send_and_wrapped_once`
 - [x] Behavior ruft den nächsten Schritt nicht auf und liefert selbst eine Antwort → `send` liefert diese Antwort, der Handler läuft nicht · `behavior_answering_without_next_returns_its_response_and_handler_does_not_run`
 - [x] Behavior setzt eine Frist, der Handler eines Requests mit Antwort braucht länger → `send` liefert `Err` statt einer Antwort, der Handler wird nicht fertig · `behavior_deadline_shorter_than_handler_returns_err_and_handler_does_not_finish`
