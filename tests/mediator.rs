@@ -225,3 +225,29 @@ async fn mediator_with_behaviors_stored_as_plain_mediator_field_runs_behaviors()
         ("Ada", 1)
     );
 }
+
+#[tokio::test]
+async fn singleton_handler_with_plain_weak_mediator_field_runs_behaviors() {
+    let passed = Arc::new(AtomicU32::new(0));
+    let mediator = Mediator::builder()
+        .open_behavior(Turnstile {
+            passed: Arc::clone(&passed),
+        })
+        .register(Handler::instance(CustomerDirectory {
+            customers: vec![ada()],
+        }))
+        .register(Handler::singleton(|sender: WeakMediator| {
+            PlaceOrderHandler { sender }
+        }))
+        .build();
+
+    let confirmation = mediator
+        .send(PlaceOrder {
+            customer_id: 7,
+            amount: 100,
+        })
+        .await
+        .unwrap();
+
+    assert_eq!((confirmation.total, passed.load(Ordering::SeqCst)), (90, 2));
+}
