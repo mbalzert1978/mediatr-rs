@@ -2,7 +2,8 @@
 
 use std::panic::{self, AssertUnwindSafe};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::{Arc, Barrier, Mutex, PoisonError};
+use std::sync::{Arc, Barrier, Mutex, PoisonError, mpsc};
+use std::time::Duration;
 
 use mediatr_provider::{GetError, Provider, Registration};
 
@@ -11,8 +12,8 @@ mod provider_fixtures;
 use provider_fixtures::{
     Alive, AuditLog, Config, Connection, Course, DeliveryNote, Document, Employee, Folder,
     Greeting, Invoice, LedgerEntry, MenuItem, Name, Printer, Report, Repository, Scheduler,
-    Session, Settings, Student, Team, UnitOfWork, connection_recipe, counting_recipe, gated_recipe,
-    settings_recipe,
+    Session, Settings, Student, Team, UnitOfWork, connection_recipe, counting_recipe,
+    employee_needing_team, gated_recipe, settings_recipe, team_needing_lead,
 };
 
 #[test]
@@ -1027,4 +1028,31 @@ fn all_with_recipe_asking_for_unregistered_service_gets_no_dependency() {
     let greetings = provider.all::<Greeting>();
 
     assert!(matches!(greetings, Err(GetError::NoDependency)));
+}
+
+#[test]
+fn mutually_dependent_singletons_on_two_threads_both_return() {
+    let both_building = Arc::new(Barrier::new(2));
+    let provider = Provider::builder()
+        .register(Registration::singleton(team_needing_lead(Arc::clone(
+            &both_building,
+        ))))
+        .register(Registration::singleton(employee_needing_team(
+            both_building,
+        )))
+        .build();
+    let (answers, answered) = mpsc::channel();
+    let (for_team, for_employee) = (answers.clone(), answers);
+    let (team_side, employee_side) = (provider.clone(), provider);
+
+    std::thread::spawn(move || for_team.send(team_side.get::<Team>().is_ok()).unwrap());
+    std::thread::spawn(move || {
+        for_employee
+            .send(employee_side.get::<Employee>().is_ok())
+            .unwrap();
+    });
+    let first = answered.recv_timeout(Duration::from_secs(5));
+    let second = answered.recv_timeout(Duration::from_secs(5));
+
+    assert_eq!((first, second), (Ok(true), Ok(true)));
 }

@@ -2,9 +2,9 @@
 
 use std::any::{Any, TypeId, type_name};
 use std::fmt;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, TryLockError};
 
-use super::{Slot, lock};
+use super::{Owning, Slot, Waiting, lock};
 use crate::{GetError, Provider};
 
 /// Liefert bei jedem Aufruf einen Dienst vom Typ `T`: neu gebaut mit dem übergebenen Provider, einmal angelegt und in der Bauanleitung gemerkt (`instance`, `singleton`), oder im Scope des übergebenen Providers auf dem übergebenen Platz gemerkt (`scoped`).
@@ -39,14 +39,14 @@ impl<T: Send + Sync + 'static> Registration<T> {
 
     /// Dienst aus `recipe`; die erste Abfrage baut ihn mit dem Provider statt mit dem Scope, jede weitere liefert dasselbe Objekt.
     ///
-    /// Fragt die Bauanleitung nach ihrem eigenen Typ, bekommt sie `Err(GetError::Cycle)`. Fragt sie nach einem `scoped`-Dienst, bekommt sie `Err(GetError::ScopedFromRoot)`, denn sie baut mit dem Provider. Singleton-Bauanleitungen dürfen einander nicht abfragen: Starten zwei Threads gleichzeitig je eine davon, warten beide für immer.
+    /// Fragt die Bauanleitung nach ihrem eigenen Typ, bekommt sie `Err(GetError::Cycle)`. Fragt sie nach einem `scoped`-Dienst, bekommt sie `Err(GetError::ScopedFromRoot)`, denn sie baut mit dem Provider. Brauchen zwei Singletons einander und bauen zwei Threads sie gleichzeitig, bekommt eine der beiden inneren Abfragen `Err(GetError::Cycle)`.
     /// Schlägt `recipe` fehl, merkt sich die Bauanleitung nichts, und die nächste Abfrage baut neu.
     #[must_use]
     pub fn singleton(
         recipe: impl Fn(&Provider) -> Result<T, GetError> + Send + Sync + 'static,
     ) -> Self {
         let kept = Mutex::new(None);
-        Self::new(move |provider, _| singleton_service(&kept, provider, &recipe))
+        Self::new(move |provider, (id, _)| singleton_service(&kept, provider, id, &recipe))
     }
 
     /// Dienst aus `recipe`; die erste Abfrage in einem Scope baut ihn, jede weitere im selben Scope liefert dasselbe Objekt.
@@ -105,15 +105,26 @@ impl<T> fmt::Debug for Registration<T> {
 }
 
 /// Liefert den Dienst in `kept`; fehlt er dort, baut `recipe` ihn mit dem Provider statt mit dem Scope von `provider`, und `kept` merkt ihn sich. Die Sperre bleibt während des Baus, damit er nur einmal läuft; schlägt er fehl, bleibt `kept` leer.
+///
+/// Baut ein anderer Thread gerade, wartet dieser Thread auf ihn; führt die Kette der Wartenden zurück zu diesem Thread, liefert sie `Err(GetError::Cycle)` statt zu warten.
 fn singleton_service<T>(
     kept: &Mutex<Option<Arc<T>>>,
     provider: &Provider,
+    id: TypeId,
     recipe: impl Fn(&Provider) -> Result<T, GetError>,
 ) -> Result<Arc<T>, GetError> {
-    let mut kept = lock(kept);
+    let mut kept = match kept.try_lock() {
+        Ok(kept) => kept,
+        Err(TryLockError::Poisoned(poisoned)) => poisoned.into_inner(),
+        Err(TryLockError::WouldBlock) => {
+            let _waiting = Waiting::enter(&provider.shared.builds, id)?;
+            lock(kept)
+        }
+    };
     if let Some(service) = kept.as_ref() {
         return Ok(Arc::clone(service));
     }
+    let _owning = Owning::enter(&provider.shared.builds, id);
     let built = Arc::new(recipe(&provider.root())?);
     *kept = Some(Arc::clone(&built));
     Ok(built)

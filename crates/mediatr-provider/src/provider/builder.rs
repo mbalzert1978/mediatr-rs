@@ -43,7 +43,7 @@ impl ProviderBuilder {
             shared: Arc::new(Shared {
                 services: self.services,
                 root,
-                building: Mutex::default(),
+                builds: Mutex::default(),
             }),
         }
     }

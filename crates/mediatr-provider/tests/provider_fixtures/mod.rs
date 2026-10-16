@@ -205,3 +205,27 @@ pub fn gated_recipe() -> (Arc<Gate>, impl Fn(&Provider) -> Result<Config, GetErr
     };
     (gate, recipe)
 }
+
+/// Bauanleitung für ein Team, das nach seiner Leitung fragt; sie wartet an `both_building`, bis auch die Leitung gebaut wird, und fragt erst dann.
+pub fn team_needing_lead(
+    both_building: Arc<Barrier>,
+) -> impl Fn(&Provider) -> Result<Team, GetError> {
+    move |provider| {
+        both_building.wait();
+        Ok(Team {
+            lead: provider.get::<Employee>().ok(),
+        })
+    }
+}
+
+/// Bauanleitung für eine Mitarbeiterin, die nach ihrem Team fragt; sie wartet an `both_building`, bis auch das Team gebaut wird, und fragt erst dann.
+pub fn employee_needing_team(
+    both_building: Arc<Barrier>,
+) -> impl Fn(&Provider) -> Result<Employee, GetError> {
+    move |provider| {
+        both_building.wait();
+        Ok(Employee {
+            team: provider.get::<Team>().ok(),
+        })
+    }
+}

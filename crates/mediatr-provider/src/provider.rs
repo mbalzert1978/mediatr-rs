@@ -38,8 +38,33 @@ struct Shared {
     services: Services,
     /// Der Speicher des Providers, aus dem alle Scopes stammen; daran erkennt der Provider, ob er selbst oder ein Scope abgefragt wird.
     root: Arc<Built>,
+    /// Was gerade gebaut wird und wer worauf wartet.
+    builds: Mutex<Builds>,
+}
+
+/// Was gerade gebaut wird und wer worauf wartet; daran erkennt der Provider einen Kreis, auch über Threads.
+#[derive(Debug, Default)]
+struct Builds {
     /// Typen, deren Bauanleitung gerade läuft, je mit dem Thread, auf dem sie läuft.
-    building: Mutex<HashSet<(ThreadId, TypeId)>>,
+    running: HashSet<(ThreadId, TypeId)>,
+    /// Welcher Thread gerade das Singleton eines Typs baut.
+    owners: HashMap<TypeId, ThreadId>,
+    /// Auf welches Singleton ein Thread gerade wartet.
+    waiting: HashMap<ThreadId, TypeId>,
+}
+
+impl Builds {
+    /// Die Threads, auf die ein Wartender auf `id` nacheinander wartet: erst der Bauende von `id`, dann der Bauende dessen Wunsches, und so weiter; endet, wenn einer nicht wartet, und bricht ab, wenn die Kette sich ohne den Fragenden schließt.
+    fn waiting_on(&self, id: TypeId) -> impl Iterator<Item = ThreadId> + '_ {
+        let mut wanted = Some(id);
+        let mut seen = HashSet::new();
+        std::iter::from_fn(move || {
+            let owner = *self.owners.get(&wanted?)?;
+            wanted = self.waiting.get(&owner).copied();
+            Some(owner)
+        })
+        .take_while(move |owner| seen.insert(*owner))
+    }
 }
 
 /// Verweis auf einen [`Provider`], den [`Provider::downgrade`] liefert; hält dessen Dienste nicht am Leben.
@@ -77,7 +102,7 @@ impl Provider {
         let recipe = recipe
             .downcast_ref::<Recipe<T>>()
             .ok_or(GetError::NoService)?;
-        let _building = Building::enter(&self.shared.building, id).ok_or(GetError::Cycle)?;
+        let _building = Building::enter(&self.shared.builds, id).ok_or(GetError::Cycle)?;
         recipe(self, (id, index)).map_err(|error| match error {
             GetError::NoService => GetError::NoDependency,
             other => other,
@@ -93,7 +118,7 @@ impl Provider {
     /// und [`GetError::NoDependency`], wenn eine Bauanleitung einen nicht registrierten Dienst abfragt und den Fehler weitergibt.
     pub fn all<T: 'static>(&self) -> Result<Vec<Arc<T>>, GetError> {
         let id = TypeId::of::<T>();
-        let _building = Building::enter(&self.shared.building, id).ok_or(GetError::Cycle)?;
+        let _building = Building::enter(&self.shared.builds, id).ok_or(GetError::Cycle)?;
         self.shared
             .services
             .get(&id)
@@ -157,25 +182,73 @@ pub(crate) fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-/// Hält den Typ `id` für den laufenden Thread in `types`, solange er lebt; gibt ihn beim Fallen frei, auch nach einem Panic der Bauanleitung.
+/// Hält den Typ `id` für den laufenden Thread in `builds.running`, solange er lebt; gibt ihn beim Fallen frei, auch nach einem Panic der Bauanleitung.
 struct Building<'a> {
-    types: &'a Mutex<HashSet<(ThreadId, TypeId)>>,
+    builds: &'a Mutex<Builds>,
     key: (ThreadId, TypeId),
 }
 
 impl<'a> Building<'a> {
-    /// Trägt `id` für den laufenden Thread in `types` ein; `None`, wenn er dort schon steht.
-    fn enter(types: &'a Mutex<HashSet<(ThreadId, TypeId)>>, id: TypeId) -> Option<Self> {
+    /// Trägt `id` für den laufenden Thread ein; `None`, wenn er dort schon steht.
+    fn enter(builds: &'a Mutex<Builds>, id: TypeId) -> Option<Self> {
         let key = (thread::current().id(), id);
-        if !lock(types).insert(key) {
+        if !lock(builds).running.insert(key) {
             return None;
         }
-        Some(Self { types, key })
+        Some(Self { builds, key })
     }
 }
 
 impl Drop for Building<'_> {
     fn drop(&mut self) {
-        lock(self.types).remove(&self.key);
+        lock(self.builds).running.remove(&self.key);
+    }
+}
+
+/// Merkt sich in `builds.owners`, dass der laufende Thread das Singleton `id` baut, solange er lebt.
+struct Owning<'a> {
+    builds: &'a Mutex<Builds>,
+    id: TypeId,
+}
+
+impl<'a> Owning<'a> {
+    fn enter(builds: &'a Mutex<Builds>, id: TypeId) -> Self {
+        lock(builds).owners.insert(id, thread::current().id());
+        Self { builds, id }
+    }
+}
+
+impl Drop for Owning<'_> {
+    fn drop(&mut self) {
+        lock(self.builds).owners.remove(&self.id);
+    }
+}
+
+/// Merkt sich in `builds.waiting`, dass der laufende Thread auf das Singleton `id` wartet, solange er lebt.
+struct Waiting<'a> {
+    builds: &'a Mutex<Builds>,
+    me: ThreadId,
+}
+
+impl<'a> Waiting<'a> {
+    /// Trägt das Warten ein; `Err(GetError::Cycle)`, wenn die Kette aus Bauenden und Wartenden zurück zu diesem Thread führt oder sich schließt.
+    ///
+    /// # Errors
+    ///
+    /// Liefert [`GetError::Cycle`], wenn der Thread, der `id` baut, (über weitere Threads) auf ein Singleton wartet, das dieser Thread baut.
+    fn enter(builds: &'a Mutex<Builds>, id: TypeId) -> Result<Self, GetError> {
+        let me = thread::current().id();
+        let mut guard = lock(builds);
+        if guard.waiting_on(id).any(|owner| owner == me) {
+            return Err(GetError::Cycle);
+        }
+        guard.waiting.insert(me, id);
+        Ok(Self { builds, me })
+    }
+}
+
+impl Drop for Waiting<'_> {
+    fn drop(&mut self) {
+        lock(self.builds).waiting.remove(&self.me);
     }
 }

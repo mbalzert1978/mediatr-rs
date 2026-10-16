@@ -9,7 +9,7 @@ use std::fmt;
 pub enum GetError {
     /// Kein Dienst vom Typ ist registriert.
     NoService,
-    /// Die Bauanleitung des Typs läuft auf diesem Thread schon; sie hat nach ihrem eigenen Typ gefragt.
+    /// Die Bauanleitung des Typs läuft auf diesem Thread schon, sie hat nach ihrem eigenen Typ gefragt; oder zwei Threads bauen Singletons, die einander brauchen.
     Cycle,
     /// Ein `scoped`-Dienst wurde beim Provider selbst abgefragt statt in einem Scope, auch aus der Bauanleitung eines Singletons.
     ScopedFromRoot,
