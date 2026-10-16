@@ -8,8 +8,8 @@ use mediatr_rs::{Handler, Mediator, RequestHandler, SendError, Sender, WeakMedia
 mod mediator_fixtures;
 
 use mediator_fixtures::{
-    Confirmation, CustomerDirectory, CustomerError, FixedCustomer, OrderError, PlaceOrder,
-    PlaceOrderHandler, WarehouseOrderHandler, ada,
+    Confirmation, CustomerDirectory, CustomerError, FixedCustomer, GetCustomer, OrderError,
+    PlaceOrder, PlaceOrderHandler, Shop, Turnstile, WarehouseOrderHandler, ada,
 };
 
 #[tokio::test]
@@ -202,4 +202,26 @@ fn handler_debug_names_handler_type_without_debug() {
     let output = format!("{handler:?}");
 
     assert!(output.contains("CustomerDirectory"), "{output}");
+}
+
+#[tokio::test]
+async fn mediator_with_behaviors_stored_as_plain_mediator_field_runs_behaviors() {
+    let passed = Arc::new(AtomicU32::new(0));
+    let shop = Shop {
+        mediator: Mediator::builder()
+            .open_behavior(Turnstile {
+                passed: Arc::clone(&passed),
+            })
+            .register(Handler::instance(CustomerDirectory {
+                customers: vec![ada()],
+            }))
+            .build(),
+    };
+
+    let customer = shop.mediator.send(GetCustomer { id: 7 }).await.unwrap();
+
+    assert_eq!(
+        (customer.name.as_str(), passed.load(Ordering::SeqCst)),
+        ("Ada", 1)
+    );
 }

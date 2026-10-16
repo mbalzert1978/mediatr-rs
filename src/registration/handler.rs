@@ -8,13 +8,13 @@ use mediatr_provider::Registration;
 use crate::{ForeachAwaitPublisher, Mediator, WeakMediator};
 
 /// Wie der Mediator einen Handler vom Typ `H` bekommt; [`MediatorBuilder::register`](crate::MediatorBuilder::register), [`MediatorBuilder::register_stream`](crate::MediatorBuilder::register_stream) und [`MediatorBuilder::subscribe`](crate::MediatorBuilder::subscribe) nehmen ihn.
-/// `S` und `P` sind Notification-Publisher und Behaviors des Mediators, für den der Handler bestimmt ist.
-pub struct Handler<H, S = ForeachAwaitPublisher, P = ()> {
+/// `S` ist der Notification-Publisher des Mediators, für den der Handler bestimmt ist.
+pub struct Handler<H, S = ForeachAwaitPublisher> {
     pub(super) registration: Registration<H>,
-    types: PhantomData<(S, P)>,
+    publisher: PhantomData<S>,
 }
 
-impl<H: Send + Sync + 'static, S: 'static, P: 'static> Handler<H, S, P> {
+impl<H: Send + Sync + 'static, S: 'static> Handler<H, S> {
     /// Handler `handler`; jede Nachricht erreicht dasselbe Objekt.
     #[must_use]
     pub fn instance(handler: H) -> Self {
@@ -23,7 +23,7 @@ impl<H: Send + Sync + 'static, S: 'static, P: 'static> Handler<H, S, P> {
 
     /// Handler aus `make`; jede Nachricht baut ihn damit neu und gibt ihm den [`Mediator`] als [`Sender`](crate::Sender) und [`Publisher`](crate::Publisher).
     #[must_use]
-    pub fn transient(make: impl Fn(Mediator<S, P>) -> H + Send + Sync + 'static) -> Self {
+    pub fn transient(make: impl Fn(Mediator<S>) -> H + Send + Sync + 'static) -> Self {
         Self::new(Registration::transient(move |provider| {
             Ok(make(Mediator::new(provider.clone())))
         }))
@@ -33,11 +33,11 @@ impl<H: Send + Sync + 'static, S: 'static, P: 'static> Handler<H, S, P> {
     ///
     /// Der Handler bekommt einen [`WeakMediator`] als [`Sender`](crate::Sender) und [`Publisher`](crate::Publisher), damit er den Mediator nicht selbst am Leben hält.
     #[must_use]
-    pub fn singleton(make: impl Fn(WeakMediator<S, P>) -> H + Send + Sync + 'static) -> Self {
+    pub fn singleton(make: impl Fn(WeakMediator<S>) -> H + Send + Sync + 'static) -> Self {
         Self::new(Registration::singleton(move |provider| {
             Ok(make(WeakMediator {
                 provider: provider.downgrade(),
-                types: PhantomData,
+                publisher: PhantomData,
             }))
         }))
     }
@@ -46,12 +46,12 @@ impl<H: Send + Sync + 'static, S: 'static, P: 'static> Handler<H, S, P> {
     fn new(registration: Registration<H>) -> Self {
         Self {
             registration,
-            types: PhantomData,
+            publisher: PhantomData,
         }
     }
 }
 
-impl<H, S, P> fmt::Debug for Handler<H, S, P> {
+impl<H, S> fmt::Debug for Handler<H, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Handler")
             .field("registration", &self.registration)

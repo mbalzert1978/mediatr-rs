@@ -21,7 +21,7 @@ use crate::{
     RequestPreProcessor, StreamPipelineBehavior, StreamRequest, StreamRequestHandler,
 };
 
-/// Sammelt Behaviors und Handler und baut daraus einen [`Mediator`] mit dem Notification-Publisher `S` und der Kette `P` der Behaviors.
+/// Sammelt Behaviors und Handler und baut daraus einen [`Mediator`] mit dem Notification-Publisher `S`; `P` ist die Kette der Behaviors, aus der `register` je Request-Typ die Pipeline baut.
 ///
 /// `F` sagt, ob schon ein Handler registriert ist; Behaviors nimmt der Builder nur davor,
 /// weil jeder Handler die Kette der Behaviors schon in seinem Typ trägt.
@@ -300,7 +300,7 @@ impl<S, P, F> MediatorBuilder<S, P, F> {
     ///
     /// Verlangt, dass jedes Behavior für alle Request-Typen den Typ `R` kann, zum Beispiel [`PipelineBehavior`] für `R` ist.
     #[must_use]
-    pub fn register<R, H>(self, handler: Handler<H, S, P>) -> MediatorBuilder<S, P, WithHandlers>
+    pub fn register<R, H>(self, handler: Handler<H, S>) -> MediatorBuilder<S, P, WithHandlers>
     where
         R: Request + 'static,
         H: RequestHandler<R> + Send + Sync + 'static,
@@ -317,7 +317,7 @@ impl<S, P, F> MediatorBuilder<S, P, F> {
     #[must_use]
     pub fn register_stream<R, H>(
         self,
-        handler: Handler<H, S, P>,
+        handler: Handler<H, S>,
     ) -> MediatorBuilder<S, P, WithHandlers>
     where
         R: StreamRequest + 'static,
@@ -331,7 +331,7 @@ impl<S, P, F> MediatorBuilder<S, P, F> {
 
     /// Registriert `handler` für Notifications vom Typ `N`; ist für `N` schon ein Handler vom Typ `H` registriert, fällt `handler` weg.
     #[must_use]
-    pub fn subscribe<N, H>(self, handler: Handler<H, S, P>) -> MediatorBuilder<S, P, WithHandlers>
+    pub fn subscribe<N, H>(self, handler: Handler<H, S>) -> MediatorBuilder<S, P, WithHandlers>
     where
         N: Notification + 'static,
         H: NotificationHandler<N> + Send + Sync + 'static,
@@ -346,7 +346,7 @@ impl<S, P, F> MediatorBuilder<S, P, F> {
 
     /// Baut den Mediator mit allen registrierten Handlern und ihren Pipelines.
     #[must_use]
-    pub fn build(self) -> Mediator<S, P> {
+    pub fn build(self) -> Mediator<S> {
         Mediator::new(self.provider.build())
     }
 

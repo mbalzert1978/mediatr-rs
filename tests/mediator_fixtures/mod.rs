@@ -1,7 +1,9 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
-use mediatr_rs::{Request, RequestHandler, SendError, Sender, WeakMediator};
+use mediatr_rs::{
+    Mediator, Next, PipelineBehavior, Request, RequestHandler, SendError, Sender, WeakMediator,
+};
 
 #[derive(Clone)]
 pub struct Customer {
@@ -138,4 +140,21 @@ impl Sender<GetCustomer> for FixedCustomer {
     async fn send(&self, _request: GetCustomer) -> Result<Customer, CustomerError> {
         Ok(self.0.clone())
     }
+}
+
+/// Zählt jeden Request, der durch die Pipeline geht, und lässt ihn dann weiter.
+pub struct Turnstile {
+    pub passed: Arc<AtomicU32>,
+}
+
+impl<R: Request> PipelineBehavior<R> for Turnstile {
+    async fn handle(&self, request: R, next: Next<R>) -> Result<R::Response, R::Error> {
+        self.passed.fetch_add(1, Ordering::SeqCst);
+        next.run(request).await
+    }
+}
+
+/// Ein Laden, der seinen Mediator als Feld hält, ohne dessen Behaviors zu nennen.
+pub struct Shop {
+    pub mediator: Mediator,
 }

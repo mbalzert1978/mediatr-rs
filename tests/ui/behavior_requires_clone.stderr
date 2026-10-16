@@ -21,7 +21,7 @@ note: required for `RetryWithCopy` to implement `PipelineBehavior<LookupStock>`
 note: required by a bound in `MediatorBuilder::<S, P, F>::register`
   --> src/registration/builder.rs
    |
-   |     pub fn register<R, H>(self, handler: Handler<H, S, P>) -> MediatorBuilder<S, P, WithHandlers>
+   |     pub fn register<R, H>(self, handler: Handler<H, S>) -> MediatorBuilder<S, P, WithHandlers>
    |            -------- required by a bound in this associated function
 ...
    |         P: Behaviors<R>,
