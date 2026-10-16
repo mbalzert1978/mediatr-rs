@@ -46,7 +46,7 @@ Quelle: Microsoft.Extensions.DependencyInjection `AddScoped`, `IServiceScopeFact
 - [x] Warenkorb mit `Handler::scoped`, zwei `AddToCart` über denselben Scope aus `Mediator::scope` → das zweite liefert die Summe beider Artikel · `scoped_cart_sums_items_added_within_same_scope`
 - [x] (T11) Warenkorb mit `Handler::scoped`, je ein `AddToCart` über zwei Scopes → jeder liefert nur seinen Artikel · `scoped_cart_starts_empty_in_each_new_scope`
 - [ ] Warenkorb mit `Handler::scoped`, `AddToCart` direkt über den Mediator ohne `scope` → `Err(SendError::NoScope)`, kein Panic
-- [ ] (T11) Handler mit `Handler::transient`, über einen Scope aufgerufen, schickt über den Mediator, den er bekommt, `AddToCart` an den Warenkorb → `AddToCart` trifft denselben Warenkorb wie ein `send` direkt über diesen Scope
+- [x] (T11) Handler mit `Handler::transient`, über einen Scope aufgerufen, schickt über den Mediator, den er bekommt, `AddToCart` an den Warenkorb → `AddToCart` trifft denselben Warenkorb wie ein `send` direkt über diesen Scope · `transient_handler_reaches_scoped_cart_of_its_scope`
 - [ ] (T11) Handler mit `Handler::singleton`, `send` über zwei Scopes und direkt über den Mediator → der Handler wird einmal gebaut
 - [ ] (T11) Mediator mit einem Behavior, `AddToCart` über einen Scope an den Warenkorb mit `Handler::scoped` → das Behavior läuft, die Antwort kommt vom Warenkorb
 - [ ] (T11) `Handler::singleton`, über einen Scope aufgerufen, schickt über seinen `WeakMediator` `AddToCart` an den `scoped`-Warenkorb → `Err(SendError::NoScope)`, kein Panic
