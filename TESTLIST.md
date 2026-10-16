@@ -86,7 +86,7 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] (T11) Zwei Threads fragen gleichzeitig ein `singleton` ab → die Bauanleitung läuft einmal, beide bekommen dasselbe Objekt · `two_threads_get_same_singleton_built_once`
 - [x] (T11) Zwei Threads fragen im selben Scope gleichzeitig denselben `scoped`-Dienst ab → beide bekommen dasselbe Objekt · `two_threads_get_same_scoped_service_in_one_scope`
 - [x] Zwei `singleton`-Bauanleitungen fragen einander ab, zwei Threads starten sie gleichzeitig → `get` kommt zurück, kein Warten für immer · `mutually_dependent_singletons_on_two_threads_both_return`
-- [ ] Zwei `singleton`-Bauanleitungen fragen einander ab, zwei Threads starten sie gleichzeitig → genau eine der beiden inneren Abfragen liefert `Err(GetError::Cycle)`
+- [x] Zwei `singleton`-Bauanleitungen fragen einander ab, zwei Threads starten sie gleichzeitig → genau eine der beiden inneren Abfragen liefert `Err(GetError::Cycle)` · `mutually_dependent_singletons_on_two_threads_exactly_one_inner_query_gets_cycle`
 - [ ] Drei `singleton`-Bauanleitungen fragen einander im Kreis ab, drei Threads starten sie gleichzeitig → jedes `get` kommt zurück
 - [x] Zwei `singleton`-Registrierungen desselben Typs, zwei Threads bauen sie gleichzeitig, die erste fragt ein Singleton ab, das ein dritter Thread baut und das auf die erste wartet → genau eine der beiden inneren Abfragen liefert `Err(GetError::Cycle)`, kein Warten für immer · `same_type_singletons_on_two_threads_with_third_thread_waiting_on_first_get_one_cycle`
 - [x] Dienst mit `scoped` registriert, Abfrage beim Provider selbst statt in einem Scope → die Abfrage liefert `Err(GetError::ScopedFromRoot)` · `scoped_service_from_provider_itself_gets_scoped_from_root`

@@ -81,14 +81,14 @@ pub struct Student {
     pub courses: Result<Vec<Arc<Course>>, GetError>,
 }
 
-/// Ein Team mit seiner Leitung, falls es eine gibt.
+/// Ein Team; `lead` hält, was die Abfrage nach seiner Leitung beim Bau ergab.
 pub struct Team {
-    pub lead: Option<Arc<Employee>>,
+    pub lead: Result<Arc<Employee>, GetError>,
 }
 
-/// Eine Mitarbeiterin mit ihrem Team, falls es eins gibt.
+/// Eine Mitarbeiterin; `team` hält, was die Abfrage nach ihrem Team beim Bau ergab.
 pub struct Employee {
-    pub team: Option<Arc<Team>>,
+    pub team: Result<Arc<Team>, GetError>,
 }
 
 /// Eine Verbindung zu einem Server, der nicht immer erreichbar ist.
@@ -213,7 +213,7 @@ pub fn team_needing_lead(
     move |provider| {
         both_building.wait();
         Ok(Team {
-            lead: provider.get::<Employee>().ok(),
+            lead: provider.get::<Employee>(),
         })
     }
 }
@@ -225,7 +225,7 @@ pub fn employee_needing_team(
     move |provider| {
         both_building.wait();
         Ok(Employee {
-            team: provider.get::<Team>().ok(),
+            team: provider.get::<Team>(),
         })
     }
 }

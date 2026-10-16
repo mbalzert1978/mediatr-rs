@@ -464,19 +464,19 @@ fn mutually_dependent_recipes_get_nothing_for_inner_query() {
     let provider = Provider::builder()
         .register(Registration::transient(|provider| {
             Ok(Team {
-                lead: provider.get::<Employee>().ok(),
+                lead: provider.get::<Employee>(),
             })
         }))
         .register(Registration::transient(|provider| {
             Ok(Employee {
-                team: provider.get::<Team>().ok(),
+                team: provider.get::<Team>(),
             })
         }))
         .build();
 
     let team = provider.get::<Team>().unwrap();
 
-    assert!(team.lead.as_ref().unwrap().team.is_none());
+    assert!(team.lead.as_ref().unwrap().team.is_err());
 }
 
 #[test]
@@ -1090,6 +1090,33 @@ fn same_type_singletons_on_two_threads_with_third_thread_waiting_on_first_get_on
             shards.first().unwrap().router_error(),
             router.shards_error()
         ),
+        (Some(GetError::Cycle), None) | (None, Some(GetError::Cycle))
+    ));
+}
+
+#[test]
+fn mutually_dependent_singletons_on_two_threads_exactly_one_inner_query_gets_cycle() {
+    let both_building = Arc::new(Barrier::new(2));
+    let provider = Provider::builder()
+        .register(Registration::singleton(team_needing_lead(Arc::clone(
+            &both_building,
+        ))))
+        .register(Registration::singleton(employee_needing_team(
+            both_building,
+        )))
+        .build();
+    let (teams, team_built) = mpsc::channel();
+    let (employees, employee_built) = mpsc::channel();
+    let (team_side, employee_side) = (provider.clone(), provider);
+    let wait = Duration::from_secs(5);
+
+    std::thread::spawn(move || teams.send(team_side.get::<Team>()).unwrap());
+    std::thread::spawn(move || employees.send(employee_side.get::<Employee>()).unwrap());
+    let team = team_built.recv_timeout(wait).unwrap().unwrap();
+    let employee = employee_built.recv_timeout(wait).unwrap().unwrap();
+
+    assert!(matches!(
+        (team.lead.as_ref().err(), employee.team.as_ref().err()),
         (Some(GetError::Cycle), None) | (None, Some(GetError::Cycle))
     ));
 }
