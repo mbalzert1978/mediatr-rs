@@ -257,3 +257,18 @@ async fn scoped_service_is_separate_in_each_scope() {
 
     assert_eq!(lines, Ok(0));
 }
+
+#[tokio::test]
+async fn scoped_handler_without_registered_dependency_gets_no_dependency() {
+    let mediator = Mediator::builder()
+        .register(Handler::scoped_from(|_, provider| {
+            Ok(OrderLineRecorder {
+                unit_of_work: provider.get()?,
+            })
+        }))
+        .build();
+
+    let result = mediator.scope().send(AddOrderLine).await;
+
+    assert_eq!(result, Err(SendError::NoDependency));
+}

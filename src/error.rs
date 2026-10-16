@@ -13,6 +13,8 @@ pub enum SendError {
     MediatorDropped,
     /// Der Handler ist mit [`Handler::scoped`](crate::Handler::scoped) registriert, die Nachricht ging aber direkt über den Mediator statt über einen Scope aus [`Mediator::scope`](crate::Mediator::scope).
     NoScope,
+    /// Die Bauanleitung eines [`Handler::scoped_from`](crate::Handler::scoped_from) braucht einen Dienst, der nicht mit [`MediatorBuilder::service`](crate::MediatorBuilder::service) registriert ist.
+    NoDependency,
 }
 
 impl fmt::Display for SendError {
@@ -21,6 +23,9 @@ impl fmt::Display for SendError {
             Self::NoHandler => f.write_str("kein Handler für diesen Request-Typ registriert"),
             Self::MediatorDropped => f.write_str("der Mediator ist weggefallen"),
             Self::NoScope => f.write_str("der Handler braucht einen Scope aus `Mediator::scope`"),
+            Self::NoDependency => {
+                f.write_str("ein Dienst, den der Handler braucht, ist nicht registriert")
+            }
         }
     }
 }

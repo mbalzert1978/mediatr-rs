@@ -102,6 +102,7 @@ impl<S> Clone for WeakMediator<S> {
 fn undeliverable(error: &GetError) -> SendError {
     match error {
         GetError::ScopedFromRoot => SendError::NoScope,
+        GetError::NoDependency => SendError::NoDependency,
         // Über den Mediator kommt sonst nur `NoService` an.
         _ => SendError::NoHandler,
     }
