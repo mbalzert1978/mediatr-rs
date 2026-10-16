@@ -1178,3 +1178,15 @@ fn has_unique_after_unique_registration_returns_true() {
 
     assert!(builder.has_unique::<Document, Invoice>());
 }
+
+#[test]
+fn has_unique_for_other_type_with_same_key_returns_false() {
+    let builder = Provider::builder().register(
+        Registration::instance(Document::from(Invoice {
+            heading: "Rechnung".to_owned(),
+        }))
+        .unique_by::<Invoice>(),
+    );
+
+    assert!(!builder.has_unique::<LedgerEntry, Invoice>());
+}
