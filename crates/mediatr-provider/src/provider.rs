@@ -102,7 +102,6 @@ impl Provider {
         let recipe = recipe
             .downcast_ref::<Recipe<T>>()
             .ok_or(GetError::NoService)?;
-        let _building = Building::enter(&self.shared.builds, id).ok_or(GetError::Cycle)?;
         recipe(self, (id, index)).map_err(|error| match error {
             GetError::NoService => GetError::NoDependency,
             other => other,
@@ -118,7 +117,6 @@ impl Provider {
     /// und [`GetError::NoDependency`], wenn eine Bauanleitung einen nicht registrierten Dienst abfragt und den Fehler weitergibt.
     pub fn all<T: 'static>(&self) -> Result<Vec<Arc<T>>, GetError> {
         let id = TypeId::of::<T>();
-        let _building = Building::enter(&self.shared.builds, id).ok_or(GetError::Cycle)?;
         self.shared
             .services
             .get(&id)
@@ -164,6 +162,16 @@ impl Provider {
             built: Arc::clone(&self.shared.root),
         }
     }
+
+    /// Baut mit `recipe` und diesem Provider einen Dienst vom Typ `id`; `Err(GetError::Cycle)`, wenn eine Bauanleitung dieses Typs auf diesem Thread schon läuft.
+    fn run_recipe<T>(
+        &self,
+        id: TypeId,
+        recipe: impl Fn(&Self) -> Result<T, GetError>,
+    ) -> Result<Arc<T>, GetError> {
+        let _building = Building::enter(&self.shared.builds, id)?;
+        Ok(Arc::new(recipe(self)?))
+    }
 }
 
 impl WeakProvider {
@@ -189,13 +197,13 @@ struct Building<'a> {
 }
 
 impl<'a> Building<'a> {
-    /// Trägt `id` für den laufenden Thread ein; `None`, wenn er dort schon steht.
-    fn enter(builds: &'a Mutex<Builds>, id: TypeId) -> Option<Self> {
+    /// Trägt `id` für den laufenden Thread ein; `Err(GetError::Cycle)`, wenn er dort schon steht.
+    fn enter(builds: &'a Mutex<Builds>, id: TypeId) -> Result<Self, GetError> {
         let key = (thread::current().id(), id);
         if !lock(builds).running.insert(key) {
-            return None;
+            return Err(GetError::Cycle);
         }
-        Some(Self { builds, key })
+        Ok(Self { builds, key })
     }
 }
 
