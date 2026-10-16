@@ -3,7 +3,7 @@
 use std::fmt;
 use std::marker::PhantomData;
 
-use mediatr_provider::Registration;
+use mediatr_provider::{GetError, Provider, Registration};
 
 use crate::{ForeachAwaitPublisher, Mediator, WeakMediator};
 
@@ -50,11 +50,22 @@ impl<H: Send + Sync + 'static, S: 'static> Handler<H, S> {
     /// Schicken zwei Aufrufe im selben Scope gleichzeitig, kann `make` zweimal laufen; beide bekommen denselben Handler.
     #[must_use]
     pub fn scoped(make: impl Fn(WeakMediator<S>) -> H + Send + Sync + 'static) -> Self {
+        Self::scoped_from(move |mediator, _| Ok(make(mediator)))
+    }
+
+    /// Handler aus `make` wie bei [`Handler::scoped`]; `make` bekommt dazu den Scope als [`Provider`] und holt daraus die Dienste aus [`MediatorBuilder::service`](crate::MediatorBuilder::service), die der Handler braucht.
+    #[must_use]
+    pub fn scoped_from(
+        make: impl Fn(WeakMediator<S>, &Provider) -> Result<H, GetError> + Send + Sync + 'static,
+    ) -> Self {
         Self::new(Registration::scoped(move |provider| {
-            Ok(make(WeakMediator {
-                provider: provider.downgrade(),
-                publisher: PhantomData,
-            }))
+            make(
+                WeakMediator {
+                    provider: provider.downgrade(),
+                    publisher: PhantomData,
+                },
+                provider,
+            )
         }))
     }
 
