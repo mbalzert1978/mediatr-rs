@@ -1,8 +1,10 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
+use futures_core::Stream;
 use mediatr_rs::{
-    Mediator, Next, PipelineBehavior, Request, RequestHandler, SendError, Sender, WeakMediator,
+    Mediator, Next, PipelineBehavior, Request, RequestHandler, SendError, Sender, StreamNext,
+    StreamPipelineBehavior, StreamRequest, StreamRequestHandler, WeakMediator,
 };
 
 #[derive(Clone)]
@@ -54,6 +56,28 @@ impl RequestHandler<GetCustomer> for CustomerDirectory {
             .find(|customer| customer.id == request.id)
             .cloned()
             .ok_or(CustomerError::NotFound)
+    }
+}
+
+/// Fragt alle Kunden ab; der Handler liefert ihre Namen als Stream.
+pub struct ListCustomers;
+
+impl StreamRequest for ListCustomers {
+    type Item = String;
+    type Error = CustomerError;
+}
+
+impl StreamRequestHandler<ListCustomers> for CustomerDirectory {
+    fn handle(
+        &self,
+        _request: ListCustomers,
+    ) -> impl Stream<Item = Result<String, CustomerError>> + use<> {
+        let names: Vec<_> = self
+            .customers
+            .iter()
+            .map(|customer| Ok(customer.name.clone()))
+            .collect();
+        futures_util::stream::iter(names)
     }
 }
 
@@ -151,6 +175,17 @@ impl<R: Request> PipelineBehavior<R> for Turnstile {
     async fn handle(&self, request: R, next: Next<R>) -> Result<R::Response, R::Error> {
         self.passed.fetch_add(1, Ordering::SeqCst);
         next.run(request).await
+    }
+}
+
+impl<R: StreamRequest + 'static> StreamPipelineBehavior<R> for Turnstile {
+    fn handle(
+        &self,
+        request: R,
+        next: StreamNext<R>,
+    ) -> impl Stream<Item = Result<R::Item, R::Error>> + use<R> {
+        self.passed.fetch_add(1, Ordering::SeqCst);
+        next.run(request)
     }
 }
 
