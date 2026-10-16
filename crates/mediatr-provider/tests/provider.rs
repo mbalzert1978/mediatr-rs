@@ -11,9 +11,10 @@ mod provider_fixtures;
 
 use provider_fixtures::{
     Alive, AuditLog, Config, Connection, Course, DeliveryNote, Document, Employee, Folder,
-    Greeting, Invoice, LedgerEntry, MenuItem, Name, Printer, Report, Repository, Scheduler,
-    Session, Settings, Student, Team, UnitOfWork, connection_recipe, counting_recipe,
-    employee_needing_team, gated_recipe, settings_recipe, team_needing_lead,
+    Greeting, Invoice, LedgerEntry, MenuItem, Name, Printer, Report, Repository, Router, Scheduler,
+    Session, Settings, Shard, Student, Team, UnitOfWork, connection_recipe, counting_recipe,
+    employee_needing_team, gated_recipe, router_collecting_shards, settings_recipe,
+    shard_needing_router, shard_without_router, team_needing_lead,
 };
 
 #[test]
@@ -1055,4 +1056,40 @@ fn mutually_dependent_singletons_on_two_threads_both_return() {
     let second = answered.recv_timeout(Duration::from_secs(5));
 
     assert_eq!((first, second), (Ok(true), Ok(true)));
+}
+
+#[test]
+fn same_type_singletons_on_two_threads_with_third_thread_waiting_on_first_get_one_cycle() {
+    let both_shards = Arc::new(Barrier::new(2));
+    let router_building = Arc::new(Barrier::new(2));
+    let provider = Provider::builder()
+        .register(Registration::singleton(shard_needing_router(
+            Arc::clone(&both_shards),
+            Arc::clone(&router_building),
+        )))
+        .register(Registration::singleton(shard_without_router(both_shards)))
+        .register(Registration::singleton(router_collecting_shards(
+            router_building,
+        )))
+        .build();
+    let (shards, shards_built) = mpsc::channel();
+    let (replica, replica_built) = mpsc::channel();
+    let (routers, router_built) = mpsc::channel();
+    let (first, second, third) = (provider.clone(), provider.clone(), provider);
+    let wait = Duration::from_secs(5);
+
+    std::thread::spawn(move || shards.send(first.all::<Shard>()).unwrap());
+    std::thread::spawn(move || replica.send(second.get::<Shard>()).unwrap());
+    replica_built.recv_timeout(wait).unwrap().unwrap();
+    std::thread::spawn(move || routers.send(third.get::<Router>()).unwrap());
+    let shards = shards_built.recv_timeout(wait).unwrap().unwrap();
+    let router = router_built.recv_timeout(wait).unwrap().unwrap();
+
+    assert!(matches!(
+        (
+            shards.first().unwrap().router_error(),
+            router.shards_error()
+        ),
+        (Some(GetError::Cycle), None) | (None, Some(GetError::Cycle))
+    ));
 }

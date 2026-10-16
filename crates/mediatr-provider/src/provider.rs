@@ -47,16 +47,16 @@ struct Shared {
 struct Builds {
     /// Typen, deren Bauanleitung gerade läuft, je mit dem Thread, auf dem sie läuft.
     running: HashSet<(ThreadId, TypeId)>,
-    /// Welcher Thread gerade das Singleton eines Typs baut.
-    owners: HashMap<TypeId, ThreadId>,
-    /// Auf welches Singleton ein Thread gerade wartet.
-    waiting: HashMap<ThreadId, TypeId>,
+    /// Welcher Thread gerade das Singleton einer Registrierung baut.
+    owners: HashMap<Slot, ThreadId>,
+    /// Auf das Singleton welcher Registrierung ein Thread gerade wartet.
+    waiting: HashMap<ThreadId, Slot>,
 }
 
 impl Builds {
-    /// Die Threads, auf die ein Wartender auf `id` nacheinander wartet: erst der Bauende von `id`, dann der Bauende dessen Wunsches, und so weiter; endet, wenn einer nicht wartet, und bricht ab, wenn die Kette sich ohne den Fragenden schließt.
-    fn waiting_on(&self, id: TypeId) -> impl Iterator<Item = ThreadId> + '_ {
-        let mut wanted = Some(id);
+    /// Die Threads, auf die ein Wartender auf `slot` nacheinander wartet: erst der Bauende von `slot`, dann der Bauende dessen Wunsches, und so weiter; endet, wenn einer nicht wartet, und bricht ab, wenn die Kette sich ohne den Fragenden schließt.
+    fn waiting_on(&self, slot: Slot) -> impl Iterator<Item = ThreadId> + '_ {
+        let mut wanted = Some(slot);
         let mut seen = HashSet::new();
         std::iter::from_fn(move || {
             let owner = *self.owners.get(&wanted?)?;
@@ -205,26 +205,26 @@ impl Drop for Building<'_> {
     }
 }
 
-/// Merkt sich in `builds.owners`, dass der laufende Thread das Singleton `id` baut, solange er lebt.
+/// Merkt sich in `builds.owners`, dass der laufende Thread das Singleton auf `slot` baut, solange er lebt.
 struct Owning<'a> {
     builds: &'a Mutex<Builds>,
-    id: TypeId,
+    slot: Slot,
 }
 
 impl<'a> Owning<'a> {
-    fn enter(builds: &'a Mutex<Builds>, id: TypeId) -> Self {
-        lock(builds).owners.insert(id, thread::current().id());
-        Self { builds, id }
+    fn enter(builds: &'a Mutex<Builds>, slot: Slot) -> Self {
+        lock(builds).owners.insert(slot, thread::current().id());
+        Self { builds, slot }
     }
 }
 
 impl Drop for Owning<'_> {
     fn drop(&mut self) {
-        lock(self.builds).owners.remove(&self.id);
+        lock(self.builds).owners.remove(&self.slot);
     }
 }
 
-/// Merkt sich in `builds.waiting`, dass der laufende Thread auf das Singleton `id` wartet, solange er lebt.
+/// Merkt sich in `builds.waiting`, dass der laufende Thread auf das Singleton auf `slot` wartet, solange er lebt.
 struct Waiting<'a> {
     builds: &'a Mutex<Builds>,
     me: ThreadId,
@@ -235,14 +235,14 @@ impl<'a> Waiting<'a> {
     ///
     /// # Errors
     ///
-    /// Liefert [`GetError::Cycle`], wenn der Thread, der `id` baut, (über weitere Threads) auf ein Singleton wartet, das dieser Thread baut.
-    fn enter(builds: &'a Mutex<Builds>, id: TypeId) -> Result<Self, GetError> {
+    /// Liefert [`GetError::Cycle`], wenn der Thread, der `slot` baut, (über weitere Threads) auf ein Singleton wartet, das dieser Thread baut.
+    fn enter(builds: &'a Mutex<Builds>, slot: Slot) -> Result<Self, GetError> {
         let me = thread::current().id();
         let mut guard = lock(builds);
-        if guard.waiting_on(id).any(|owner| owner == me) {
+        if guard.waiting_on(slot).any(|owner| owner == me) {
             return Err(GetError::Cycle);
         }
-        guard.waiting.insert(me, id);
+        guard.waiting.insert(me, slot);
         Ok(Self { builds, me })
     }
 }

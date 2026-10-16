@@ -46,7 +46,7 @@ impl<T: Send + Sync + 'static> Registration<T> {
         recipe: impl Fn(&Provider) -> Result<T, GetError> + Send + Sync + 'static,
     ) -> Self {
         let kept = Mutex::new(None);
-        Self::new(move |provider, (id, _)| singleton_service(&kept, provider, id, &recipe))
+        Self::new(move |provider, slot| singleton_service(&kept, provider, slot, &recipe))
     }
 
     /// Dienst aus `recipe`; die erste Abfrage in einem Scope baut ihn, jede weitere im selben Scope liefert dasselbe Objekt.
@@ -110,21 +110,21 @@ impl<T> fmt::Debug for Registration<T> {
 fn singleton_service<T>(
     kept: &Mutex<Option<Arc<T>>>,
     provider: &Provider,
-    id: TypeId,
+    slot: Slot,
     recipe: impl Fn(&Provider) -> Result<T, GetError>,
 ) -> Result<Arc<T>, GetError> {
     let mut kept = match kept.try_lock() {
         Ok(kept) => kept,
         Err(TryLockError::Poisoned(poisoned)) => poisoned.into_inner(),
         Err(TryLockError::WouldBlock) => {
-            let _waiting = Waiting::enter(&provider.shared.builds, id)?;
+            let _waiting = Waiting::enter(&provider.shared.builds, slot)?;
             lock(kept)
         }
     };
     if let Some(service) = kept.as_ref() {
         return Ok(Arc::clone(service));
     }
-    let _owning = Owning::enter(&provider.shared.builds, id);
+    let _owning = Owning::enter(&provider.shared.builds, slot);
     let built = Arc::new(recipe(&provider.root())?);
     *kept = Some(Arc::clone(&built));
     Ok(built)

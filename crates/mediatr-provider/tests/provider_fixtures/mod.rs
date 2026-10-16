@@ -229,3 +229,65 @@ pub fn employee_needing_team(
         })
     }
 }
+
+/// Ein Teil der Daten der Anwendung; `router` hält, was die Abfrage nach dem Router beim Bau ergab, `None`, wenn der Teil keinen braucht.
+pub struct Shard {
+    pub router: Option<Result<Arc<Router>, GetError>>,
+}
+
+impl Shard {
+    /// Der Fehler, den die Abfrage nach dem Router beim Bau ergab, falls einer.
+    pub fn router_error(&self) -> Option<&GetError> {
+        self.router
+            .as_ref()
+            .and_then(|router| router.as_ref().err())
+    }
+}
+
+/// Verteilt Anfragen auf alle Teile; `shards` hält, was die Abfrage nach ihnen beim Bau ergab.
+pub struct Router {
+    pub shards: Result<Vec<Arc<Shard>>, GetError>,
+}
+
+impl Router {
+    /// Der Fehler, den die Abfrage nach den Teilen beim Bau ergab, falls einer.
+    pub fn shards_error(&self) -> Option<&GetError> {
+        self.shards.as_ref().err()
+    }
+}
+
+/// Bauanleitung für den ersten Teil: wartet an `both_shards`, bis auch der zweite gebaut wird, dann an `router_building`, bis der Router gebaut wird, und fragt erst dann nach ihm.
+pub fn shard_needing_router(
+    both_shards: Arc<Barrier>,
+    router_building: Arc<Barrier>,
+) -> impl Fn(&Provider) -> Result<Shard, GetError> {
+    move |provider| {
+        both_shards.wait();
+        router_building.wait();
+        Ok(Shard {
+            router: Some(provider.get::<Router>()),
+        })
+    }
+}
+
+/// Bauanleitung für einen Teil ohne Router: wartet an `both_shards`, bis auch der erste gebaut wird, und ist dann fertig.
+pub fn shard_without_router(
+    both_shards: Arc<Barrier>,
+) -> impl Fn(&Provider) -> Result<Shard, GetError> {
+    move |_| {
+        both_shards.wait();
+        Ok(Shard { router: None })
+    }
+}
+
+/// Bauanleitung für den Router: wartet an `router_building`, bis der erste Teil so weit ist, und sammelt dann alle Teile.
+pub fn router_collecting_shards(
+    router_building: Arc<Barrier>,
+) -> impl Fn(&Provider) -> Result<Router, GetError> {
+    move |provider| {
+        router_building.wait();
+        Ok(Router {
+            shards: provider.all::<Shard>(),
+        })
+    }
+}
