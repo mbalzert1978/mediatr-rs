@@ -33,6 +33,11 @@ Quelle: MediatR `Mediator(IServiceProvider)` speichert keine Handler; es holt si
 - [x] Mediator mit Behaviors in einem Feld vom Typ `Mediator` gespeichert, ohne die Behaviors zu nennen → `send` darüber läuft durch die Behaviors und liefert die Antwort des Handlers · `mediator_with_behaviors_stored_as_plain_mediator_field_runs_behaviors`
 - [x] (T11) Mediator mit Behaviors, ein `Handler::singleton` hält `WeakMediator` als Feld, ohne die Behaviors zu nennen → `send` über diesen `WeakMediator` läuft durch die Behaviors · `singleton_handler_with_plain_weak_mediator_field_runs_behaviors`
 - [x] Mediator mit Stream-Behaviors in einem Feld vom Typ `Mediator` gespeichert, ohne die Behaviors zu nennen → `create_stream` darüber läuft durch die Stream-Behaviors und liefert die Items des Handlers · `mediator_with_stream_behaviors_stored_as_plain_mediator_field_runs_stream_behaviors`
+- [ ] Mediator mit einem Behavior in eine mit `tokio::spawn` gestartete Aufgabe verschoben, dort `send` → liefert die Antwort des Handlers, das Behavior lief
+- [ ] (T11) Handler bekommt den Mediator per Konstruktor als generischen `Sender`, Mediator in eine mit `tokio::spawn` gestartete Aufgabe verschoben, dort `send` → liefert die Antwort des Handlers
+- [ ] Mediator in eine mit `tokio::spawn` gestartete Aufgabe verschoben, dort `publish` → alle Handler laufen
+- [ ] Mediator in eine mit `tokio::spawn` gestartete Aufgabe verschoben, dort einen Stream gelesen → er liefert die Elemente des Stream-Handlers
+- [ ] (T11) Zwei Threads schicken über Klone desselben Mediators gleichzeitig Requests an einen `Handler::singleton` → beide bekommen ihre Antwort, der Handler wird einmal gebaut
 
 ## Provider-Crate `mediatr-provider`
 
