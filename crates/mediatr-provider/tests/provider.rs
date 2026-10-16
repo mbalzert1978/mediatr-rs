@@ -1190,3 +1190,15 @@ fn has_unique_for_other_type_with_same_key_returns_false() {
 
     assert!(!builder.has_unique::<LedgerEntry, Invoice>());
 }
+
+#[test]
+fn has_unique_for_same_type_with_other_key_returns_false() {
+    let builder = Provider::builder().register(
+        Registration::instance(Document::from(Invoice {
+            heading: "Rechnung".to_owned(),
+        }))
+        .unique_by::<Invoice>(),
+    );
+
+    assert!(!builder.has_unique::<Document, DeliveryNote>());
+}

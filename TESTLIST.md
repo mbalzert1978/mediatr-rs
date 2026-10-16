@@ -104,7 +104,7 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] `ProviderBuilder` ohne Registrierung mit `unique_by` → `has_unique` liefert `false` · `has_unique_without_unique_registration_returns_false`
 - [x] Registrierung mit `unique_by` für einen Typ und einen Schlüsseltyp → `has_unique` für genau dieses Paar liefert `true` · `has_unique_after_unique_registration_returns_true`
 - [x] (T11) Registrierung mit `unique_by` für einen Typ und einen Schlüsseltyp → `has_unique` für einen anderen Typ mit demselben Schlüsseltyp liefert `false` · `has_unique_for_other_type_with_same_key_returns_false`
-- [ ] Registrierung mit `unique_by` für einen Typ und einen Schlüsseltyp → `has_unique` für denselben Typ mit einem anderen Schlüsseltyp liefert `false`
+- [x] Registrierung mit `unique_by` für einen Typ und einen Schlüsseltyp → `has_unique` für denselben Typ mit einem anderen Schlüsseltyp liefert `false` · `has_unique_for_same_type_with_other_key_returns_false`
 
 ## Notification — `publish`
 
