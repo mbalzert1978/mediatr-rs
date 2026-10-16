@@ -1157,3 +1157,12 @@ fn three_singletons_in_a_ring_on_three_threads_all_return_and_exactly_one_inner_
         .chain(shipping.orders.as_ref().err());
     assert_eq!(errors.collect::<Vec<_>>(), [&GetError::Cycle]);
 }
+
+#[test]
+fn has_unique_without_unique_registration_returns_false() {
+    let builder = Provider::builder().register(Registration::instance(Document::from(Invoice {
+        heading: "Rechnung".to_owned(),
+    })));
+
+    assert!(!builder.has_unique::<Document, Invoice>());
+}
