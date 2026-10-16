@@ -51,7 +51,7 @@ Quelle: Microsoft.Extensions.DependencyInjection `AddScoped`, `IServiceScopeFact
 - [x] (T11) Mediator mit einem Behavior, `AddToCart` über einen Scope an den Warenkorb mit `Handler::scoped` → das Behavior läuft, die Antwort kommt vom Warenkorb · `behavior_runs_around_scoped_cart_in_scope`
 - [x] (T11) `Handler::singleton`, über einen Scope aufgerufen, schickt über seinen `WeakMediator` `AddToCart` an den `scoped`-Warenkorb → `Err(SendError::NoScope)`, kein Panic · `singleton_handler_sending_to_scoped_cart_gets_no_scope`
 - [x] (T11) Scope fällt weg, der Mediator lebt → der Warenkorb wird freigegeben (sein `Drop` läuft) · `scoped_cart_is_released_with_its_scope`
-- [ ] (T11) Ein Warenkorb, der den `WeakMediator` seines Scopes behalten hat, schickt `AddToCart`, nachdem der Scope weggefallen ist; der Mediator lebt → `Err(SendError::MediatorDropped)`, kein Panic
+- [x] (T11) Ein Handler mit `Handler::scoped`, der den `WeakMediator` seines Scopes behalten hat, schickt `AddToCart`, nachdem der Scope weggefallen ist; der Mediator lebt → `Err(SendError::MediatorDropped)`, kein Panic · `scoped_handler_sending_after_scope_dropped_gets_mediator_dropped`
 - [ ] Notification-Handler mit `Handler::scoped`, `publish` über einen Scope → der Handler läuft
 - [ ] Notification-Handler mit `Handler::scoped`, `publish` direkt über den Mediator ohne `scope` → `Err(SendError::NoScope)`, kein Panic
 - [ ] Stream-Handler mit `Handler::scoped`, `create_stream` über einen Scope → der Stream liefert die Elemente des Handlers
