@@ -1015,3 +1015,16 @@ fn recipe_passing_on_cycle_keeps_cycle() {
 
     assert!(matches!(folder, Err(GetError::Cycle)));
 }
+
+#[test]
+fn all_with_recipe_asking_for_unregistered_service_gets_no_dependency() {
+    let provider = Provider::builder()
+        .register(Registration::transient(|provider| {
+            Ok(Greeting(format!("Hallo {}", provider.get::<Name>()?.0)))
+        }))
+        .build();
+
+    let greetings = provider.all::<Greeting>();
+
+    assert!(matches!(greetings, Err(GetError::NoDependency)));
+}

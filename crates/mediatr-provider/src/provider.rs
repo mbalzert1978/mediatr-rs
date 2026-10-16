@@ -89,7 +89,8 @@ impl Provider {
     /// # Errors
     ///
     /// Liefert [`GetError::Cycle`], wenn die Bauanleitung von `T` auf diesem Thread gerade läuft,
-    /// und [`GetError::ScopedFromRoot`], wenn ein `scoped`-Dienst von `T` beim Provider selbst abgefragt wird.
+    /// [`GetError::ScopedFromRoot`], wenn ein `scoped`-Dienst von `T` beim Provider selbst abgefragt wird,
+    /// und [`GetError::NoDependency`], wenn eine Bauanleitung einen nicht registrierten Dienst abfragt und den Fehler weitergibt.
     pub fn all<T: 'static>(&self) -> Result<Vec<Arc<T>>, GetError> {
         let id = TypeId::of::<T>();
         let _building = Building::enter(&self.shared.building, id).ok_or(GetError::Cycle)?;
@@ -102,6 +103,10 @@ impl Provider {
             .filter_map(|(index, recipe)| Some((index, recipe.downcast_ref::<Recipe<T>>()?)))
             .map(|(index, recipe)| recipe(self, (id, index)))
             .collect::<Result<Vec<_>, _>>()
+            .map_err(|error| match error {
+                GetError::NoService => GetError::NoDependency,
+                other => other,
+            })
     }
 
     /// Beginnt einen neuen Scope mit denselben Diensten; `scoped`-Dienste baut er neu.

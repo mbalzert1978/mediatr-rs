@@ -92,7 +92,7 @@ Quelle: Lebensdauern von `Microsoft.Extensions.DependencyInjection` (`AddSinglet
 - [x] (T11) Dienst mit `scoped` registriert, `all` beim Provider selbst statt in einem Scope → `all` liefert `Err(GetError::ScopedFromRoot)` · `scoped_all_from_provider_itself_gets_scoped_from_root`
 - [x] Bauanleitung von `transient` fragt nach einem nicht registrierten Dienst und gibt den Fehler mit `?` weiter → die äußere Abfrage liefert `Err(GetError::NoDependency)` · `recipe_asking_for_unregistered_service_gets_no_dependency`
 - [x] (T11) Bauanleitung gibt das `Err(GetError::Cycle)` einer inneren Abfrage weiter → die äußere Abfrage liefert `Err(GetError::Cycle)`, nicht `NoDependency` · `recipe_passing_on_cycle_keeps_cycle`
-- [ ] Bauanleitung, über `all` abgefragt, fragt nach einem nicht registrierten Dienst und gibt den Fehler weiter → `all` liefert `Err(GetError::NoDependency)`
+- [x] Bauanleitung, über `all` abgefragt, fragt nach einem nicht registrierten Dienst und gibt den Fehler weiter → `all` liefert `Err(GetError::NoDependency)` · `all_with_recipe_asking_for_unregistered_service_gets_no_dependency`
 - [x] Bauanleitung von `scoped` fragt nach einem nicht registrierten Dienst und gibt den Fehler weiter → die Abfrage im Scope liefert `Err(GetError::NoDependency)` · `scoped_recipe_asking_for_unregistered_service_gets_no_dependency`
 - [x] Bauanleitung von `singleton` fragt nach einem nicht registrierten Dienst und gibt den Fehler weiter → die Abfrage liefert `Err(GetError::NoDependency)`, und die nächste Abfrage baut neu · `singleton_recipe_asking_for_unregistered_service_gets_no_dependency_and_builds_again`
 
