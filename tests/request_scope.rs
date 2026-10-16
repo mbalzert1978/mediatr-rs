@@ -1,9 +1,9 @@
 //! Tests für den Abschnitt „Mediator — Request-Scope“ in `TESTLIST.md`.
 
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::{Arc, mpsc};
 
-use mediatr_rs::{Handler, Mediator, SendError, Sender};
+use mediatr_rs::{Handler, Mediator, RequestHandler, SendError, Sender, WeakMediator};
 
 mod request_scope_fixtures;
 
@@ -120,4 +120,26 @@ async fn scoped_cart_is_released_with_its_scope() {
     drop(scope);
 
     assert!(!till.load(Ordering::SeqCst));
+}
+
+#[tokio::test]
+async fn scoped_handler_sending_after_scope_dropped_gets_mediator_dropped() {
+    let (keep, handed_out) = mpsc::channel();
+    let mediator = Mediator::builder()
+        .register(Handler::scoped(|_| Cart::default()))
+        .register(Handler::scoped(move |sender: WeakMediator| {
+            keep.send(sender.clone()).unwrap();
+            GiftWrapHandler { sender }
+        }))
+        .build();
+    let scope = mediator.scope();
+    scope.send(AddGiftWrap).await.unwrap();
+    let gift_wrap = GiftWrapHandler {
+        sender: handed_out.try_recv().unwrap(),
+    };
+    drop(scope);
+
+    let total = gift_wrap.handle(AddGiftWrap).await;
+
+    assert_eq!(total, Err(SendError::MediatorDropped));
 }

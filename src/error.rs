@@ -9,7 +9,7 @@ use std::fmt;
 pub enum SendError {
     /// Für den Request-Typ ist kein Handler registriert.
     NoHandler,
-    /// Der Mediator, über den ein [`WeakMediator`](crate::WeakMediator) sendet oder meldet, ist weggefallen.
+    /// Der Mediator oder der Scope, über den ein [`WeakMediator`](crate::WeakMediator) sendet oder meldet, ist weggefallen.
     MediatorDropped,
     /// Der Handler ist mit [`Handler::scoped`](crate::Handler::scoped) registriert, die Nachricht ging aber direkt über den Mediator statt über einen Scope aus [`Mediator::scope`](crate::Mediator::scope).
     NoScope,
